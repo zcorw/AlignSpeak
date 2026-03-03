@@ -55,3 +55,15 @@
 ## Encoding Convention
 - All newly created or updated files must use UTF-8 (without BOM).
 - Do not commit files encoded as GBK/ANSI/UTF-16.
+
+## Third-Party Library Policy (Mandatory)
+- Prefer mature third-party libraries for common capabilities; do not re-implement from scratch without a clear reason.
+- Typical examples:
+  - HTTP client: prefer `axios` instead of custom `fetch` wrappers.
+  - Date/time handling: prefer `dayjs` instead of manual date formatting/parsing.
+- If a custom implementation is still chosen, PR must include:
+  - Why existing libraries are not suitable.
+  - Scope/risk of maintaining custom code.
+  - Follow-up plan for replacement or long-term maintenance.
+- Dependency selection baseline:
+  - Active maintenance, permissive license, acceptable bundle impact, and no known high-severity vulnerabilities.

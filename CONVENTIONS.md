@@ -58,3 +58,11 @@ masked_token_indices 必须：0-based、去重、升序。
 ## Encoding Convention
 - All newly created or updated files must use UTF-8 (without BOM).
 - Do not commit files encoded as GBK/ANSI/UTF-16.
+
+## Third-Party First Convention (Mandatory)
+- For generic capabilities (HTTP, date/time, validation, state helpers, etc.), use mature libraries first.
+- Do not build in-house utility modules for solved problems unless there is a strong technical constraint.
+- Recommended defaults:
+  - HTTP: `axios`
+  - Date/time: `dayjs`
+- Any exception must be documented in PR with technical rationale and maintenance plan.
