@@ -1,0 +1,67 @@
+﻿version: "3.9"
+
+services:
+  web:
+    image: node:20-alpine
+    working_dir: /workspace/apps/web
+    command: sh -c "corepack enable && corepack prepare yarn@4.12.0 --activate && yarn --version && yarn install && yarn dev --host 0.0.0.0 --port 5173"
+    environment:
+      VITE_USE_MOCK: "false"
+      API_PROXY_TARGET: "http://api:8000"
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "150"
+      VITE_WATCH_POLLING: "true"
+    volumes:
+      - ./:/workspace
+      - web_node_modules:/workspace/apps/web/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://alignspeak:alignspeak@db:5432/alignspeak
+      JWT_SECRET: alignspeak-dev-secret
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: alignspeak
+      POSTGRES_USER: alignspeak
+      POSTGRES_PASSWORD: alignspeak
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alignspeak -d alignspeak"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: ./apps/api
+    command: ["python", "-c", "import time; print('worker placeholder started'); time.sleep(3600)"]
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://alignspeak:alignspeak@db:5432/alignspeak
+      JWT_SECRET: alignspeak-dev-secret
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - worker
+
+volumes:
+  pgdata:
+  web_node_modules:

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AlignSpeak - 注册预览</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="./ui.js"></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="brand">AlignSpeak</div>
+        <nav class="nav">
+          <a href="./index.html">总览</a>
+          <a href="./auth-login.html">登录</a>
+          <a class="active" href="./auth-register.html">注册</a>
+          <a href="./workspace.html">文章工作台</a>
+          <a href="./practice.html">练习页</a>
+          <a href="./progress.html">进度页</a>
+        </nav>
+      </header>
+
+      <section class="split" style="margin-top: 20px">
+        <div class="card stagger">
+          <span class="chip">Join</span>
+          <h1 style="margin-top: 10px">创建你的学习空间</h1>
+          <p class="muted">建立账号后，系统会保存你的文章、练习记录和递进遮挡进度。</p>
+          <ul class="list">
+            <li>按文章、段落追踪准确率</li>
+            <li>自动保留 TTS 与练习历史</li>
+            <li>支持后续多端同步</li>
+          </ul>
+        </div>
+
+        <div class="card stagger">
+          <h3>注册账号</h3>
+          <form class="form">
+            <div class="field">
+              <label>昵称</label>
+              <input type="text" placeholder="例如：Aiko" />
+            </div>
+            <div class="field">
+              <label>邮箱</label>
+              <input type="email" placeholder="you@example.com" />
+            </div>
+            <div class="field">
+              <label>密码</label>
+              <input type="password" placeholder="至少 8 位，含字母和数字" />
+            </div>
+            <div class="field">
+              <label>确认密码</label>
+              <input type="password" placeholder="再次输入密码" />
+            </div>
+            <div class="actions">
+              <button type="button" class="btn primary">创建账号</button>
+              <a class="btn ghost" href="./auth-login.html">已有账号，去登录</a>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
+

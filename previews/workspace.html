@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AlignSpeak - 文章工作台预览</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="./ui.js"></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="brand">AlignSpeak</div>
+        <nav class="nav">
+          <a href="./index.html">总览</a>
+          <a href="./auth-login.html">登录</a>
+          <a href="./auth-register.html">注册</a>
+          <a class="active" href="./workspace.html">文章工作台</a>
+          <a href="./practice.html">练习页</a>
+          <a href="./progress.html">进度页</a>
+        </nav>
+      </header>
+
+      <section class="hero stagger">
+        <h1>文章输入与分段</h1>
+        <p>在这里输入训练文本，生成分段，随后按段请求标准朗读音频（TTS）。</p>
+      </section>
+
+      <section class="split">
+        <div class="card stagger">
+          <h3>文章输入</h3>
+          <form class="form">
+            <div class="field">
+              <label>语言</label>
+              <select>
+                <option>ja</option>
+                <option>en</option>
+                <option>zh</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>文本</label>
+              <textarea>春は、あけぼの。やうやう白くなりゆく山ぎは、少しあかりて、紫だちたる雲の細くたなびきたる。</textarea>
+            </div>
+            <div class="actions">
+              <button class="btn primary" type="button">自动分段</button>
+              <button class="btn secondary" type="button">生成 TTS</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="grid stagger">
+          <div class="card">
+            <h3>分段预览</h3>
+            <ol class="list">
+              <li>春は、あけぼの。</li>
+              <li>やうやう白くなりゆく山ぎは、</li>
+              <li>少しあかりて、紫だちたる雲の細くたなびきたる。</li>
+            </ol>
+          </div>
+          <div class="card">
+            <h3>TTS 状态</h3>
+            <div class="bar">
+              <span>Segment 1</span>
+              <div class="bar-track"><span style="width: 100%"></span></div>
+              <strong>Ready</strong>
+            </div>
+            <div class="bar">
+              <span>Segment 2</span>
+              <div class="bar-track"><span style="width: 100%"></span></div>
+              <strong>Ready</strong>
+            </div>
+            <div class="bar">
+              <span>Segment 3</span>
+              <div class="bar-track"><span style="width: 70%"></span></div>
+              <strong>70%</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
+

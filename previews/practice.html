@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AlignSpeak - 练习页预览</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="./ui.js"></script>
+  </head>
+  <body class="mobile-app">
+    <div class="page" style="max-width: 480px; padding-bottom: 24px">
+      <header class="topbar">
+        <div class="brand">AlignSpeak</div>
+        <nav class="nav">
+          <a href="./index.html">总览</a>
+          <a class="active" href="./practice.html">练习页</a>
+        </nav>
+      </header>
+
+      <section class="hero">
+        <h1>练习对比</h1>
+        <p>一行原文，一行识别。差异直接高亮，降低理解成本。</p>
+      </section>
+
+      <section class="card">
+        <h3>Segment 03</h3>
+
+        <div class="mode-switch" data-practice-switch>
+          <button class="mode-btn is-active" type="button" data-practice-target="practice-pre-page">录音前</button>
+          <button class="mode-btn" type="button" data-practice-target="practice-result-page">识别结果</button>
+        </div>
+
+        <div class="practice-state is-active" id="practice-pre-page" data-practice-state>
+          <div class="mask-panel">
+            <div class="mask-header">
+              <span class="chip">Level 2</span>
+              <span class="muted">遮挡 40%</span>
+            </div>
+            <div class="mask-article">
+              <p class="mask-line">
+                <span class="mask-word">春は、</span>
+                <span class="mask-word hidden">あけぼの</span>
+                <span class="mask-word">。</span>
+                <span class="mask-word">やうやう</span>
+                <span class="mask-word">白く</span>
+                <span class="mask-word hidden">なりゆく</span>
+                <span class="mask-word">山ぎは。</span>
+              </p>
+            </div>
+          </div>
+          <div class="actions" style="margin-top: 14px">
+            <button class="btn secondary" type="button">播放标准音频</button>
+            <button class="btn primary" type="button">开始录音</button>
+          </div>
+        </div>
+
+        <div class="practice-state" id="practice-result-page" data-practice-state>
+          <div class="compare-block">
+            <div class="compare-row">
+              <div class="line-label">原文</div>
+              <div class="line-text">
+                <span class="piece">春は、</span>
+                <span class="piece err-missing">あけぼの</span>
+                <span class="piece">。</span>
+              </div>
+            </div>
+            <div class="compare-row">
+              <div class="line-label">识别</div>
+              <div class="line-text">
+                <span class="piece">春は、</span>
+                <span class="piece err-insert">えっと</span>
+                <span class="piece">。</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="compare-block">
+            <div class="compare-row">
+              <div class="line-label">原文</div>
+              <div class="line-text">
+                <span class="piece">やうやう</span>
+                <span class="piece">白く</span>
+                <span class="piece err-substitute">なりゆく</span>
+              </div>
+            </div>
+            <div class="compare-row">
+              <div class="line-label">识别</div>
+              <div class="line-text">
+                <span class="piece">やうやう</span>
+                <span class="piece">白く</span>
+                <span class="piece err-substitute">なるゆく</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="legend">
+            <span class="legend-item"><i class="dot miss"></i>漏读</span>
+            <span class="legend-item"><i class="dot ins"></i>多读</span>
+            <span class="legend-item"><i class="dot sub"></i>替换</span>
+          </div>
+
+          <div class="actions" style="margin-top: 14px">
+            <button class="btn secondary" type="button">播放标准音频</button>
+            <button class="btn primary" type="button">重新录音</button>
+            <button class="btn ghost" type="button">下一段</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
