@@ -6,6 +6,7 @@ Updated: 2026-03-03
 - Home page now prioritizes article creation.
 - Web is connected to API article endpoints:
   - `POST /articles` (manual/upload/ocr)
+  - `POST /articles/detect-language` (manual text / upload file / ocr file)
   - `GET /articles`
 - Auth token is injected through axios interceptor for these endpoints.
 
@@ -18,7 +19,10 @@ Updated: 2026-03-03
 - Home page behavior:
   - Supports `manual` text creation.
   - Supports file-based creation (`upload` / `ocr`) via multipart.
+  - Real-time language detection while typing text (debounced).
+  - Language detection for uploaded file text before create.
   - Shows latest create result with returned `segments`.
+  - Shows create-time detected language from backend response.
   - Shows recent article list from `GET /articles`.
 - HTTP client:
   - Added `postMultipart`.

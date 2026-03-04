@@ -10,3 +10,4 @@ argon2-cffi==23.1.0
 email-validator==2.2.0
 Pillow==10.4.0
 pytesseract==0.3.13
+pycld2==0.42

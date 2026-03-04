@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -14,6 +14,8 @@ import {
 import type {
   ArticleCreateInput,
   ArticleCreateResult,
+  ArticleLanguageDetectInput,
+  ArticleLanguageDetectResult,
   ArticleLanguage,
   ArticleListItem,
   ArticleSourceType,
@@ -23,12 +25,20 @@ interface HomeScreenProps {
   articles: ArticleListItem[];
   creating: boolean;
   onCreateArticle: (input: ArticleCreateInput) => Promise<ArticleCreateResult>;
+  onDetectLanguage: (input: ArticleLanguageDetectInput) => Promise<ArticleLanguageDetectResult>;
 }
 
 const languageOptions: ArticleLanguage[] = ["ja", "en", "zh"];
 const sourceTypeOptions: ArticleSourceType[] = ["manual", "upload", "ocr"];
 
-export const HomeScreen = ({ articles, creating, onCreateArticle }: HomeScreenProps) => {
+const languageLabelMap: Record<ArticleLanguage | "unknown", string> = {
+  ja: "Japanese",
+  en: "English",
+  zh: "Chinese",
+  unknown: "Unknown",
+};
+
+export const HomeScreen = ({ articles, creating, onCreateArticle, onDetectLanguage }: HomeScreenProps) => {
   const [title, setTitle] = useState("");
   const [language, setLanguage] = useState<ArticleLanguage>("ja");
   const [sourceType, setSourceType] = useState<ArticleSourceType>("manual");
@@ -36,12 +46,79 @@ export const HomeScreen = ({ articles, creating, onCreateArticle }: HomeScreenPr
   const [file, setFile] = useState<File | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [createdResult, setCreatedResult] = useState<ArticleCreateResult | null>(null);
+  const [detected, setDetected] = useState<ArticleLanguageDetectResult | null>(null);
+  const [detecting, setDetecting] = useState(false);
+  const detectRequestRef = useRef(0);
 
   const fileAccept = useMemo(() => {
     if (sourceType === "upload") return ".txt,.md,text/plain,text/markdown";
     if (sourceType === "ocr") return ".png,.jpg,.jpeg,.webp,image/*";
     return undefined;
   }, [sourceType]);
+
+  useEffect(() => {
+    if (sourceType !== "manual") return;
+    const normalized = text.trim();
+    if (normalized.length < 8) {
+      setDetected(null);
+      setDetecting(false);
+      return;
+    }
+
+    const requestId = detectRequestRef.current + 1;
+    detectRequestRef.current = requestId;
+    setDetecting(true);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await onDetectLanguage({
+          sourceType: "manual",
+          text: normalized,
+        });
+        if (detectRequestRef.current === requestId) {
+          setDetected(result);
+        }
+      } catch {
+        // global error handled by controller
+      } finally {
+        if (detectRequestRef.current === requestId) {
+          setDetecting(false);
+        }
+      }
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [onDetectLanguage, sourceType, text]);
+
+  useEffect(() => {
+    if (sourceType === "manual" || !file) return;
+
+    const requestId = detectRequestRef.current + 1;
+    detectRequestRef.current = requestId;
+    setDetecting(true);
+
+    const run = async () => {
+      try {
+        const result = await onDetectLanguage({
+          sourceType,
+          file,
+        });
+        if (detectRequestRef.current === requestId) {
+          setDetected(result);
+        }
+      } catch {
+        // global error handled by controller
+      } finally {
+        if (detectRequestRef.current === requestId) {
+          setDetecting(false);
+        }
+      }
+    };
+
+    void run();
+  }, [file, onDetectLanguage, sourceType]);
 
   const onSubmit = async () => {
     setLocalError(null);
@@ -71,6 +148,8 @@ export const HomeScreen = ({ articles, creating, onCreateArticle }: HomeScreenPr
       setCreatedResult(created);
       setText("");
       setFile(null);
+      setDetected(null);
+      setDetecting(false);
     } catch {
       // Page-level errors are handled by the controller and shown in App.
     }
@@ -109,6 +188,8 @@ export const HomeScreen = ({ articles, creating, onCreateArticle }: HomeScreenPr
               onChange={(event) => {
                 setSourceType(event.target.value as ArticleSourceType);
                 setFile(null);
+                setDetected(null);
+                setDetecting(false);
               }}
             >
               {sourceTypeOptions.map((option) => (
@@ -146,6 +227,32 @@ export const HomeScreen = ({ articles, creating, onCreateArticle }: HomeScreenPr
               </Stack>
             )}
 
+            <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+              <Chip
+                size="small"
+                color={detected?.detectedLanguage === "unknown" ? "default" : "success"}
+                label={
+                  detecting
+                    ? "Detecting language..."
+                    : `Detected: ${languageLabelMap[detected?.detectedLanguage ?? "unknown"]}`
+                }
+              />
+              {detected?.detectedConfidence !== undefined ? (
+                <Typography variant="caption" color="text.secondary">
+                  confidence: {Math.round(detected.detectedConfidence * 100)}%
+                </Typography>
+              ) : null}
+              {detected && detected.detectedLanguage !== "unknown" && detected.detectedLanguage !== language ? (
+                <Button
+                  size="small"
+                  type="button"
+                  onClick={() => setLanguage(detected.detectedLanguage as ArticleLanguage)}
+                >
+                  Use detected language
+                </Button>
+              ) : null}
+            </Box>
+
             {localError ? <Alert severity="warning">{localError}</Alert> : null}
             <Box display="flex" justifyContent="flex-start">
               <Button variant="contained" disabled={creating} onClick={onSubmit}>
@@ -162,6 +269,12 @@ export const HomeScreen = ({ articles, creating, onCreateArticle }: HomeScreenPr
             <Typography variant="subtitle1">Created</Typography>
             <Typography variant="body2" color="text.secondary" mt={0.5}>
               {createdResult.title} ({createdResult.language}) - {createdResult.articleId}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              detected={languageLabelMap[createdResult.detectedLanguage ?? "unknown"]}
+              {createdResult.detectedConfidence !== undefined
+                ? ` (${Math.round(createdResult.detectedConfidence * 100)}%)`
+                : ""}
             </Typography>
             <Stack spacing={1} mt={1.5}>
               {createdResult.segments.map((segment) => (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppUseCases } from "../application/usecases/createAppUseCases";
 import type {
   MeSummary,
@@ -6,7 +6,13 @@ import type {
   PracticeResultData,
   ProgressSummary,
 } from "../domain/practice/entities";
-import type { ArticleCreateInput, ArticleCreateResult, ArticleListItem } from "../domain/article/entities";
+import type {
+  ArticleCreateInput,
+  ArticleCreateResult,
+  ArticleLanguageDetectInput,
+  ArticleLanguageDetectResult,
+  ArticleListItem,
+} from "../domain/article/entities";
 import { HttpError } from "../infrastructure/http/httpClient";
 import { useAppUIState } from "./useAppUIState";
 
@@ -125,7 +131,7 @@ export const useAppController = (useCases: AppUseCases, options: UseAppControlle
     void loadPractice();
   }, [enabled, maxAutoRequestAttempts, useCases, ui.selectedDocId, ui.selectedSegmentId]);
 
-  const submitRecognition = async (): Promise<PracticeResultData> => {
+  const submitRecognition = useCallback(async (): Promise<PracticeResultData> => {
     try {
       return await useCases.submitRecognition(ui.selectedDocId, ui.selectedSegmentId);
     } catch (err) {
@@ -136,9 +142,9 @@ export const useAppController = (useCases: AppUseCases, options: UseAppControlle
       }
       throw err;
     }
-  };
+  }, [ui.selectedDocId, ui.selectedSegmentId, useCases]);
 
-  const createArticle = async (input: ArticleCreateInput): Promise<ArticleCreateResult> => {
+  const createArticle = useCallback(async (input: ArticleCreateInput): Promise<ArticleCreateResult> => {
     setArticleCreating(true);
     setError(null);
     try {
@@ -156,7 +162,23 @@ export const useAppController = (useCases: AppUseCases, options: UseAppControlle
     } finally {
       setArticleCreating(false);
     }
-  };
+  }, [useCases]);
+
+  const detectArticleLanguage = useCallback(
+    async (input: ArticleLanguageDetectInput): Promise<ArticleLanguageDetectResult> => {
+      try {
+        return await useCases.detectArticleLanguage(input);
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 401) {
+          onUnauthorizedRef.current();
+        } else {
+          setError(resolveErrorMessage(err, "Failed to detect language."));
+        }
+        throw err;
+      }
+    },
+    [useCases],
+  );
 
   return {
     ui,
@@ -168,6 +190,7 @@ export const useAppController = (useCases: AppUseCases, options: UseAppControlle
     },
     actions: {
       createArticle,
+      detectArticleLanguage,
       submitRecognition,
     },
     articleCreating,

@@ -4,6 +4,8 @@ export const createAppUseCases = (repository: PracticeRepository) => {
   return {
     createArticle: (...args: Parameters<PracticeRepository["createArticle"]>) =>
       repository.createArticle(...args),
+    detectArticleLanguage: (...args: Parameters<PracticeRepository["detectArticleLanguage"]>) =>
+      repository.detectArticleLanguage(...args),
     loadArticles: (...args: Parameters<PracticeRepository["listArticles"]>) =>
       repository.listArticles(...args),
     loadPracticeBundle: (docId?: string, segmentId?: string) =>

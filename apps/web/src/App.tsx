@@ -215,6 +215,7 @@ function App() {
                 articles={data.articles}
                 creating={articleCreating}
                 onCreateArticle={actions.createArticle}
+                onDetectLanguage={actions.detectArticleLanguage}
               />
             ) : (
               <Navigate to="/login" replace />

@@ -8,6 +8,7 @@ import type {
 } from "../domain/practice/entities";
 import type {
   ArticleCreateResult,
+  ArticleLanguageDetectResult,
   ArticleLanguage,
   ArticleListResult,
   ArticleSourceType,
@@ -365,6 +366,51 @@ const splitMockSegments = (text: string): string[] => {
     .filter((part) => part.length > 0);
 };
 
+export const detectMockLanguage = (text: string): ArticleLanguageDetectResult => {
+  const normalized = text.trim();
+  const ja = (normalized.match(/[\u3040-\u30ff]/g) ?? []).length;
+  const zh = (normalized.match(/[\u4e00-\u9fff]/g) ?? []).length;
+  const en = (normalized.match(/[A-Za-z]/g) ?? []).length;
+
+  if (ja >= 2 && ja >= en) {
+    return {
+      detectedLanguage: "ja",
+      detectedConfidence: 0.93,
+      detectedReliable: true,
+      detectedRawLanguage: "ja",
+      textLength: normalized.length,
+    };
+  }
+
+  if (zh >= 2 && ja === 0) {
+    return {
+      detectedLanguage: "zh",
+      detectedConfidence: 0.92,
+      detectedReliable: true,
+      detectedRawLanguage: "zh",
+      textLength: normalized.length,
+    };
+  }
+
+  if (en >= 4 && zh === 0 && ja === 0) {
+    return {
+      detectedLanguage: "en",
+      detectedConfidence: 0.9,
+      detectedReliable: true,
+      detectedRawLanguage: "en",
+      textLength: normalized.length,
+    };
+  }
+
+  return {
+    detectedLanguage: "unknown",
+    detectedConfidence: 0.3,
+    detectedReliable: false,
+    detectedRawLanguage: "unknown",
+    textLength: normalized.length,
+  };
+};
+
 export const createMockArticle = (input: {
   title: string;
   language: ArticleLanguage;
@@ -385,11 +431,16 @@ export const createMockArticle = (input: {
     segment_count: safeSegments.length,
     created_at: now,
   });
+  const detected = detectMockLanguage(input.text);
 
   return {
     articleId,
     title: input.title,
     language: input.language,
+    detectedLanguage: detected.detectedLanguage,
+    detectedConfidence: detected.detectedConfidence,
+    detectedReliable: detected.detectedReliable,
+    detectedRawLanguage: detected.detectedRawLanguage,
     segments: safeSegments.map((segment, index) => ({
       id: `seg_mock_${articleId}_${index + 1}`,
       order: index + 1,

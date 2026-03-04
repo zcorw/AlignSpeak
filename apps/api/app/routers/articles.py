@@ -19,6 +19,8 @@ from app.schemas.article import (
     ArticleListItem,
     ArticleListResponse,
     CreateArticlePayload,
+    DetectLanguagePayload,
+    DetectLanguageResponse,
 )
 from app.services.article_service import (
     ParsedArticleInput,
@@ -32,6 +34,7 @@ from app.services.article_service import (
     split_segments,
     validate_article_input,
 )
+from app.services.language_detection_service import detect_language
 
 router = APIRouter(prefix="/articles", tags=["articles"])
 
@@ -155,6 +158,88 @@ async def _parse_create_article_input(request: Request) -> ParsedArticleInput:
     )
 
 
+def _extract_best_ocr_text(filename: str, content: bytes) -> str:
+    best_text = ""
+    for language in ("ja", "en", "zh"):
+        candidate = extract_text_from_image(filename=filename, content=content, language=language)
+        if len(normalize_text(candidate)) > len(normalize_text(best_text)):
+            best_text = candidate
+    return best_text
+
+
+async def _parse_detect_language_text(request: Request) -> str:
+    content_type = (request.headers.get("content-type") or "").lower()
+
+    if content_type.startswith("application/json"):
+        try:
+            payload = await request.json()
+        except Exception as exc:
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message="Invalid JSON payload.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            ) from exc
+        if not isinstance(payload, dict):
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message="JSON payload must be an object.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            parsed = DetectLanguagePayload.model_validate(payload)
+        except ValidationError as exc:
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message="Invalid language detection payload.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            ) from exc
+        return parsed.text
+
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        source_type = _as_str(form.get("source_type"))
+        file_value = form.get("file")
+        if not isinstance(file_value, UploadFile):
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message="File is required for multipart payload.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        filename = file_value.filename or ""
+        content = await file_value.read()
+        if not content:
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message="Uploaded file is empty.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if source_type == "upload":
+            return decode_uploaded_text(filename=filename, content=content)
+        if source_type == "ocr":
+            text = _extract_best_ocr_text(filename=filename, content=content)
+            if not normalize_text(text):
+                raise AppError(
+                    code="OCR_EMPTY_TEXT",
+                    message="OCR did not extract any valid text.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            return text
+
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Multipart payload supports source_type=upload|ocr.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    raise AppError(
+        code="VALIDATION_ERROR",
+        message="Unsupported content type.",
+        status_code=status.HTTP_400_BAD_REQUEST,
+    )
+
+
 @router.post("", response_model=ArticleCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_article(
     request: Request,
@@ -163,6 +248,7 @@ async def create_article(
 ) -> ArticleCreateResponse:
     parsed = await _parse_create_article_input(request=request)
     normalized_full_text = normalize_text(parsed.raw_text)
+    detection = detect_language(normalized_full_text)
     segment_texts = split_segments(normalized_text=normalized_full_text)
     if not segment_texts:
         raise AppError(
@@ -206,6 +292,10 @@ async def create_article(
         article_id=article.id,
         title=article.title,
         language=article.language,
+        detected_language=detection.detected_language,
+        detected_confidence=detection.confidence,
+        detected_reliable=detection.reliable,
+        detected_raw_language=detection.raw_language,
         segments=[
             ArticleCreateSegment(
                 id=segment.id,
@@ -214,6 +304,30 @@ async def create_article(
             )
             for segment in segments
         ],
+    )
+
+
+@router.post("/detect-language", response_model=DetectLanguageResponse)
+async def detect_article_language(
+    request: Request,
+    _current_user: User = Depends(get_current_user),
+) -> DetectLanguageResponse:
+    raw_text = await _parse_detect_language_text(request=request)
+    normalized_text = normalize_text(raw_text)
+    if not normalized_text:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Input text is empty.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    detection = detect_language(normalized_text)
+    return DetectLanguageResponse(
+        detected_language=detection.detected_language,
+        detected_confidence=detection.confidence,
+        detected_reliable=detection.reliable,
+        detected_raw_language=detection.raw_language,
+        text_length=len(normalized_text),
     )
 
 

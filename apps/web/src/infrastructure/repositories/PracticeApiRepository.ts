@@ -9,6 +9,8 @@ import type {
 import type {
   ArticleCreateInput,
   ArticleCreateResult,
+  ArticleLanguageDetectInput,
+  ArticleLanguageDetectResult,
   ArticleLanguage,
   ArticleListResult,
 } from "../../domain/article/entities";
@@ -68,11 +70,57 @@ export class PracticeApiRepository implements PracticeRepository {
       articleId: toString(read(raw, "articleId", "article_id"), ""),
       title: toString(read(raw, "title", "title"), ""),
       language: (toString(read(raw, "language", "language"), "ja") as ArticleLanguage),
+      detectedLanguage: toString(read(raw, "detectedLanguage", "detected_language"), "unknown") as
+        | "ja"
+        | "en"
+        | "zh"
+        | "unknown",
+      detectedConfidence: (() => {
+        const value = read(raw, "detectedConfidence", "detected_confidence");
+        if (typeof value === "number" && Number.isFinite(value)) return value;
+        return undefined;
+      })(),
+      detectedReliable: Boolean(read(raw, "detectedReliable", "detected_reliable")),
+      detectedRawLanguage: toString(read(raw, "detectedRawLanguage", "detected_raw_language"), "unknown"),
       segments: rawSegments.map((segment) => ({
         id: toString(read(segment, "id", "id"), ""),
         order: toNumber(read(segment, "order", "order"), 0),
         preview: toString(read(segment, "preview", "preview"), ""),
       })),
+    };
+  }
+
+  async detectArticleLanguage(input: ArticleLanguageDetectInput): Promise<ArticleLanguageDetectResult> {
+    let raw: AnyRecord;
+
+    if (input.sourceType === "manual") {
+      raw = (await postJSON<AnyRecord, Record<string, unknown>>("/articles/detect-language", {
+        text: input.text ?? "",
+      })) as AnyRecord;
+    } else {
+      if (!input.file) {
+        throw new Error("File is required for upload/ocr language detection.");
+      }
+      const formData = new FormData();
+      formData.append("source_type", input.sourceType);
+      formData.append("file", input.file);
+      raw = (await postMultipart<AnyRecord>("/articles/detect-language", formData)) as AnyRecord;
+    }
+
+    return {
+      detectedLanguage: toString(read(raw, "detectedLanguage", "detected_language"), "unknown") as
+        | "ja"
+        | "en"
+        | "zh"
+        | "unknown",
+      detectedConfidence: (() => {
+        const value = read(raw, "detectedConfidence", "detected_confidence");
+        if (typeof value === "number" && Number.isFinite(value)) return value;
+        return undefined;
+      })(),
+      detectedReliable: Boolean(read(raw, "detectedReliable", "detected_reliable")),
+      detectedRawLanguage: toString(read(raw, "detectedRawLanguage", "detected_raw_language"), "unknown"),
+      textLength: toNumber(read(raw, "textLength", "text_length"), 0),
     };
   }
 

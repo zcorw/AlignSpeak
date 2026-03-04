@@ -1,6 +1,7 @@
 import { HttpResponse, http } from "msw";
 import {
   createMockArticle,
+  detectMockLanguage,
   getPracticeBundleByDocIdAndSegmentId,
   getPracticeResultByDocIdAndSegmentId,
   homeSummary,
@@ -227,6 +228,10 @@ export const handlers = [
         article_id: created.articleId,
         title: created.title,
         language: created.language,
+        detected_language: created.detectedLanguage ?? "unknown",
+        detected_confidence: created.detectedConfidence ?? null,
+        detected_reliable: created.detectedReliable ?? false,
+        detected_raw_language: created.detectedRawLanguage ?? "unknown",
         segments: created.segments.map((segment) => ({
           id: segment.id,
           order: segment.order,
@@ -235,6 +240,48 @@ export const handlers = [
       },
       { status: 201 },
     );
+  }),
+
+  http.post("/articles/detect-language", async ({ request }) => {
+    const unauthorized = ensureAuthorized(request);
+    if (unauthorized) return unauthorized;
+
+    const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+    let text = "";
+
+    if (contentType.startsWith("application/json")) {
+      const body = (await request.json()) as { text?: string };
+      text = body.text ?? "";
+    } else if (contentType.startsWith("multipart/form-data")) {
+      const formData = await request.formData();
+      const sourceType = String(formData.get("source_type") ?? "upload") as ArticleSourceType;
+      const file = formData.get("file");
+      if (!(file instanceof File)) {
+        return HttpResponse.json(
+          {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "File is required.",
+            },
+          },
+          { status: 400 },
+        );
+      }
+      if (sourceType === "upload") {
+        text = await file.text();
+      } else if (sourceType === "ocr") {
+        text = `[OCR] ${file.name}`;
+      }
+    }
+
+    const detected = detectMockLanguage(text);
+    return HttpResponse.json({
+      detected_language: detected.detectedLanguage,
+      detected_confidence: detected.detectedConfidence ?? null,
+      detected_reliable: detected.detectedReliable,
+      detected_raw_language: detected.detectedRawLanguage,
+      text_length: detected.textLength,
+    });
   }),
 
   http.get("/api/home-summary", ({ request }) => {

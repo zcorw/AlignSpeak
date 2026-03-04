@@ -13,6 +13,10 @@ class ArticleCreateResponse(BaseModel):
     article_id: str
     title: str
     language: str
+    detected_language: str
+    detected_confidence: float | None = None
+    detected_reliable: bool
+    detected_raw_language: str
     segments: list[ArticleCreateSegment]
 
 
@@ -52,3 +56,15 @@ class CreateArticlePayload(BaseModel):
     language: str
     source_type: str
     text: str
+
+
+class DetectLanguagePayload(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)
+
+
+class DetectLanguageResponse(BaseModel):
+    detected_language: str
+    detected_confidence: float | None = None
+    detected_reliable: bool
+    detected_raw_language: str
+    text_length: int

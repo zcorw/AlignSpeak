@@ -144,3 +144,13 @@ Response `200`：
 - 为 TTS/STT/练习模块提供稳定主键：`article_id`、`segment_id`
 - 段落顺序与文本在创建后保持不变（只读策略）
 - 分段结果作为后续遮挡与对齐的输入基线
+
+## 8. Language Detection Extension (2026-03-04)
+- Added article-management language detection endpoint:
+  - `POST /articles/detect-language`
+- `POST /articles` response now includes:
+  - `detected_language`
+  - `detected_confidence`
+  - `detected_reliable`
+  - `detected_raw_language`
+- Detection engine is internal service based on CLD2 (`pycld2`), not exposed as a standalone public module API.
