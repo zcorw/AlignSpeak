@@ -24,6 +24,7 @@ from app.schemas.article import (
 )
 from app.services.article_service import (
     ParsedArticleInput,
+    detect_source_type_by_filename,
     decode_cursor,
     decode_uploaded_text,
     encode_cursor,
@@ -82,7 +83,6 @@ async def _parse_multipart_payload(request: Request) -> ParsedArticleInput:
     form = await request.form()
     title = _as_str(form.get("title"))
     language = _as_str(form.get("language"))
-    source_type = _as_str(form.get("source_type"))
     file_value = form.get("file")
 
     if not isinstance(file_value, UploadFile):
@@ -101,9 +101,11 @@ async def _parse_multipart_payload(request: Request) -> ParsedArticleInput:
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
+    source_type = detect_source_type_by_filename(filename)
+
     if source_type == "upload":
         text = decode_uploaded_text(filename=filename, content=content)
-    elif source_type == "ocr":
+    else:
         text = extract_text_from_image(filename=filename, content=content, language=language)
         if not normalize_text(text):
             raise AppError(
@@ -111,12 +113,6 @@ async def _parse_multipart_payload(request: Request) -> ParsedArticleInput:
                 message="OCR did not extract any valid text.",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
-    else:
-        raise AppError(
-            code="VALIDATION_ERROR",
-            message="Multipart payload supports source_type=upload|ocr.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
 
     return validate_article_input(
         ParsedArticleInput(
@@ -158,15 +154,6 @@ async def _parse_create_article_input(request: Request) -> ParsedArticleInput:
     )
 
 
-def _extract_best_ocr_text(filename: str, content: bytes) -> str:
-    best_text = ""
-    for language in ("ja", "en", "zh"):
-        candidate = extract_text_from_image(filename=filename, content=content, language=language)
-        if len(normalize_text(candidate)) > len(normalize_text(best_text)):
-            best_text = candidate
-    return best_text
-
-
 async def _parse_detect_language_text(request: Request) -> str:
     content_type = (request.headers.get("content-type") or "").lower()
 
@@ -195,47 +182,9 @@ async def _parse_detect_language_text(request: Request) -> str:
             ) from exc
         return parsed.text
 
-    if content_type.startswith("multipart/form-data"):
-        form = await request.form()
-        source_type = _as_str(form.get("source_type"))
-        file_value = form.get("file")
-        if not isinstance(file_value, UploadFile):
-            raise AppError(
-                code="VALIDATION_ERROR",
-                message="File is required for multipart payload.",
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
-        filename = file_value.filename or ""
-        content = await file_value.read()
-        if not content:
-            raise AppError(
-                code="VALIDATION_ERROR",
-                message="Uploaded file is empty.",
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if source_type == "upload":
-            return decode_uploaded_text(filename=filename, content=content)
-        if source_type == "ocr":
-            text = _extract_best_ocr_text(filename=filename, content=content)
-            if not normalize_text(text):
-                raise AppError(
-                    code="OCR_EMPTY_TEXT",
-                    message="OCR did not extract any valid text.",
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
-            return text
-
-        raise AppError(
-            code="VALIDATION_ERROR",
-            message="Multipart payload supports source_type=upload|ocr.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
-
     raise AppError(
         code="VALIDATION_ERROR",
-        message="Unsupported content type.",
+        message="Language detection only supports application/json with text.",
         status_code=status.HTTP_400_BAD_REQUEST,
     )
 

@@ -60,7 +60,6 @@ export class PracticeApiRepository implements PracticeRepository {
       const formData = new FormData();
       formData.append("title", input.title);
       formData.append("language", input.language);
-      formData.append("source_type", input.sourceType);
       formData.append("file", input.file);
       raw = (await postMultipart<AnyRecord>("/articles", formData)) as AnyRecord;
     }
@@ -91,21 +90,9 @@ export class PracticeApiRepository implements PracticeRepository {
   }
 
   async detectArticleLanguage(input: ArticleLanguageDetectInput): Promise<ArticleLanguageDetectResult> {
-    let raw: AnyRecord;
-
-    if (input.sourceType === "manual") {
-      raw = (await postJSON<AnyRecord, Record<string, unknown>>("/articles/detect-language", {
-        text: input.text ?? "",
-      })) as AnyRecord;
-    } else {
-      if (!input.file) {
-        throw new Error("File is required for upload/ocr language detection.");
-      }
-      const formData = new FormData();
-      formData.append("source_type", input.sourceType);
-      formData.append("file", input.file);
-      raw = (await postMultipart<AnyRecord>("/articles/detect-language", formData)) as AnyRecord;
-    }
+    const raw = (await postJSON<AnyRecord, Record<string, unknown>>("/articles/detect-language", {
+      text: input.text,
+    })) as AnyRecord;
 
     return {
       detectedLanguage: toString(read(raw, "detectedLanguage", "detected_language"), "unknown") as

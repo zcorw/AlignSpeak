@@ -40,6 +40,15 @@ const ensureAuthorized = (request: Request): ReturnType<typeof HttpResponse.json
   return null;
 };
 
+const inferMockSourceTypeByFilename = (filename: string): ArticleSourceType | null => {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".txt") || lower.endsWith(".md")) return "upload";
+  if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".webp")) {
+    return "ocr";
+  }
+  return null;
+};
+
 export const handlers = [
   http.post("/auth/register", async ({ request }) => {
     const body = (await request.json()) as { email?: string };
@@ -174,7 +183,7 @@ export const handlers = [
       const formData = await request.formData();
       title = String(formData.get("title") ?? "").trim();
       language = String(formData.get("language") ?? "ja") as ArticleLanguage;
-      sourceType = String(formData.get("source_type") ?? "upload") as ArticleSourceType;
+      const sourceTypeRaw = String(formData.get("source_type") ?? "").trim();
       const file = formData.get("file");
       if (!(file instanceof File)) {
         return HttpResponse.json(
@@ -182,6 +191,18 @@ export const handlers = [
             error: {
               code: "VALIDATION_ERROR",
               message: "File is required.",
+            },
+          },
+          { status: 400 },
+        );
+      }
+      sourceType = (sourceTypeRaw || inferMockSourceTypeByFilename(file.name) || "") as ArticleSourceType;
+      if (sourceType !== "upload" && sourceType !== "ocr") {
+        return HttpResponse.json(
+          {
+            error: {
+              code: "UNSUPPORTED_FILE_TYPE",
+              message: "Unsupported file type.",
             },
           },
           { status: 400 },
@@ -247,32 +268,20 @@ export const handlers = [
     if (unauthorized) return unauthorized;
 
     const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
-    let text = "";
-
-    if (contentType.startsWith("application/json")) {
-      const body = (await request.json()) as { text?: string };
-      text = body.text ?? "";
-    } else if (contentType.startsWith("multipart/form-data")) {
-      const formData = await request.formData();
-      const sourceType = String(formData.get("source_type") ?? "upload") as ArticleSourceType;
-      const file = formData.get("file");
-      if (!(file instanceof File)) {
-        return HttpResponse.json(
-          {
-            error: {
-              code: "VALIDATION_ERROR",
-              message: "File is required.",
-            },
+    if (!contentType.startsWith("application/json")) {
+      return HttpResponse.json(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Language detection only supports application/json with text.",
           },
-          { status: 400 },
-        );
-      }
-      if (sourceType === "upload") {
-        text = await file.text();
-      } else if (sourceType === "ocr") {
-        text = `[OCR] ${file.name}`;
-      }
+        },
+        { status: 400 },
+      );
     }
+
+    const body = (await request.json()) as { text?: string };
+    const text = body.text ?? "";
 
     const detected = detectMockLanguage(text);
     return HttpResponse.json({

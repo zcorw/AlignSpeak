@@ -41,9 +41,7 @@ export interface ArticleListResult {
 }
 
 export interface ArticleLanguageDetectInput {
-  sourceType: ArticleSourceType;
-  text?: string;
-  file?: File;
+  text: string;
 }
 
 export interface ArticleLanguageDetectResult {

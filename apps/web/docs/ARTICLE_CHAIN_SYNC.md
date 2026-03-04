@@ -38,3 +38,8 @@ Updated: 2026-03-03
 ## Verification
 - `yarn lint` passed.
 - `yarn build` passed.
+
+## Adjustment (2026-03-04)
+- `/articles/detect-language` is now text-only (JSON `text` payload).
+- File language detection is returned by `POST /articles` after backend parsing.
+- Home page no longer calls language detection for files before create.

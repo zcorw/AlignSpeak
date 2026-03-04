@@ -154,3 +154,16 @@ Response `200`：
   - `detected_reliable`
   - `detected_raw_language`
 - Detection engine is internal service based on CLD2 (`pycld2`), not exposed as a standalone public module API.
+
+## 9. Upload Parsing Adjustment (2026-03-04)
+- Multipart file upload in `POST /articles` now auto-selects parser by file extension.
+- No client `source_type` routing is required for parser selection.
+- Routing rules:
+  - `txt/md` -> text parser
+  - `png/jpg/jpeg/webp` -> OCR parser
+- `POST /articles` continues to return language detection fields:
+  - `detected_language`
+  - `detected_confidence`
+  - `detected_reliable`
+  - `detected_raw_language`
+- `POST /articles/detect-language` is text-only (`application/json` with `text`).

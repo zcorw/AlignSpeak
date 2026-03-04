@@ -72,7 +72,6 @@ export const HomeScreen = ({ articles, creating, onCreateArticle, onDetectLangua
     const timer = window.setTimeout(async () => {
       try {
         const result = await onDetectLanguage({
-          sourceType: "manual",
           text: normalized,
         });
         if (detectRequestRef.current === requestId) {
@@ -91,34 +90,6 @@ export const HomeScreen = ({ articles, creating, onCreateArticle, onDetectLangua
       window.clearTimeout(timer);
     };
   }, [onDetectLanguage, sourceType, text]);
-
-  useEffect(() => {
-    if (sourceType === "manual" || !file) return;
-
-    const requestId = detectRequestRef.current + 1;
-    detectRequestRef.current = requestId;
-    setDetecting(true);
-
-    const run = async () => {
-      try {
-        const result = await onDetectLanguage({
-          sourceType,
-          file,
-        });
-        if (detectRequestRef.current === requestId) {
-          setDetected(result);
-        }
-      } catch {
-        // global error handled by controller
-      } finally {
-        if (detectRequestRef.current === requestId) {
-          setDetecting(false);
-        }
-      }
-    };
-
-    void run();
-  }, [file, onDetectLanguage, sourceType]);
 
   const onSubmit = async () => {
     setLocalError(null);
@@ -232,7 +203,9 @@ export const HomeScreen = ({ articles, creating, onCreateArticle, onDetectLangua
                 size="small"
                 color={detected?.detectedLanguage === "unknown" ? "default" : "success"}
                 label={
-                  detecting
+                  sourceType !== "manual"
+                    ? "Language will be detected after create"
+                    : detecting
                     ? "Detecting language..."
                     : `Detected: ${languageLabelMap[detected?.detectedLanguage ?? "unknown"]}`
                 }

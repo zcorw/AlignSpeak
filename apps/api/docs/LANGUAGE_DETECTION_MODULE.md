@@ -71,3 +71,13 @@
 - `VALIDATION_ERROR`：请求格式错误、空内容、不支持类型。
 - `OCR_EMPTY_TEXT`：OCR 未提取到有效文本。
 - 对未知语种或置信度过低返回 `unknown`，由前端提示用户手动确认语言。
+
+## 7. Adjustment (2026-03-04)
+- `POST /articles/detect-language` now supports **text-only JSON** payload:
+  - `application/json` with `{ "text": "..." }`
+- File parsing is no longer handled by this endpoint.
+- File language detection is unified in `POST /articles`:
+  - Backend auto-detects file type by extension.
+  - Text files (`txt/md`) -> text parser.
+  - Image files (`png/jpg/jpeg/webp`) -> OCR parser.
+  - Creation response returns `detected_language` and related detection fields.

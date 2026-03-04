@@ -91,6 +91,15 @@ def decode_uploaded_text(filename: str, content: bytes) -> str:
         raise AppError("VALIDATION_ERROR", "Text file must be UTF-8 encoded.", status.HTTP_400_BAD_REQUEST) from exc
 
 
+def detect_source_type_by_filename(filename: str) -> str:
+    extension = Path(filename).suffix.lower()
+    if extension in SUPPORTED_UPLOAD_EXTENSIONS:
+        return "upload"
+    if extension in SUPPORTED_IMAGE_EXTENSIONS:
+        return "ocr"
+    raise AppError("UNSUPPORTED_FILE_TYPE", "Unsupported file type.", status.HTTP_400_BAD_REQUEST)
+
+
 def extract_text_from_image(filename: str, content: bytes, language: str) -> str:
     extension = Path(filename).suffix.lower()
     if extension not in SUPPORTED_IMAGE_EXTENSIONS:
