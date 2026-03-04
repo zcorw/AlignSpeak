@@ -6,8 +6,14 @@ import type {
   PracticeResultData,
   ProgressSummary,
 } from "../../domain/practice/entities";
+import type {
+  ArticleCreateInput,
+  ArticleCreateResult,
+  ArticleLanguage,
+  ArticleListResult,
+} from "../../domain/article/entities";
 import type { PracticeRepository } from "../../application/ports/PracticeRepository";
-import { getJSON, postJSON } from "../http/httpClient";
+import { getJSON, postJSON, postMultipart } from "../http/httpClient";
 
 type AnyRecord = Record<string, unknown>;
 
@@ -35,6 +41,65 @@ const toDiffKind = (value: unknown): DiffKind | undefined => {
 };
 
 export class PracticeApiRepository implements PracticeRepository {
+  async createArticle(input: ArticleCreateInput): Promise<ArticleCreateResult> {
+    let raw: AnyRecord;
+
+    if (input.sourceType === "manual") {
+      raw = (await postJSON<AnyRecord, Record<string, unknown>>("/articles", {
+        title: input.title,
+        language: input.language,
+        source_type: input.sourceType,
+        text: input.text ?? "",
+      })) as AnyRecord;
+    } else {
+      if (!input.file) {
+        throw new Error("File is required for upload/ocr source type.");
+      }
+      const formData = new FormData();
+      formData.append("title", input.title);
+      formData.append("language", input.language);
+      formData.append("source_type", input.sourceType);
+      formData.append("file", input.file);
+      raw = (await postMultipart<AnyRecord>("/articles", formData)) as AnyRecord;
+    }
+
+    const rawSegments = (read(raw, "segments", "segments") as AnyRecord[]) ?? [];
+    return {
+      articleId: toString(read(raw, "articleId", "article_id"), ""),
+      title: toString(read(raw, "title", "title"), ""),
+      language: (toString(read(raw, "language", "language"), "ja") as ArticleLanguage),
+      segments: rawSegments.map((segment) => ({
+        id: toString(read(segment, "id", "id"), ""),
+        order: toNumber(read(segment, "order", "order"), 0),
+        preview: toString(read(segment, "preview", "preview"), ""),
+      })),
+    };
+  }
+
+  async listArticles(limit = 20, cursor?: string): Promise<ArticleListResult> {
+    const search = new URLSearchParams();
+    search.set("limit", String(limit));
+    if (cursor) {
+      search.set("cursor", cursor);
+    }
+    const raw = (await getJSON<AnyRecord>(`/articles?${search.toString()}`)) as AnyRecord;
+    const rawItems = (read(raw, "items", "items") as AnyRecord[]) ?? [];
+    return {
+      items: rawItems.map((item) => ({
+        articleId: toString(read(item, "articleId", "article_id"), ""),
+        title: toString(read(item, "title", "title"), ""),
+        language: toString(read(item, "language", "language"), "ja") as ArticleLanguage,
+        segmentCount: toNumber(read(item, "segmentCount", "segment_count"), 0),
+        createdAt: toString(read(item, "createdAt", "created_at"), ""),
+      })),
+      nextCursor: (() => {
+        const value = read(raw, "nextCursor", "next_cursor");
+        if (typeof value === "string" && value.length > 0) return value;
+        return undefined;
+      })(),
+    };
+  }
+
   async getHomeSummary(): Promise<HomeSummary> {
     const raw = (await getJSON<AnyRecord>("/api/home-summary")) as AnyRecord;
     return {

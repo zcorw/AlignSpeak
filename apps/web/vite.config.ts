@@ -24,6 +24,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      "/articles": {
+        target: proxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 })

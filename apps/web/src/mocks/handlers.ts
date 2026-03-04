@@ -1,11 +1,14 @@
 import { HttpResponse, http } from "msw";
 import {
+  createMockArticle,
   getPracticeBundleByDocIdAndSegmentId,
   getPracticeResultByDocIdAndSegmentId,
   homeSummary,
+  listMockArticles,
   meSummary,
   progressSummary,
 } from "./data";
+import type { ArticleLanguage, ArticleSourceType } from "../domain/article/entities";
 
 const mockToken = "mock-access-token";
 const mockUserEmail = "you@example.com";
@@ -123,6 +126,115 @@ export const handlers = [
       display_name: "Mock User",
       status: "active",
     });
+  }),
+
+  http.get("/articles", ({ request }) => {
+    const unauthorized = ensureAuthorized(request);
+    if (unauthorized) return unauthorized;
+    const url = new URL(request.url);
+    const limitRaw = url.searchParams.get("limit");
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 20;
+    const list = listMockArticles(Number.isFinite(limit) ? limit : 20);
+    return HttpResponse.json({
+      items: list.items.map((item) => ({
+        article_id: item.articleId,
+        title: item.title,
+        language: item.language,
+        segment_count: item.segmentCount,
+        created_at: item.createdAt,
+      })),
+      next_cursor: list.nextCursor ?? null,
+    });
+  }),
+
+  http.post("/articles", async ({ request }) => {
+    const unauthorized = ensureAuthorized(request);
+    if (unauthorized) return unauthorized;
+
+    const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+
+    let title = "";
+    let language: ArticleLanguage = "ja";
+    let sourceType: ArticleSourceType = "manual";
+    let text = "";
+
+    if (contentType.startsWith("application/json")) {
+      const body = (await request.json()) as {
+        title?: string;
+        language?: ArticleLanguage;
+        source_type?: ArticleSourceType;
+        text?: string;
+      };
+      title = body.title?.trim() ?? "";
+      language = body.language ?? "ja";
+      sourceType = body.source_type ?? "manual";
+      text = body.text ?? "";
+    } else if (contentType.startsWith("multipart/form-data")) {
+      const formData = await request.formData();
+      title = String(formData.get("title") ?? "").trim();
+      language = String(formData.get("language") ?? "ja") as ArticleLanguage;
+      sourceType = String(formData.get("source_type") ?? "upload") as ArticleSourceType;
+      const file = formData.get("file");
+      if (!(file instanceof File)) {
+        return HttpResponse.json(
+          {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "File is required.",
+            },
+          },
+          { status: 400 },
+        );
+      }
+      if (sourceType === "upload") {
+        text = await file.text();
+      } else {
+        text = `[OCR] ${file.name}`;
+      }
+    } else {
+      return HttpResponse.json(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Unsupported content type.",
+          },
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!title || !text.trim()) {
+      return HttpResponse.json(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Title and content are required.",
+          },
+        },
+        { status: 400 },
+      );
+    }
+
+    const created = createMockArticle({
+      title,
+      language,
+      sourceType,
+      text,
+    });
+
+    return HttpResponse.json(
+      {
+        article_id: created.articleId,
+        title: created.title,
+        language: created.language,
+        segments: created.segments.map((segment) => ({
+          id: segment.id,
+          order: segment.order,
+          preview: segment.preview,
+        })),
+      },
+      { status: 201 },
+    );
   }),
 
   http.get("/api/home-summary", ({ request }) => {

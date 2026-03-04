@@ -8,6 +8,7 @@ from app.core.errors import (
     validation_error_handler,
 )
 from app.db import Base, engine
+from app.routers.articles import router as articles_router
 from app.routers.auth import router as auth_router
 from app.routers.protected import router as protected_router
 
@@ -29,4 +30,5 @@ def health() -> dict[str, str]:
 
 
 app.include_router(auth_router)
+app.include_router(articles_router)
 app.include_router(protected_router)

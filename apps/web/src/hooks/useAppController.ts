@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { AppUseCases } from "../application/usecases/createAppUseCases";
 import type {
-  HomeSummary,
   MeSummary,
   PracticeBundle,
   PracticeResultData,
   ProgressSummary,
 } from "../domain/practice/entities";
+import type { ArticleCreateInput, ArticleCreateResult, ArticleListItem } from "../domain/article/entities";
 import { HttpError } from "../infrastructure/http/httpClient";
 import { useAppUIState } from "./useAppUIState";
 
@@ -27,10 +27,11 @@ export const useAppController = (useCases: AppUseCases, options: UseAppControlle
   const { enabled, onUnauthorized } = options;
   const maxAutoRequestAttempts = options.maxAutoRequestAttempts ?? 2;
 
-  const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
+  const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [practiceBundle, setPracticeBundle] = useState<PracticeBundle | null>(null);
   const [progressSummary, setProgressSummary] = useState<ProgressSummary | null>(null);
   const [meSummary, setMeSummary] = useState<MeSummary | null>(null);
+  const [articleCreating, setArticleCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +46,7 @@ export const useAppController = (useCases: AppUseCases, options: UseAppControlle
 
   useEffect(() => {
     if (!enabled) {
-      setHomeSummary(null);
+      setArticles([]);
       setProgressSummary(null);
       setMeSummary(null);
       setLoading(false);
@@ -64,12 +65,12 @@ export const useAppController = (useCases: AppUseCases, options: UseAppControlle
       setError(null);
       initialAttemptsRef.current += 1;
       try {
-        const [home, progress, me] = await Promise.all([
-          useCases.loadHomeSummary(),
+        const [articleList, progress, me] = await Promise.all([
+          useCases.loadArticles(20),
           useCases.loadProgressSummary(),
           useCases.loadMeSummary(),
         ]);
-        setHomeSummary(home);
+        setArticles(articleList.items);
         setProgressSummary(progress);
         setMeSummary(me);
         initialAttemptsRef.current = 0;
@@ -137,17 +138,39 @@ export const useAppController = (useCases: AppUseCases, options: UseAppControlle
     }
   };
 
+  const createArticle = async (input: ArticleCreateInput): Promise<ArticleCreateResult> => {
+    setArticleCreating(true);
+    setError(null);
+    try {
+      const created = await useCases.createArticle(input);
+      const articleList = await useCases.loadArticles(20);
+      setArticles(articleList.items);
+      return created;
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 401) {
+        onUnauthorizedRef.current();
+      } else {
+        setError(resolveErrorMessage(err, "Failed to create article."));
+      }
+      throw err;
+    } finally {
+      setArticleCreating(false);
+    }
+  };
+
   return {
     ui,
     data: {
-      homeSummary,
+      articles,
       practiceBundle,
       progressSummary,
       meSummary,
     },
     actions: {
+      createArticle,
       submitRecognition,
     },
+    articleCreating,
     loading,
     error,
   };

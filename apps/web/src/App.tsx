@@ -60,7 +60,7 @@ function App() {
     navigate("/login", { replace: true });
   }, [logout, navigate]);
 
-  const { ui, data, actions, loading, error } = useAppController(useCases, {
+  const { ui, data, actions, articleCreating, loading, error } = useAppController(useCases, {
     enabled: isAuthenticated,
     onUnauthorized: handleUnauthorized,
     maxAutoRequestAttempts: 2,
@@ -209,7 +209,17 @@ function App() {
         />
         <Route
           path="/home"
-          element={isAuthenticated ? <HomeScreen summary={data.homeSummary} /> : <Navigate to="/login" replace />}
+          element={
+            isAuthenticated ? (
+              <HomeScreen
+                articles={data.articles}
+                creating={articleCreating}
+                onCreateArticle={actions.createArticle}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
         <Route
           path="/practice"

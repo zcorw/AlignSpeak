@@ -6,6 +6,12 @@ import type {
   PracticeSegmentOption,
   ProgressSummary,
 } from "../domain/practice/entities";
+import type {
+  ArticleCreateResult,
+  ArticleLanguage,
+  ArticleListResult,
+  ArticleSourceType,
+} from "../domain/article/entities";
 
 export const homeSummary: HomeSummary = {
   targetSegments: 3,
@@ -323,4 +329,83 @@ export const getPracticeResultByDocIdAndSegmentId = (
   segmentId?: string,
 ): PracticeResultData => {
   return getPracticeBundleByDocIdAndSegmentId(docId, segmentId).result;
+};
+
+let articleCounter = 3;
+
+const articleStore: Array<{
+  article_id: string;
+  title: string;
+  language: ArticleLanguage;
+  segment_count: number;
+  created_at: string;
+}> = [
+  {
+    article_id: "art_mock_001",
+    title: "Mock Japanese Article",
+    language: "ja",
+    segment_count: 3,
+    created_at: "2026-03-03T09:40:00Z",
+  },
+  {
+    article_id: "art_mock_002",
+    title: "Mock English Article",
+    language: "en",
+    segment_count: 2,
+    created_at: "2026-03-02T18:20:00Z",
+  },
+];
+
+const splitMockSegments = (text: string): string[] => {
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  if (!normalized) return [];
+  return normalized
+    .split(/\n\s*\n+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+};
+
+export const createMockArticle = (input: {
+  title: string;
+  language: ArticleLanguage;
+  sourceType: ArticleSourceType;
+  text: string;
+}): ArticleCreateResult => {
+  const articleId = `art_mock_${String(articleCounter).padStart(3, "0")}`;
+  articleCounter += 1;
+
+  const segments = splitMockSegments(input.text);
+  const safeSegments = segments.length > 0 ? segments : [input.text.trim() || "(empty)"];
+  const now = new Date().toISOString();
+
+  articleStore.unshift({
+    article_id: articleId,
+    title: input.title,
+    language: input.language,
+    segment_count: safeSegments.length,
+    created_at: now,
+  });
+
+  return {
+    articleId,
+    title: input.title,
+    language: input.language,
+    segments: safeSegments.map((segment, index) => ({
+      id: `seg_mock_${articleId}_${index + 1}`,
+      order: index + 1,
+      preview: segment.length > 40 ? `${segment.slice(0, 40)}...` : segment,
+    })),
+  };
+};
+
+export const listMockArticles = (limit = 20): ArticleListResult => {
+  return {
+    items: articleStore.slice(0, limit).map((item) => ({
+      articleId: item.article_id,
+      title: item.title,
+      language: item.language,
+      segmentCount: item.segment_count,
+      createdAt: item.created_at,
+    })),
+  };
 };

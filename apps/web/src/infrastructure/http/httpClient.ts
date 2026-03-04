@@ -94,7 +94,9 @@ http.interceptors.request.use((config) => {
 
   config._requestKey = requestKey;
   config.headers = config.headers ?? {};
-  config.headers["Content-Type"] = "application/json";
+  if (!(config.data instanceof FormData) && !config.headers["Content-Type"]) {
+    config.headers["Content-Type"] = "application/json";
+  }
 
   const authEnabled = config.requiresAuth ?? true;
   if (authEnabled) {
@@ -138,6 +140,17 @@ export const postJSON = async <T, B extends Record<string, unknown>>(
   options: RequestOptions = {},
 ): Promise<T> => {
   const response = await http.post<T>(path, body, {
+    requiresAuth: options.auth ?? true,
+  });
+  return response.data as T;
+};
+
+export const postMultipart = async <T>(
+  path: string,
+  formData: FormData,
+  options: RequestOptions = {},
+): Promise<T> => {
+  const response = await http.post<T>(path, formData, {
     requiresAuth: options.auth ?? true,
   });
   return response.data as T;
