@@ -1,117 +1,654 @@
-<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AlignSpeak - 练习页预览</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="./styles.css" />
-    <script defer src="./ui.js"></script>
-  </head>
-  <body class="mobile-app">
-    <div class="page" style="max-width: 480px; padding-bottom: 24px">
-      <header class="topbar">
-        <div class="brand">AlignSpeak</div>
-        <nav class="nav">
-          <a href="./index.html">总览</a>
-          <a class="active" href="./practice.html">练习页</a>
-        </nav>
-      </header>
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>练习 — AlignSpeak</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .page-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 4px 20px 32px;
+      gap: 16px;
+      overflow-y: auto;
+    }
+    /* Article info */
+    .article-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .article-name {
+      font-size: 13px;
+      color: var(--text-2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .practice-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    /* Segment text card */
+    .segment-card {
+      background: var(--card);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r);
+      padding: 20px;
+      position: relative;
+    }
+    .segment-num {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 10px;
+    }
+    .segment-text {
+      font-size: 17px;
+      line-height: 1.75;
+      color: var(--text);
+    }
+    .segment-text.zh { font-size: 18px; }
+    /* Threshold */
+    .threshold-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-3);
+    }
+    .threshold-line { flex: 1; height: 1px; background: var(--border); }
+    .threshold-val { font-weight: 600; color: var(--accent-2); font-family: 'SF Mono', monospace; }
+    /* Record area */
+    .record-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 8px 0 4px;
+    }
+    .record-btn {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 0 0 0 var(--accent-glow);
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+    }
+    .record-btn:hover { transform: scale(1.05); }
+    .record-btn.recording {
+      background: var(--danger);
+      animation: rec-ring 1.5s ease-out infinite;
+    }
+    @keyframes rec-ring {
+      0% { box-shadow: 0 0 0 0 rgba(240,82,82,0.4); }
+      70% { box-shadow: 0 0 0 18px rgba(240,82,82,0); }
+      100% { box-shadow: 0 0 0 0 rgba(240,82,82,0); }
+    }
+    .record-label { font-size: 13px; color: var(--text-2); }
+    /* Score display */
+    .score-area {
+      background: var(--card);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .score-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .score-big {
+      font-size: 36px;
+      font-weight: 800;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      line-height: 1;
+    }
+    .score-big.pass { color: var(--success); }
+    .score-big.fail { color: var(--danger); }
+    .score-details {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+    .score-detail-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-2);
+    }
+    .score-detail-row span:last-child { font-family: monospace; color: var(--text); }
+    .alignment-preview {
+      font-size: 14px;
+      line-height: 1.8;
+      padding: 12px;
+      background: var(--card-2);
+      border-radius: var(--r-sm);
+    }
+    .action-row {
+      display: flex;
+      gap: 10px;
+    }
+    /* Expand toggle */
+    .expand-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-2);
+      cursor: pointer;
+      padding: 8px 0;
+      border: none;
+      background: transparent;
+      transition: color 0.15s;
+    }
+    .expand-toggle:hover { color: var(--text); }
+    .expand-icon { transition: transform 0.25s; }
+    .expand-icon.open { transform: rotate(180deg); }
+    /* Full mode */
+    .full-mode {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .full-mode.show { display: flex; }
+    .trend-row { display: flex; gap: 6px; align-items: flex-end; }
+    .trend-bar-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .trend-bar {
+      width: 24px;
+      background: var(--card-2);
+      border-radius: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+    .trend-fill {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      background: var(--accent);
+      border-radius: 4px;
+      transition: height 0.4s;
+    }
+    .trend-fill.pass-fill { background: var(--success); }
+    .trend-score { font-size: 10px; color: var(--text-3); font-family: monospace; }
+    /* Matrix */
+    .matrix-section { display: flex; flex-direction: column; gap: 8px; }
+    .matrix-row { display: flex; align-items: center; gap: 8px; }
+    .matrix-level-label { font-size: 11px; font-weight: 700; color: var(--text-3); font-family: monospace; width: 22px; }
+    .matrix-cells { display: flex; gap: 5px; flex-wrap: wrap; }
+    /* Skip action */
+    .skip-btn {
+      background: none;
+      border: none;
+      font-size: 13px;
+      color: var(--text-3);
+      cursor: pointer;
+      padding: 6px 0;
+      transition: color 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .skip-btn:hover { color: var(--text-2); }
 
-      <section class="hero">
-        <h1>练习对比</h1>
-        <p>一行原文，一行识别。差异直接高亮，降低理解成本。</p>
-      </section>
+    /* Recording overlay */
+    .rec-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    .rec-overlay.open { transform: translateY(0); }
+    .rec-topbar {
+      display: flex;
+      align-items: center;
+      padding: 16px 20px;
+      gap: 12px;
+    }
+    .rec-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--danger);
+    }
+    .rec-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 28px;
+      gap: 32px;
+    }
+    .rec-segment-label { font-size: 12px; color: var(--text-3); font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+    .rec-segment-text {
+      font-size: 20px;
+      line-height: 1.7;
+      text-align: center;
+      color: var(--text);
+    }
+    .rec-waveform {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      height: 32px;
+    }
+    .wave-bar {
+      width: 4px;
+      background: var(--danger);
+      border-radius: 2px;
+      animation: wave 0.8s ease-in-out infinite alternate;
+    }
+    .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.15s; }
+    .wave-bar:nth-child(5) { animation-delay: 0.25s; }
+    .wave-bar:nth-child(6) { animation-delay: 0.05s; }
+    .wave-bar:nth-child(7) { animation-delay: 0.3s; }
+    @keyframes wave {
+      from { height: 4px; }
+      to { height: 28px; }
+    }
+    .rec-footer {
+      padding: 20px 24px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
 
-      <section class="card">
-        <h3>Segment 03</h3>
+    /* Progress drawer */
+    .backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,0.6); display: none; }
+    .backdrop.show { display: block; }
+    /* Recognizing state */
+    .recognizing-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 32px;
+    }
+    .recognizing-state.show { display: flex; }
+    .recognizing-spinner {
+      width: 28px; height: 28px;
+      border: 3px solid var(--border-2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+    }
 
-        <div class="mode-switch" data-practice-switch>
-          <button class="mode-btn is-active" type="button" data-practice-target="practice-pre-page">录音前</button>
-          <button class="mode-btn" type="button" data-practice-target="practice-result-page">识别结果</button>
-        </div>
-
-        <div class="practice-state is-active" id="practice-pre-page" data-practice-state>
-          <div class="mask-panel">
-            <div class="mask-header">
-              <span class="chip">Level 2</span>
-              <span class="muted">遮挡 40%</span>
-            </div>
-            <div class="mask-article">
-              <p class="mask-line">
-                <span class="mask-word">春は、</span>
-                <span class="mask-word hidden">あけぼの</span>
-                <span class="mask-word">。</span>
-                <span class="mask-word">やうやう</span>
-                <span class="mask-word">白く</span>
-                <span class="mask-word hidden">なりゆく</span>
-                <span class="mask-word">山ぎは。</span>
-              </p>
-            </div>
-          </div>
-          <div class="actions" style="margin-top: 14px">
-            <button class="btn secondary" type="button">播放标准音频</button>
-            <button class="btn primary" type="button">开始录音</button>
-          </div>
-        </div>
-
-        <div class="practice-state" id="practice-result-page" data-practice-state>
-          <div class="compare-block">
-            <div class="compare-row">
-              <div class="line-label">原文</div>
-              <div class="line-text">
-                <span class="piece">春は、</span>
-                <span class="piece err-missing">あけぼの</span>
-                <span class="piece">。</span>
-              </div>
-            </div>
-            <div class="compare-row">
-              <div class="line-label">识别</div>
-              <div class="line-text">
-                <span class="piece">春は、</span>
-                <span class="piece err-insert">えっと</span>
-                <span class="piece">。</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="compare-block">
-            <div class="compare-row">
-              <div class="line-label">原文</div>
-              <div class="line-text">
-                <span class="piece">やうやう</span>
-                <span class="piece">白く</span>
-                <span class="piece err-substitute">なりゆく</span>
-              </div>
-            </div>
-            <div class="compare-row">
-              <div class="line-label">识别</div>
-              <div class="line-text">
-                <span class="piece">やうやう</span>
-                <span class="piece">白く</span>
-                <span class="piece err-substitute">なるゆく</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="legend">
-            <span class="legend-item"><i class="dot miss"></i>漏读</span>
-            <span class="legend-item"><i class="dot ins"></i>多读</span>
-            <span class="legend-item"><i class="dot sub"></i>替换</span>
-          </div>
-
-          <div class="actions" style="margin-top: 14px">
-            <button class="btn secondary" type="button">播放标准音频</button>
-            <button class="btn primary" type="button">重新录音</button>
-            <button class="btn ghost" type="button">下一段</button>
-          </div>
-        </div>
-      </section>
+    /* Sync warn */
+    .sync-bar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 20px 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Topbar -->
+    <div class="topbar">
+      <a href="start.html" class="icon-btn" title="返回">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      </a>
+      <div style="flex:1;display:flex;flex-direction:column;gap:1px;">
+        <span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">The Little Prince — Ch.I</span>
+        <span style="font-size:11px;color:var(--text-2);">英语</span>
+      </div>
+      <button class="icon-btn" onclick="openProgress()" title="进度">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </button>
+      <a href="mine.html" class="icon-btn" title="我的">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </a>
     </div>
-  </body>
+
+    <!-- Sync warn (示例：未同步状态) -->
+    <div class="sync-bar" id="sync-bar" style="display:none">
+      <div class="sync-warn" onclick="retrySync()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+        未同步 · 点击重试
+      </div>
+    </div>
+
+    <!-- Page body -->
+    <div class="page-body fade-up" id="practice-body">
+      <div class="article-info">
+        <div class="practice-meta">
+          <span class="badge badge-accent">L2</span>
+          <span style="font-size:13px;color:var(--text-2);">段落 3 / 5</span>
+          <span style="font-size:12px;color:var(--text-3);">目标 ≥85%</span>
+        </div>
+      </div>
+
+      <!-- Segment text -->
+      <div class="segment-card">
+        <div class="segment-num">§3 跟读段落</div>
+        <div class="segment-text" id="seg-text">
+          After that I used to think a lot about jungle adventures, and eventually managed to make my first drawing with colored pencils.
+        </div>
+      </div>
+
+      <!-- Record area -->
+      <div class="record-area" id="record-area">
+        <button class="record-btn" id="record-btn" onclick="startRecording()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v6a2 2 0 0 0 4 0V5a2 2 0 0 0-2-2z"/><path d="M19 11a1 1 0 0 1 1 1 8 8 0 0 1-7 7.93V22h3a1 1 0 0 1 0 2H8a1 1 0 0 1 0-2h3v-2.07A8 8 0 0 1 4 12a1 1 0 0 1 2 0 6 6 0 0 0 12 0 1 1 0 0 1 1-1z"/></svg>
+        </button>
+        <span class="record-label" id="record-label">点击开始录音</span>
+      </div>
+
+      <!-- Recognizing state -->
+      <div class="recognizing-state" id="recognizing-state">
+        <div class="recognizing-spinner spin"></div>
+        <span style="font-size:14px;color:var(--text-2);">识别中…</span>
+      </div>
+
+      <!-- Score area (hidden initially) -->
+      <div class="score-area" id="score-area" style="display:none">
+        <div class="score-row">
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+            <div class="score-big pass" id="score-num">78%</div>
+            <div style="font-size:11px;color:var(--text-3);">未达标</div>
+          </div>
+          <div class="score-details">
+            <div class="score-detail-row"><span>正确词</span><span>11 / 18</span></div>
+            <div class="score-detail-row"><span>错误词</span><span>3</span></div>
+            <div class="score-detail-row"><span>漏读词</span><span>4</span></div>
+          </div>
+        </div>
+        <div class="alignment-preview" id="alignment-preview"></div>
+        <div class="action-row">
+          <button class="btn btn-primary btn-full" onclick="practiceAgain()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+            再练一次
+          </button>
+          <button class="btn btn-secondary" onclick="submitResult()" style="white-space:nowrap">提交查看</button>
+        </div>
+        <button class="skip-btn" onclick="skipSegment()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          跳过本段（标记未完成）
+        </button>
+      </div>
+
+      <!-- Expand toggle -->
+      <button class="expand-toggle" id="expand-toggle" onclick="toggleFull()">
+        <svg class="expand-icon" id="expand-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        <span id="expand-label">展开完整模式</span>
+      </button>
+
+      <!-- Full mode (collapsed by default) -->
+      <div class="full-mode" id="full-mode">
+        <!-- Recent trend -->
+        <div class="card-2">
+          <div class="label" style="margin-bottom:12px;">最近成绩趋势</div>
+          <div class="trend-row" id="trend-row"></div>
+        </div>
+        <!-- Matrix -->
+        <div class="card-2">
+          <div class="label" style="margin-bottom:12px;">等级达标矩阵</div>
+          <div class="matrix-section" id="matrix"></div>
+        </div>
+        <!-- Manual level switch -->
+        <div class="card-2">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="label">手动切换等级</span>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-ghost" onclick="switchLevel(1)">L1</button>
+              <button class="btn btn-sm btn-accent" style="background:var(--accent-glow);color:var(--accent-2);border:1px solid rgba(110,96,238,0.3);">L2</button>
+              <button class="btn btn-sm btn-ghost" onclick="switchLevel(3)">L3</button>
+              <button class="btn btn-sm btn-ghost" onclick="switchLevel(4)">L4</button>
+            </div>
+          </div>
+          <p style="font-size:12px;color:var(--text-3);margin-top:8px;">切换等级将重置当前等级进度</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recording overlay -->
+  <div class="rec-overlay" id="rec-overlay">
+    <div class="rec-topbar">
+      <button class="icon-btn" onclick="cancelRecording()" style="background:transparent;border-color:transparent;color:var(--text-2);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="rec-status">
+        <div class="rec-dot"></div>
+        录音中
+      </div>
+      <span style="flex:1"></span>
+      <span id="rec-timer" style="font-size:14px;font-weight:600;font-family:monospace;color:var(--text-2);">0:00</span>
+    </div>
+    <div class="rec-body">
+      <div class="rec-segment-label">§3 · 跟读段落</div>
+      <div class="rec-segment-text">
+        After that I used to think a lot about jungle adventures, and eventually managed to make my first drawing with colored pencils.
+      </div>
+      <div class="rec-waveform">
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+      </div>
+    </div>
+    <div class="rec-footer">
+      <button class="btn btn-danger btn-full btn-lg" onclick="stopRecording()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        结束录音
+      </button>
+    </div>
+  </div>
+
+  <!-- Progress drawer backdrop -->
+  <div class="backdrop" id="backdrop" onclick="closeProgress()"></div>
+
+  <!-- Progress drawer -->
+  <div class="drawer" id="progress-drawer">
+    <div class="drawer-handle"></div>
+    <div class="drawer-header">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3)"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span class="drawer-title">本文练习进度</span>
+      <button class="icon-btn" onclick="closeProgress()" style="background:transparent;border-color:transparent;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="drawer-body">
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:16px;">The Little Prince — Chapter I · 5 段</div>
+      <div class="matrix-section" id="drawer-matrix"></div>
+      <div style="margin-top:20px;font-size:12px;color:var(--text-3);line-height:1.7;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span class="matrix-cell pass" style="width:20px;height:20px;font-size:9px;">✓</span> 已达标</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span class="matrix-cell current" style="width:20px;height:20px;font-size:9px;">→</span> 当前</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span class="matrix-cell skip" style="width:20px;height:20px;font-size:9px;">↷</span> 已跳过</div>
+        <div style="display:flex;align-items:center;gap:6px;"><span class="matrix-cell fail" style="width:20px;height:20px;font-size:9px;">·</span> 未完成</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PROGRESS = {
+      L1: ['pass','pass','pass','pass','pass'],
+      L2: ['pass','pass','current','fail','fail'],
+      L3: ['fail','fail','fail','fail','fail'],
+      L4: ['fail','fail','fail','fail','fail'],
+    };
+    const TRENDS = [62, 70, 75, 78]; // recent scores for seg3
+
+    let recTimer = null;
+    let recSeconds = 0;
+    let isFullMode = false;
+
+    // Build full-mode matrix
+    function buildMatrix(containerId) {
+      const el = document.getElementById(containerId);
+      el.innerHTML = '';
+      const levels = ['L1','L2','L3','L4'];
+      levels.forEach(lv => {
+        const row = document.createElement('div');
+        row.className = 'matrix-row';
+        row.innerHTML = `<span class="matrix-level-label">${lv}</span>`;
+        const cells = document.createElement('div');
+        cells.className = 'matrix-cells';
+        PROGRESS[lv].forEach((state, i) => {
+          const cell = document.createElement('div');
+          cell.className = `matrix-cell ${state}`;
+          cell.title = `${lv} · 段落 ${i+1}`;
+          if (state === 'pass') cell.textContent = '✓';
+          else if (state === 'current') cell.textContent = i+1;
+          else if (state === 'skip') cell.textContent = '↷';
+          else cell.textContent = '·';
+          cells.appendChild(cell);
+        });
+        row.appendChild(cells);
+        el.appendChild(row);
+      });
+    }
+
+    // Build trend
+    function buildTrend() {
+      const el = document.getElementById('trend-row');
+      const maxH = 40;
+      el.innerHTML = TRENDS.map((s, i) => {
+        const h = Math.max(4, Math.round(s / 100 * maxH));
+        const pass = s >= 85;
+        return `<div class="trend-bar-item">
+          <div class="trend-bar" style="height:${maxH}px;">
+            <div class="trend-fill ${pass ? 'pass-fill' : ''}" style="height:${h}px;"></div>
+          </div>
+          <span class="trend-score">${s}%</span>
+        </div>`;
+      }).join('');
+    }
+
+    // Alignment preview
+    function buildAlignment() {
+      const tokens = [
+        {w:'After',t:'ok'},{w:'that',t:'ok'},{w:'I',t:'ok'},{w:'use',t:'err'},{w:'used',t:'miss'},
+        {w:'to',t:'ok'},{w:'think',t:'ok'},{w:'a',t:'ok'},{w:'lot',t:'ok'},{w:'about',t:'ok'},
+        {w:'jungle',t:'ok'},{w:'adventure',t:'err'},{w:'adventures',t:'miss'},{w:',',t:'ok'},
+        {w:'and',t:'ok'},{w:'eventually',t:'ok'},{w:'managed',t:'ok'},{w:'to',t:'ok'},
+        {w:'make',t:'ok'},{w:'my',t:'miss'},{w:'first',t:'ok'},{w:'drawing',t:'ok'},{w:'…',t:'ins'}
+      ];
+      document.getElementById('alignment-preview').innerHTML =
+        tokens.map(t => `<span class="token token-${t.t}">${t.w}</span> `).join('');
+    }
+
+    function startRecording() {
+      document.getElementById('rec-overlay').classList.add('open');
+      recSeconds = 0;
+      updateTimer();
+      recTimer = setInterval(() => {
+        recSeconds++;
+        updateTimer();
+      }, 1000);
+    }
+
+    function updateTimer() {
+      const m = Math.floor(recSeconds / 60);
+      const s = recSeconds % 60;
+      document.getElementById('rec-timer').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    }
+
+    function cancelRecording() {
+      clearInterval(recTimer);
+      document.getElementById('rec-overlay').classList.remove('open');
+    }
+
+    function stopRecording() {
+      clearInterval(recTimer);
+      document.getElementById('rec-overlay').classList.remove('open');
+      // Show recognizing state
+      document.getElementById('record-area').style.display = 'none';
+      document.getElementById('recognizing-state').classList.add('show');
+      setTimeout(() => {
+        document.getElementById('recognizing-state').classList.remove('show');
+        showScore();
+      }, 1800);
+    }
+
+    function showScore() {
+      buildAlignment();
+      document.getElementById('score-area').style.display = 'flex';
+      // Show sync warn
+      setTimeout(() => {
+        document.getElementById('sync-bar').style.display = 'flex';
+        setTimeout(() => document.getElementById('sync-bar').style.display = 'none', 4000);
+      }, 500);
+    }
+
+    function practiceAgain() {
+      document.getElementById('score-area').style.display = 'none';
+      document.getElementById('record-area').style.display = 'flex';
+    }
+
+    function submitResult() {
+      window.location.href = 'result.html';
+    }
+
+    function skipSegment() {
+      if (confirm('跳过本段将标记为未完成，需要在本等级结束前补齐。确认跳过？')) {
+        window.location.href = 'practice.html?seg=4';
+      }
+    }
+
+    function toggleFull() {
+      isFullMode = !isFullMode;
+      document.getElementById('full-mode').classList.toggle('show', isFullMode);
+      document.getElementById('expand-icon').classList.toggle('open', isFullMode);
+      document.getElementById('expand-label').textContent = isFullMode ? '收起完整模式' : '展开完整模式';
+      if (isFullMode) {
+        buildTrend();
+        buildMatrix('matrix');
+      }
+    }
+
+    function openProgress() {
+      document.getElementById('progress-drawer').classList.add('open');
+      document.getElementById('backdrop').classList.add('show');
+      buildMatrix('drawer-matrix');
+    }
+
+    function closeProgress() {
+      document.getElementById('progress-drawer').classList.remove('open');
+      document.getElementById('backdrop').classList.remove('show');
+    }
+
+    function switchLevel(lv) {
+      if (confirm(`切换到 L${lv} 将重置当前等级进度。确认切换？`)) {
+        alert(`已切换到 L${lv}`);
+      }
+    }
+
+    function retrySync() {
+      document.getElementById('sync-bar').innerHTML = `<div class="sync-warn"><div class="recognizing-spinner spin" style="width:12px;height:12px;border-width:2px;"></div> 同步中…</div>`;
+      setTimeout(() => { document.getElementById('sync-bar').style.display = 'none'; }, 1500);
+    }
+  </script>
+</body>
 </html>

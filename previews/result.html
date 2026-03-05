@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>练习结果 — AlignSpeak</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .page-body {
+      flex: 1;
+      padding: 8px 20px 40px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    /* Score header */
+    .score-header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 20px;
+      background: var(--card);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r);
+      position: relative;
+      overflow: hidden;
+    }
+    .score-header.pass-bg::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 80% 50%, rgba(29,201,138,0.08) 0%, transparent 70%);
+    }
+    .score-header.fail-bg::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 80% 50%, rgba(240,82,82,0.06) 0%, transparent 70%);
+    }
+    .score-circle {
+      width: 80px;
+      height: 80px;
+      flex-shrink: 0;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .score-circle svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+    .score-circle-num {
+      font-size: 22px;
+      font-weight: 800;
+      font-family: 'SF Mono', monospace;
+      z-index: 1;
+    }
+    .score-circle-num.pass { color: var(--success); }
+    .score-circle-num.fail { color: var(--danger); }
+    .score-info { flex: 1; display: flex; flex-direction: column; gap: 8px; z-index: 1; }
+    .score-verdict {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .score-verdict.pass { color: var(--success); }
+    .score-verdict.fail { color: var(--danger); }
+    .score-sub { font-size: 13px; color: var(--text-2); }
+    .score-breakdown {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .score-breakdown-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 8px 12px;
+      background: var(--card-2);
+      border-radius: var(--r-sm);
+    }
+    .score-breakdown-val { font-size: 18px; font-weight: 700; font-family: monospace; }
+    .score-breakdown-label { font-size: 10px; color: var(--text-3); letter-spacing: 0.5px; text-transform: uppercase; }
+
+    /* Alignment section */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      padding: 0 2px;
+    }
+    .alignment-block {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 18px;
+    }
+    .alignment-original {
+      font-size: 14px;
+      line-height: 2;
+      margin-bottom: 14px;
+    }
+    .alignment-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      font-size: 11px;
+      color: var(--text-3);
+    }
+    .alignment-divider::before, .alignment-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .alignment-spoken {
+      font-size: 14px;
+      line-height: 2;
+    }
+    .legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--text-2);
+    }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 2px;
+    }
+
+    /* Matrix */
+    .matrix-compact {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .matrix-compact-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .matrix-compact-level {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-3);
+      font-family: monospace;
+      width: 22px;
+    }
+    .matrix-compact-cells { display: flex; gap: 5px; }
+
+    /* Actions */
+    .actions-card {
+      background: var(--card);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .actions-hint { font-size: 13px; color: var(--text-2); }
+
+    /* Level up banner */
+    .level-up-banner {
+      display: none;
+      background: linear-gradient(135deg, rgba(110,96,238,0.15), rgba(29,201,138,0.1));
+      border: 1px solid rgba(110,96,238,0.3);
+      border-radius: var(--r);
+      padding: 18px;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+    }
+    .level-up-banner.show { display: flex; }
+    .level-up-icon { font-size: 32px; }
+    .level-up-title { font-size: 18px; font-weight: 700; }
+    .level-up-sub { font-size: 13px; color: var(--text-2); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Topbar -->
+    <div class="topbar">
+      <a href="practice.html" class="icon-btn" title="返回练习">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      </a>
+      <div style="flex:1;display:flex;flex-direction:column;gap:1px;">
+        <span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">The Little Prince — Ch.I</span>
+        <span style="font-size:11px;color:var(--text-2);">L2 · 段落 3/5</span>
+      </div>
+      <a href="mine.html" class="icon-btn" title="我的">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </a>
+    </div>
+
+    <div class="page-body fade-up">
+      <!-- Score header -->
+      <div class="score-header fail-bg" id="score-header">
+        <div class="score-circle">
+          <svg width="80" height="80" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="var(--card-2)" stroke-width="7"/>
+            <circle cx="40" cy="40" r="34" fill="none" stroke="var(--danger)" stroke-width="7"
+              stroke-dasharray="213.6" stroke-dashoffset="47" stroke-linecap="round"/>
+          </svg>
+          <span class="score-circle-num fail" id="score-num">78%</span>
+        </div>
+        <div class="score-info">
+          <div class="score-verdict fail" id="verdict">未达标</div>
+          <div class="score-sub">目标 ≥85%，差 7%</div>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <span class="badge badge-accent">L2</span>
+            <span class="badge badge-neutral">§3</span>
+            <span class="badge badge-neutral">第 4 次</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Breakdown -->
+      <div style="display:flex;gap:8px;">
+        <div class="score-breakdown-item" style="flex:1;background:var(--card);border:1px solid var(--border);">
+          <span class="score-breakdown-val" style="color:var(--success);">11</span>
+          <span class="score-breakdown-label">正确词</span>
+        </div>
+        <div class="score-breakdown-item" style="flex:1;background:var(--card);border:1px solid var(--border);">
+          <span class="score-breakdown-val" style="color:var(--danger);">3</span>
+          <span class="score-breakdown-label">错误词</span>
+        </div>
+        <div class="score-breakdown-item" style="flex:1;background:var(--card);border:1px solid var(--border);">
+          <span class="score-breakdown-val" style="color:var(--warning);">4</span>
+          <span class="score-breakdown-label">漏读词</span>
+        </div>
+        <div class="score-breakdown-item" style="flex:1;background:var(--card);border:1px solid var(--border);">
+          <span class="score-breakdown-val" style="color:var(--text-3);">1</span>
+          <span class="score-breakdown-label">多读词</span>
+        </div>
+      </div>
+
+      <!-- Alignment -->
+      <div class="section-label">对齐详情</div>
+      <div class="alignment-block">
+        <div class="alignment-original" id="alignment-original"></div>
+        <div class="alignment-divider">识别结果</div>
+        <div class="alignment-spoken" id="alignment-spoken"></div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(29,201,138,0.3)"></div>正确</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(240,82,82,0.3)"></div>错误</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(240,166,35,0.25)"></div>漏读</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(240,82,82,0.1)"></div>多读</div>
+        </div>
+      </div>
+
+      <!-- Progress matrix -->
+      <div class="section-label">L2 整篇达标进度</div>
+      <div class="card" id="matrix-card">
+        <div class="matrix-compact" id="matrix-compact"></div>
+        <p style="font-size:12px;color:var(--text-3);margin-top:12px;">所有 5 段达标后升至 L3</p>
+      </div>
+
+      <!-- Level up banner (hidden; shown if all pass) -->
+      <div class="level-up-banner" id="level-up-banner">
+        <div class="level-up-icon">🎉</div>
+        <div class="level-up-title">L2 全段达标！</div>
+        <div class="level-up-sub">已解锁 L3，继续保持！</div>
+        <a href="practice.html?level=3" class="btn btn-primary btn-full" style="margin-top:8px;">开始 L3 练习</a>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions-card" id="actions-card">
+        <p class="actions-hint">本段尚未达标，建议再练一次</p>
+        <a href="practice.html" class="btn btn-primary btn-full">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+          再练一次
+        </a>
+        <a href="practice.html?seg=4" class="btn btn-secondary btn-full" id="next-btn">前往下一段</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SCORE = 78;
+    const PASS = SCORE >= 85;
+
+    const ORIGINAL_TOKENS = [
+      {w:'After',s:'ok'},{w:'that',s:'ok'},{w:'I',s:'ok'},{w:'used',s:'err'},
+      {w:'to',s:'ok'},{w:'think',s:'ok'},{w:'a',s:'ok'},{w:'lot',s:'ok'},
+      {w:'about',s:'ok'},{w:'jungle',s:'ok'},{w:'adventures',s:'err'},
+      {w:',',s:'ok'},{w:'and',s:'ok'},{w:'eventually',s:'ok'},{w:'managed',s:'ok'},
+      {w:'to',s:'ok'},{w:'make',s:'ok'},{w:'my',s:'miss'},{w:'first',s:'ok'},
+      {w:'drawing',s:'ok'},{w:'with',s:'miss'},{w:'colored',s:'miss'},{w:'pencils',s:'miss'},{w:'.',s:'ok'}
+    ];
+    const SPOKEN_TOKENS = [
+      {w:'After',s:'ok'},{w:'that',s:'ok'},{w:'I',s:'ok'},{w:'use',s:'err'},
+      {w:'to',s:'ok'},{w:'think',s:'ok'},{w:'a',s:'ok'},{w:'lot',s:'ok'},
+      {w:'about',s:'ok'},{w:'jungle',s:'ok'},{w:'adventure',s:'err'},
+      {w:',',s:'ok'},{w:'and',s:'ok'},{w:'eventually',s:'ok'},{w:'managed',s:'ok'},
+      {w:'to',s:'ok'},{w:'make',s:'ok'},{w:'first',s:'ok'},
+      {w:'drawing',s:'ok'},{w:'.',s:'ok'},{w:'right',s:'ins'}
+    ];
+
+    const PROGRESS = {
+      L1: ['pass','pass','pass','pass','pass'],
+      L2: ['pass','pass','current','fail','fail'],
+      L3: ['fail','fail','fail','fail','fail'],
+      L4: ['fail','fail','fail','fail','fail'],
+    };
+
+    function renderAlignment() {
+      const origEl = document.getElementById('alignment-original');
+      const spkEl = document.getElementById('alignment-spoken');
+      origEl.innerHTML = ORIGINAL_TOKENS.map(t => {
+        const cls = t.s === 'ok' ? 'token-ok' : t.s === 'err' ? 'token-err' : t.s === 'miss' ? 'token-miss' : '';
+        return `<span class="token ${cls}">${t.w}</span> `;
+      }).join('');
+      spkEl.innerHTML = SPOKEN_TOKENS.map(t => {
+        const cls = t.s === 'ok' ? 'token-ok' : t.s === 'err' ? 'token-err' : t.s === 'ins' ? 'token-ins' : '';
+        return `<span class="token ${cls}">${t.w}</span> `;
+      }).join('');
+    }
+
+    function renderMatrix() {
+      const el = document.getElementById('matrix-compact');
+      el.innerHTML = '';
+      const levels = ['L1','L2','L3','L4'];
+      levels.forEach(lv => {
+        const row = document.createElement('div');
+        row.className = 'matrix-compact-row';
+        row.innerHTML = `<span class="matrix-compact-level">${lv}</span>`;
+        const cells = document.createElement('div');
+        cells.className = 'matrix-compact-cells';
+        PROGRESS[lv].forEach((state, i) => {
+          const cell = document.createElement('div');
+          cell.className = `matrix-cell ${state}`;
+          cell.title = `${lv} 段落 ${i+1}`;
+          if (state === 'pass') cell.textContent = '✓';
+          else if (state === 'current') cell.textContent = i+1;
+          else if (state === 'skip') cell.textContent = '↷';
+          else cell.textContent = '·';
+          cell.onclick = () => {
+            if (state === 'pass' || state === 'current') {
+              window.location.href = `practice.html?seg=${i}&lv=${lv}`;
+            }
+          };
+          cells.appendChild(cell);
+        });
+        row.appendChild(cells);
+        el.appendChild(row);
+      });
+    }
+
+    function updateUI() {
+      const header = document.getElementById('score-header');
+      const num = document.getElementById('score-num');
+      const verdict = document.getElementById('verdict');
+      const actionsCard = document.getElementById('actions-card');
+      const nextBtn = document.getElementById('next-btn');
+
+      // Score circle arc
+      const circ = 2 * Math.PI * 34;
+      const dashoffset = circ * (1 - SCORE / 100);
+      const circle = header.querySelector('circle:last-child');
+      if (circle) {
+        circle.setAttribute('stroke-dasharray', circ.toFixed(1));
+        circle.setAttribute('stroke-dashoffset', dashoffset.toFixed(1));
+      }
+
+      if (PASS) {
+        header.className = 'score-header pass-bg';
+        num.className = 'score-circle-num pass';
+        verdict.className = 'score-verdict pass';
+        verdict.textContent = '达标';
+        header.querySelector('.score-sub').textContent = '超过目标 ' + (SCORE - 85) + '%';
+        header.querySelector('circle:last-child').setAttribute('stroke', 'var(--success)');
+        actionsCard.querySelector('.actions-hint').textContent = '已达标，可继续下一段';
+        actionsCard.querySelector('.btn-primary').textContent = '再练一次';
+      } else {
+        nextBtn.style.color = 'var(--text-3)';
+      }
+    }
+
+    renderAlignment();
+    renderMatrix();
+    updateUI();
+  </script>
+</body>
+</html>

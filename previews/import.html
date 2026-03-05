@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>导入文章 — AlignSpeak</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .page-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 8px 24px 32px;
+      gap: 24px;
+      overflow-y: auto;
+    }
+    .page-headline {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .page-desc { font-size: 14px; color: var(--text-2); margin-top: 6px; line-height: 1.6; }
+    .import-methods { display: flex; flex-direction: column; gap: 10px; }
+    .method-btn {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 18px;
+      background: var(--card);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      text-align: left;
+    }
+    .method-btn:hover { border-color: var(--accent); background: var(--card-2); }
+    .method-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: var(--card-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .method-info { flex: 1; }
+    .method-name { font-size: 15px; font-weight: 600; }
+    .method-desc { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+    .method-badge { font-size: 11px; font-weight: 600; color: var(--accent-2); background: var(--accent-glow); padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
+    .divider-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-3);
+    }
+    .divider-label::before, .divider-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .manual-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      background: transparent;
+      border: 1px dashed var(--border-2);
+      border-radius: var(--r);
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-2);
+      transition: color 0.15s, border-color 0.15s;
+      text-align: left;
+    }
+    .manual-btn:hover { color: var(--text); border-color: var(--border-2); }
+
+    /* Full-screen text overlay */
+    .text-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+    }
+    .text-overlay.open { transform: translateY(0); }
+    .overlay-topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .overlay-topbar-title { font-size: 16px; font-weight: 600; flex: 1; }
+    .text-area-wrap {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      padding: 16px 20px;
+      gap: 12px;
+      overflow: hidden;
+    }
+    .text-area-wrap textarea {
+      flex: 1;
+      font-size: 15px;
+      line-height: 1.7;
+      min-height: 0;
+    }
+    .text-meta-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .lang-selector {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--card-2);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-full);
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      font-family: inherit;
+      outline: none;
+    }
+    .text-stats {
+      font-size: 12px;
+      color: var(--text-3);
+      font-family: 'SF Mono', monospace;
+    }
+    .text-stats .warn { color: var(--warning); }
+    .text-stats .err { color: var(--danger); }
+    .overlay-bottom {
+      padding: 16px 20px 32px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .segment-preview {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .segment-preview-label { font-size: 11px; font-weight: 600; letter-spacing: 0.7px; text-transform: uppercase; color: var(--text-3); }
+    .segment-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .segment-chip {
+      padding: 4px 10px;
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-full);
+      font-size: 12px;
+      color: var(--text-2);
+      max-width: 120px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .segment-chip.more { color: var(--text-3); }
+
+    /* OCR loading */
+    .ocr-loading {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 40px;
+    }
+    .ocr-loading.show { display: flex; }
+    .ocr-spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border-2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Topbar -->
+    <div class="topbar">
+      <a href="start.html" class="icon-btn" title="返回">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      </a>
+      <span class="topbar-title" style="font-size:16px;">新建文章</span>
+      <a href="mine.html" class="icon-btn" title="我的">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </a>
+    </div>
+
+    <!-- Body -->
+    <div class="page-body fade-up">
+      <div>
+        <h1 class="page-headline">选择导入方式</h1>
+        <p class="page-desc">将文章导入后，你可以进行校对和分段确认。</p>
+      </div>
+
+      <div class="import-methods">
+        <button class="method-btn" onclick="openOverlay('clipboard')">
+          <div class="method-icon">📋</div>
+          <div class="method-info">
+            <div class="method-name">从剪贴板粘贴</div>
+            <div class="method-desc">直接粘贴已复制的文本</div>
+          </div>
+          <div class="method-badge">推荐</div>
+        </button>
+
+        <button class="method-btn" onclick="triggerFileUpload()">
+          <div class="method-icon">📄</div>
+          <div class="method-info">
+            <div class="method-name">上传文件</div>
+            <div class="method-desc">支持 .txt · .md · 图片 OCR</div>
+          </div>
+        </button>
+
+        <input type="file" id="file-input" accept=".txt,.md,image/*" style="display:none" onchange="handleFile(event)">
+      </div>
+
+      <div class="divider-label">或手动输入</div>
+
+      <button class="manual-btn" onclick="openOverlay('manual')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        输入文本内容
+      </button>
+    </div>
+  </div>
+
+  <!-- Full-screen text overlay -->
+  <div class="text-overlay" id="text-overlay">
+    <div class="overlay-topbar">
+      <button class="icon-btn" onclick="closeOverlay()" style="background:transparent;border-color:transparent;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <span class="overlay-topbar-title">校对文本</span>
+      <span class="text-stats" id="text-stats">0 字 · 0 段</span>
+    </div>
+
+    <!-- OCR loading -->
+    <div class="ocr-loading" id="ocr-loading">
+      <div class="ocr-spinner"></div>
+      <span style="font-size:14px;color:var(--text-2);">正在识别图片文字…</span>
+    </div>
+
+    <div class="text-area-wrap" id="text-wrap">
+      <div class="text-meta-bar">
+        <select class="lang-selector" id="lang-select">
+          <option value="en">🇺🇸 English</option>
+          <option value="zh">🇨🇳 中文</option>
+          <option value="jp">🇯🇵 日本語</option>
+          <option value="ko">🇰🇷 한국어</option>
+          <option value="fr">🇫🇷 Français</option>
+        </select>
+        <span style="font-size:12px;color:var(--text-3);">自动检测 · 可修改</span>
+      </div>
+      <textarea class="input" id="text-input"
+        placeholder="在此输入或粘贴文章内容…&#10;&#10;以换行分隔段落。"
+        oninput="updateStats()"
+      ></textarea>
+    </div>
+
+    <div class="overlay-bottom">
+      <div class="segment-preview" id="seg-preview" style="display:none">
+        <div class="segment-preview-label">段落预览</div>
+        <div class="segment-chips" id="seg-chips"></div>
+      </div>
+      <div id="validation-msg" style="font-size:13px;color:var(--danger);display:none"></div>
+      <button class="btn btn-primary btn-full btn-lg" id="confirm-btn" onclick="confirmText()" disabled>
+        确认并开始练习
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const SAMPLE_TEXT = `Once when I was six years old I saw a magnificent picture in a book about the primeval forest.
+
+It was a picture of a boa constrictor in the act of swallowing an animal.
+
+In the book it said: Boa constrictors swallow their prey whole, without chewing it. After that I used to think a lot about jungle adventures.
+
+I showed my masterpiece to the grown-ups, and asked them whether the drawing frightened them.
+
+They answered: "Why should anyone be frightened by a hat?"`;
+
+    function openOverlay(source) {
+      const overlay = document.getElementById('text-overlay');
+      overlay.classList.add('open');
+      const input = document.getElementById('text-input');
+      if (source === 'clipboard') {
+        navigator.clipboard.readText().then(text => {
+          input.value = text || SAMPLE_TEXT;
+          detectLang(input.value);
+          updateStats();
+        }).catch(() => {
+          input.value = SAMPLE_TEXT;
+          detectLang(SAMPLE_TEXT);
+          updateStats();
+        });
+      } else if (source === 'manual') {
+        setTimeout(() => input.focus(), 350);
+      }
+    }
+
+    function closeOverlay() {
+      document.getElementById('text-overlay').classList.remove('open');
+    }
+
+    function triggerFileUpload() {
+      document.getElementById('file-input').click();
+    }
+
+    function handleFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const overlay = document.getElementById('text-overlay');
+      overlay.classList.add('open');
+
+      if (file.type.startsWith('image/')) {
+        document.getElementById('ocr-loading').classList.add('show');
+        document.getElementById('text-wrap').style.display = 'none';
+        setTimeout(() => {
+          document.getElementById('ocr-loading').classList.remove('show');
+          document.getElementById('text-wrap').style.display = 'flex';
+          const input = document.getElementById('text-input');
+          input.value = SAMPLE_TEXT;
+          detectLang(SAMPLE_TEXT);
+          updateStats();
+        }, 2200);
+      } else {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const input = document.getElementById('text-input');
+          input.value = ev.target.result;
+          detectLang(ev.target.result);
+          updateStats();
+        };
+        reader.readAsText(file);
+      }
+    }
+
+    function detectLang(text) {
+      const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+      const jp = (text.match(/[\u3040-\u30ff]/g) || []).length;
+      const kr = (text.match(/[\uac00-\ud7af]/g) || []).length;
+      const sel = document.getElementById('lang-select');
+      if (jp > 5) sel.value = 'jp';
+      else if (kr > 5) sel.value = 'ko';
+      else if (cjk > 10) sel.value = 'zh';
+      else sel.value = 'en';
+    }
+
+    function updateStats() {
+      const text = document.getElementById('text-input').value.trim();
+      const segments = text ? text.split(/\n+/).filter(s => s.trim().length > 0) : [];
+      const chars = text.replace(/\s/g, '').length;
+      const statsEl = document.getElementById('text-stats');
+      const btnEl = document.getElementById('confirm-btn');
+      const msgEl = document.getElementById('validation-msg');
+      const previewEl = document.getElementById('seg-preview');
+      const chipsEl = document.getElementById('seg-chips');
+
+      let statText = `${chars} 字 · ${segments.length} 段`;
+      let valid = true;
+      let msg = '';
+
+      if (text.length < 20) { valid = false; msg = '文本不能少于 20 个字符'; }
+      else if (segments.length < 1) { valid = false; msg = '至少需要 1 个段落'; }
+      else if (segments.length > 30) { valid = false; msg = `段落数超出上限（${segments.length}/30），请在此手动拆分或精简`; }
+
+      if (segments.length > 30) statText += ` <span class="err">超出上限</span>`;
+      else if (segments.length > 20) statText += ` <span class="warn">接近上限</span>`;
+
+      statsEl.innerHTML = statText;
+      btnEl.disabled = !valid;
+      msgEl.style.display = msg ? 'block' : 'none';
+      msgEl.textContent = msg;
+
+      if (segments.length > 0) {
+        previewEl.style.display = 'flex';
+        const show = segments.slice(0, 4);
+        chipsEl.innerHTML = show.map((s, i) =>
+          `<span class="segment-chip">§${i+1} ${s.slice(0, 12)}${s.length > 12 ? '…' : ''}</span>`
+        ).join('') + (segments.length > 4 ? `<span class="segment-chip more">+${segments.length - 4} 段</span>` : '');
+      } else {
+        previewEl.style.display = 'none';
+      }
+    }
+
+    function confirmText() {
+      sessionStorage.setItem('article_text', document.getElementById('text-input').value);
+      sessionStorage.setItem('article_lang', document.getElementById('lang-select').value);
+      window.location.href = 'practice.html?new=1';
+    }
+  </script>
+</body>
+</html>

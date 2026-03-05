@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>AlignSpeak</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 32px 24px 48px;
+      gap: 32px;
+    }
+    .greeting { font-size: 14px; color: var(--text-2); margin-bottom: 4px; }
+    .greeting strong { color: var(--text); font-weight: 600; }
+    .article-card {
+      background: var(--card);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r);
+      padding: 22px;
+      position: relative;
+      overflow: hidden;
+    }
+    .article-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    }
+    .article-lang-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--text-3);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .article-title {
+      font-size: 17px;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 20px;
+    }
+    .meta-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .meta-label { font-size: 10px; font-weight: 600; letter-spacing: 0.7px; text-transform: uppercase; color: var(--text-3); }
+    .meta-value { font-size: 15px; font-weight: 700; color: var(--text); font-family: 'SF Mono', monospace; }
+    .meta-value .accent { color: var(--accent-2); }
+    .divider-v { width: 1px; background: var(--border); align-self: stretch; margin: 0 4px; }
+    .progress-bar-wrap {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-2);
+    }
+    .progress-bar {
+      height: 4px;
+      background: var(--card-2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .or-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-3);
+      font-size: 12px;
+    }
+    .or-divider::before, .or-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .recent-section { display: flex; flex-direction: column; gap: 10px; }
+    .recent-label { font-size: 11px; font-weight: 600; letter-spacing: 0.7px; text-transform: uppercase; color: var(--text-3); padding: 0 2px; }
+    .recent-list { display: flex; flex-direction: column; gap: 8px; }
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 13px 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      text-decoration: none;
+    }
+    .recent-item:hover { border-color: var(--border-2); background: var(--card-2); }
+    .recent-item-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--card-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .recent-item-body { flex: 1; min-width: 0; }
+    .recent-item-title {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .recent-item-meta { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+    .recent-item-level {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-2);
+      font-family: 'SF Mono', monospace;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="logo-icon" style="width:30px;height:30px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;">🎯</div>
+      <span class="topbar-title" style="font-size:15px;">AlignSpeak</span>
+      <a href="mine.html" class="icon-btn" title="我的">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </a>
+    </div>
+
+    <!-- Main -->
+    <div class="main-content fade-up scroll">
+      <div>
+        <p class="greeting">欢迎回来，<strong>张明</strong></p>
+      </div>
+
+      <!-- Current article card -->
+      <div class="article-card">
+        <div class="article-lang-badge">🇺🇸 English</div>
+        <div class="article-title">The Little Prince — Chapter I</div>
+        <div class="meta-row">
+          <div class="meta-item">
+            <span class="meta-label">当前等级</span>
+            <span class="meta-value"><span class="accent">L2</span></span>
+          </div>
+          <div class="divider-v"></div>
+          <div class="meta-item">
+            <span class="meta-label">当前段落</span>
+            <span class="meta-value">3 <span style="font-size:13px;color:var(--text-2);font-weight:400;">/ 5</span></span>
+          </div>
+          <div class="divider-v"></div>
+          <div class="meta-item">
+            <span class="meta-label">上次练习</span>
+            <span class="meta-value" style="font-size:13px;color:var(--text-2);font-weight:500;">今天</span>
+          </div>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-label">
+            <span>L2 整体进度</span>
+            <span>2 / 5 段达标</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:40%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <a href="practice.html" class="btn btn-primary btn-lg btn-full">继续上次练习</a>
+        <div class="or-divider">或</div>
+        <a href="import.html" class="btn btn-secondary btn-full">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+          导入新文章
+        </a>
+      </div>
+
+      <!-- Recent articles -->
+      <div class="recent-section">
+        <div class="recent-label">历史文章</div>
+        <div class="recent-list">
+          <a href="practice.html?a=2" class="recent-item">
+            <div class="recent-item-icon">📖</div>
+            <div class="recent-item-body">
+              <div class="recent-item-title">Pride and Prejudice — Opening</div>
+              <div class="recent-item-meta">英语 · 2天前 · 段落 2/4</div>
+            </div>
+            <div class="recent-item-level">L1</div>
+          </a>
+          <a href="practice.html?a=3" class="recent-item">
+            <div class="recent-item-icon">📗</div>
+            <div class="recent-item-body">
+              <div class="recent-item-title">《围城》第一章节选</div>
+              <div class="recent-item-meta">中文 · 13天前 · 段落 5/8</div>
+            </div>
+            <div class="recent-item-level">L3</div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
