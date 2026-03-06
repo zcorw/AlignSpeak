@@ -2,6 +2,9 @@ import { useState, FormEvent } from 'react'
 import { Box, TextField, Button, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { loginSchema } from '../utils/validation'
+import { Alert, FieldError } from '../components/Alert'
+import { ZodError } from 'zod'
 
 export const LoginPage = () => {
   const { t } = useTranslation()
@@ -10,18 +13,40 @@ export const LoginPage = () => {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setFieldErrors({})
 
-    // TODO: Call login API
-    setTimeout(() => {
+    try {
+      // Validate form data
+      const validatedData = loginSchema.parse({ email, password })
+
+      // TODO: Call login API with validatedData
+      setTimeout(() => {
+        setLoading(false)
+        // Mock: navigate to start page
+        navigate('/start')
+      }, 1000)
+    } catch (err) {
       setLoading(false)
-      // Mock: navigate to start page
-      navigate('/start')
-    }, 1000)
+      if (err instanceof ZodError) {
+        // Handle validation errors
+        const errors: Record<string, string> = {}
+        err.issues.forEach((issue) => {
+          if (issue.path[0]) {
+            errors[issue.path[0] as string] = issue.message
+          }
+        })
+        setFieldErrors(errors)
+      } else {
+        // Handle API errors
+        setError('An unexpected error occurred. Please try again.')
+      }
+    }
   }
 
   return (
@@ -91,15 +116,18 @@ export const LoginPage = () => {
             <TextField
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setFieldErrors((prev) => ({ ...prev, email: '' }))
+              }}
               placeholder={t('pages.login.emailPlaceholder')}
-              required
               autoComplete="email"
               fullWidth
+              error={!!fieldErrors.email}
               sx={{
                 '& .MuiInputBase-root': {
                   bgcolor: '#22223a',
-                  border: '1px solid rgba(255,255,255,0.13)',
+                  border: `1px solid ${fieldErrors.email ? '#f05252' : 'rgba(255,255,255,0.13)'}`,
                   borderRadius: '8px',
                   fontSize: 15,
                   color: '#eeeef6',
@@ -113,6 +141,7 @@ export const LoginPage = () => {
                 },
               }}
             />
+            {fieldErrors.email && <FieldError message={fieldErrors.email} />}
           </Box>
 
           <Box>
@@ -133,15 +162,18 @@ export const LoginPage = () => {
             <TextField
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                setFieldErrors((prev) => ({ ...prev, password: '' }))
+              }}
               placeholder={t('pages.login.passwordPlaceholder')}
-              required
               autoComplete="current-password"
               fullWidth
+              error={!!fieldErrors.password}
               sx={{
                 '& .MuiInputBase-root': {
                   bgcolor: '#22223a',
-                  border: '1px solid rgba(255,255,255,0.13)',
+                  border: `1px solid ${fieldErrors.password ? '#f05252' : 'rgba(255,255,255,0.13)'}`,
                   borderRadius: '8px',
                   fontSize: 15,
                   color: '#eeeef6',
@@ -155,22 +187,11 @@ export const LoginPage = () => {
                 },
               }}
             />
+            {fieldErrors.password && <FieldError message={fieldErrors.password} />}
           </Box>
 
           {error && (
-            <Box
-              sx={{
-                px: '12px',
-                py: '12px',
-                bgcolor: 'rgba(240,82,82,0.1)',
-                border: '1px solid rgba(240,82,82,0.3)',
-                borderRadius: '8px',
-                color: '#f05252',
-                fontSize: 14,
-              }}
-            >
-              {error}
-            </Box>
+            <Alert type="error" message={error} />
           )}
 
           <Button

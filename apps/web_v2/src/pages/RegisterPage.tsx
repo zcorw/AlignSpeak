@@ -2,6 +2,9 @@ import { useState, FormEvent } from 'react'
 import { Box, TextField, Button, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { registerSchema } from '../utils/validation'
+import { Alert, FieldError } from '../components/Alert'
+import { ZodError } from 'zod'
 
 export const RegisterPage = () => {
   const { t } = useTranslation()
@@ -12,19 +15,41 @@ export const RegisterPage = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
     setSuccessMessage(null)
+    setFieldErrors({})
 
-    // TODO: Call register API
-    setTimeout(() => {
+    try {
+      // Validate form data
+      const validatedData = registerSchema.parse({ email, password, displayName })
+
+      // TODO: Call register API with validatedData
+      setTimeout(() => {
+        setLoading(false)
+        setSuccessMessage(t('pages.register.success'))
+        navigate('/register/verify', { state: { email, verificationCode: '123456' } })
+      }, 1000)
+    } catch (err) {
       setLoading(false)
-      setSuccessMessage(t('pages.register.success'))
-      navigate('/register/verify', { state: { email, verificationCode: '123456' } })
-    }, 1000)
+      if (err instanceof ZodError) {
+        // Handle validation errors
+        const errors: Record<string, string> = {}
+        err.issues.forEach((issue) => {
+          if (issue.path[0]) {
+            errors[issue.path[0] as string] = issue.message
+          }
+        })
+        setFieldErrors(errors)
+      } else {
+        // Handle API errors
+        setError('An unexpected error occurred. Please try again.')
+      }
+    }
   }
 
   const labelSx = {
@@ -91,13 +116,23 @@ export const RegisterPage = () => {
             <TextField
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setFieldErrors((prev) => ({ ...prev, email: '' }))
+              }}
               placeholder={t('pages.register.emailPlaceholder')}
-              required
               autoComplete="email"
               fullWidth
-              sx={inputSx}
+              error={!!fieldErrors.email}
+              sx={{
+                ...inputSx,
+                '& .MuiInputBase-root': {
+                  ...inputSx['& .MuiInputBase-root'],
+                  border: `1px solid ${fieldErrors.email ? '#f05252' : 'rgba(255,255,255,0.13)'}`,
+                },
+              }}
             />
+            {fieldErrors.email && <FieldError message={fieldErrors.email} />}
           </Box>
 
           <Box>
@@ -105,13 +140,23 @@ export const RegisterPage = () => {
             <TextField
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                setFieldErrors((prev) => ({ ...prev, password: '' }))
+              }}
               placeholder={t('pages.register.passwordPlaceholder')}
-              required
               autoComplete="new-password"
               fullWidth
-              sx={inputSx}
+              error={!!fieldErrors.password}
+              sx={{
+                ...inputSx,
+                '& .MuiInputBase-root': {
+                  ...inputSx['& .MuiInputBase-root'],
+                  border: `1px solid ${fieldErrors.password ? '#f05252' : 'rgba(255,255,255,0.13)'}`,
+                },
+              }}
             />
+            {fieldErrors.password && <FieldError message={fieldErrors.password} />}
           </Box>
 
           <Box>
@@ -128,35 +173,11 @@ export const RegisterPage = () => {
           </Box>
 
           {successMessage && (
-            <Box
-              sx={{
-                px: '12px',
-                py: '12px',
-                bgcolor: 'rgba(29,201,138,0.1)',
-                border: '1px solid rgba(29,201,138,0.3)',
-                borderRadius: '8px',
-                color: '#1dc98a',
-                fontSize: 14,
-              }}
-            >
-              {successMessage}
-            </Box>
+            <Alert type="success" message={successMessage} />
           )}
 
           {error && (
-            <Box
-              sx={{
-                px: '12px',
-                py: '12px',
-                bgcolor: 'rgba(240,82,82,0.1)',
-                border: '1px solid rgba(240,82,82,0.3)',
-                borderRadius: '8px',
-                color: '#f05252',
-                fontSize: 14,
-              }}
-            >
-              {error}
-            </Box>
+            <Alert type="error" message={error} />
           )}
 
           <Button

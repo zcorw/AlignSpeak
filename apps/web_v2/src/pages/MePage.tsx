@@ -3,6 +3,9 @@ import { Box, Button, TextField, Typography } from '@mui/material'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { changePasswordSchema } from '../utils/validation'
+import { FieldError } from '../components/Alert'
+import { ZodError } from 'zod'
 
 type FilterType = 'all' | 'en' | 'zh' | 'done'
 
@@ -94,6 +97,7 @@ export const MePage = () => {
   const [currentPwd, setCurrentPwd] = useState('')
   const [newPwd, setNewPwd] = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const filteredArticles = useMemo(() => {
     if (filter === 'en') return ARTICLES.filter((item) => item.lang === 'en')
@@ -108,18 +112,38 @@ export const MePage = () => {
 
   const closePasswordModal = () => {
     setPasswordModalOpen(false)
-  }
-
-  const submitPasswordChange = () => {
-    if (!currentPwd || !newPwd || !confirmPwd) return
-    if (newPwd !== confirmPwd) {
-      window.alert(t('pages.me.passwordModal.mismatchError'))
-      return
-    }
     setCurrentPwd('')
     setNewPwd('')
     setConfirmPwd('')
-    closePasswordModal()
+    setFieldErrors({})
+  }
+
+  const submitPasswordChange = () => {
+    setFieldErrors({})
+
+    try {
+      // Validate form data
+      changePasswordSchema.parse({
+        currentPassword: currentPwd,
+        newPassword: newPwd,
+        confirmPassword: confirmPwd,
+      })
+
+      // TODO: Call change password API
+      console.log('Password change validated')
+      closePasswordModal()
+    } catch (err) {
+      if (err instanceof ZodError) {
+        // Handle validation errors
+        const errors: Record<string, string> = {}
+        err.issues.forEach((issue) => {
+          if (issue.path[0]) {
+            errors[issue.path[0] as string] = issue.message
+          }
+        })
+        setFieldErrors(errors)
+      }
+    }
   }
 
   const filters = [
@@ -419,45 +443,69 @@ export const MePage = () => {
           </Box>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <TextField
-              value={currentPwd}
-              onChange={(event) => setCurrentPwd(event.target.value)}
-              type="password"
-              size="small"
-              fullWidth
-              placeholder={t('pages.me.passwordModal.currentPlaceholder')}
-              sx={{
-                '.MuiOutlinedInput-root': {
-                  bgcolor: '#22223a',
-                },
-              }}
-            />
-            <TextField
-              value={newPwd}
-              onChange={(event) => setNewPwd(event.target.value)}
-              type="password"
-              size="small"
-              fullWidth
-              placeholder={t('pages.me.passwordModal.newPlaceholder')}
-              sx={{
-                '.MuiOutlinedInput-root': {
-                  bgcolor: '#22223a',
-                },
-              }}
-            />
-            <TextField
-              value={confirmPwd}
-              onChange={(event) => setConfirmPwd(event.target.value)}
-              type="password"
-              size="small"
-              fullWidth
-              placeholder={t('pages.me.passwordModal.confirmPlaceholder')}
-              sx={{
-                '.MuiOutlinedInput-root': {
-                  bgcolor: '#22223a',
-                },
-              }}
-            />
+            <Box>
+              <TextField
+                value={currentPwd}
+                onChange={(event) => {
+                  setCurrentPwd(event.target.value)
+                  setFieldErrors((prev) => ({ ...prev, currentPassword: '' }))
+                }}
+                type="password"
+                size="small"
+                fullWidth
+                placeholder={t('pages.me.passwordModal.currentPlaceholder')}
+                error={!!fieldErrors.currentPassword}
+                sx={{
+                  '.MuiOutlinedInput-root': {
+                    bgcolor: '#22223a',
+                    borderColor: fieldErrors.currentPassword ? '#f05252' : undefined,
+                  },
+                }}
+              />
+              {fieldErrors.currentPassword && <FieldError message={fieldErrors.currentPassword} />}
+            </Box>
+            <Box>
+              <TextField
+                value={newPwd}
+                onChange={(event) => {
+                  setNewPwd(event.target.value)
+                  setFieldErrors((prev) => ({ ...prev, newPassword: '' }))
+                }}
+                type="password"
+                size="small"
+                fullWidth
+                placeholder={t('pages.me.passwordModal.newPlaceholder')}
+                error={!!fieldErrors.newPassword}
+                sx={{
+                  '.MuiOutlinedInput-root': {
+                    bgcolor: '#22223a',
+                    borderColor: fieldErrors.newPassword ? '#f05252' : undefined,
+                  },
+                }}
+              />
+              {fieldErrors.newPassword && <FieldError message={fieldErrors.newPassword} />}
+            </Box>
+            <Box>
+              <TextField
+                value={confirmPwd}
+                onChange={(event) => {
+                  setConfirmPwd(event.target.value)
+                  setFieldErrors((prev) => ({ ...prev, confirmPassword: '' }))
+                }}
+                type="password"
+                size="small"
+                fullWidth
+                placeholder={t('pages.me.passwordModal.confirmPlaceholder')}
+                error={!!fieldErrors.confirmPassword}
+                sx={{
+                  '.MuiOutlinedInput-root': {
+                    bgcolor: '#22223a',
+                    borderColor: fieldErrors.confirmPassword ? '#f05252' : undefined,
+                  },
+                }}
+              />
+              {fieldErrors.confirmPassword && <FieldError message={fieldErrors.confirmPassword} />}
+            </Box>
           </Box>
 
           <Button variant="contained" fullWidth onClick={submitPasswordChange}>

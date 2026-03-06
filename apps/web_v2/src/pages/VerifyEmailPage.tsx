@@ -2,6 +2,9 @@ import { useState, FormEvent } from 'react'
 import { Box, TextField, Button, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { verifyEmailSchema } from '../utils/validation'
+import { Alert, FieldError } from '../components/Alert'
+import { ZodError } from 'zod'
 
 interface LocationState {
   email?: string
@@ -19,18 +22,40 @@ export const VerifyEmailPage = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setFieldErrors({})
 
-    // TODO: Call verify-email API
-    setTimeout(() => {
+    try {
+      // Validate form data
+      const validatedData = verifyEmailSchema.parse({ email, code })
+
+      // TODO: Call verify-email API with validatedData
+      setTimeout(() => {
+        setLoading(false)
+        setSuccessMessage(t('pages.verifyEmail.success'))
+        setTimeout(() => navigate('/login', { replace: true }), 1200)
+      }, 1000)
+    } catch (err) {
       setLoading(false)
-      setSuccessMessage(t('pages.verifyEmail.success'))
-      setTimeout(() => navigate('/login', { replace: true }), 1200)
-    }, 1000)
+      if (err instanceof ZodError) {
+        // Handle validation errors
+        const errors: Record<string, string> = {}
+        err.issues.forEach((issue) => {
+          if (issue.path[0]) {
+            errors[issue.path[0] as string] = issue.message
+          }
+        })
+        setFieldErrors(errors)
+      } else {
+        // Handle API errors
+        setError('An unexpected error occurred. Please try again.')
+      }
+    }
   }
 
   const labelSx = {
@@ -95,13 +120,23 @@ export const VerifyEmailPage = () => {
             <TextField
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setFieldErrors((prev) => ({ ...prev, email: '' }))
+              }}
               placeholder={t('pages.verifyEmail.emailPlaceholder')}
-              required
               autoComplete="email"
               fullWidth
-              sx={inputSx}
+              error={!!fieldErrors.email}
+              sx={{
+                ...inputSx,
+                '& .MuiInputBase-root': {
+                  ...inputSx['& .MuiInputBase-root'],
+                  border: `1px solid ${fieldErrors.email ? '#f05252' : 'rgba(255,255,255,0.13)'}`,
+                },
+              }}
             />
+            {fieldErrors.email && <FieldError message={fieldErrors.email} />}
           </Box>
 
           <Box>
@@ -109,13 +144,20 @@ export const VerifyEmailPage = () => {
             <TextField
               type="text"
               value={code}
-              onChange={(e) => setCode(e.target.value.trim())}
+              onChange={(e) => {
+                setCode(e.target.value.trim())
+                setFieldErrors((prev) => ({ ...prev, code: '' }))
+              }}
               placeholder={t('pages.verifyEmail.codePlaceholder')}
-              required
-              inputProps={{ maxLength: 6, pattern: '[0-9]{6}' }}
+              inputProps={{ maxLength: 6 }}
               fullWidth
+              error={!!fieldErrors.code}
               sx={{
                 ...inputSx,
+                '& .MuiInputBase-root': {
+                  ...inputSx['& .MuiInputBase-root'],
+                  border: `1px solid ${fieldErrors.code ? '#f05252' : 'rgba(255,255,255,0.13)'}`,
+                },
                 '& input': {
                   fontFamily: "'SF Mono', 'Fira Code', monospace",
                   letterSpacing: '0.5em',
@@ -124,61 +166,20 @@ export const VerifyEmailPage = () => {
                 },
               }}
             />
+            {fieldErrors.code && <FieldError message={fieldErrors.code} />}
           </Box>
 
           {/* Dev verification code hint */}
           {state.verificationCode && (
-            <Box
-              sx={{
-                px: '12px',
-                py: '12px',
-                bgcolor: 'rgba(110,96,238,0.15)',
-                border: '1px solid rgba(110,96,238,0.3)',
-                borderRadius: '8px',
-                color: '#8b7fff',
-                fontSize: 14,
-              }}
-            >
-              {t('pages.verifyEmail.devCodePrefix')}{' '}
-              <Box
-                component="span"
-                sx={{ fontFamily: "'SF Mono', monospace", fontWeight: 600 }}
-              >
-                {state.verificationCode}
-              </Box>
-            </Box>
+            <Alert type="info" message={`${t('pages.verifyEmail.devCodePrefix')} ${state.verificationCode}`} />
           )}
 
           {successMessage && (
-            <Box
-              sx={{
-                px: '12px',
-                py: '12px',
-                bgcolor: 'rgba(29,201,138,0.1)',
-                border: '1px solid rgba(29,201,138,0.3)',
-                borderRadius: '8px',
-                color: '#1dc98a',
-                fontSize: 14,
-              }}
-            >
-              {successMessage}
-            </Box>
+            <Alert type="success" message={successMessage} />
           )}
 
           {error && (
-            <Box
-              sx={{
-                px: '12px',
-                py: '12px',
-                bgcolor: 'rgba(240,82,82,0.1)',
-                border: '1px solid rgba(240,82,82,0.3)',
-                borderRadius: '8px',
-                color: '#f05252',
-                fontSize: 14,
-              }}
-            >
-              {error}
-            </Box>
+            <Alert type="error" message={error} />
           )}
 
           <Button
