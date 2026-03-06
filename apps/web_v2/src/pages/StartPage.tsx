@@ -1,18 +1,20 @@
 import { NorthRounded, PersonOutlineRounded } from '@mui/icons-material'
 import { Box, Button, Typography } from '@mui/material'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, Link } from 'react-router-dom'
 
 export const StartPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   const currentArticle = {
-    title: 'The Little Prince — Chapter I',
-    language: '🇺🇸 English',
+    title: t('pages.start.currentArticle.title'),
+    language: t('pages.start.currentArticle.language'),
     level: 2,
     segment: 3,
     totalSegments: 5,
     passedSegments: 2,
-    lastPracticedAt: '今天',
+    lastPracticedAt: t('pages.start.currentArticle.lastPracticeValue'),
   }
   const progress = Math.round((currentArticle.passedSegments / currentArticle.totalSegments) * 100)
 
@@ -21,16 +23,16 @@ export const StartPage = () => {
       id: '2',
       to: '/practice',
       icon: '📖',
-      title: 'Pride and Prejudice — Opening',
-      meta: '英语 · 2天前 · 段落 2/4',
+      title: t('pages.start.recent.article1.title'),
+      meta: t('pages.start.recent.article1.meta'),
       level: 'L1',
     },
     {
       id: '3',
       to: '/practice',
       icon: '📗',
-      title: '《围城》第一章节选',
-      meta: '中文 · 13天前 · 段落 5/8',
+      title: t('pages.start.recent.article2.title'),
+      meta: t('pages.start.recent.article2.meta'),
       level: 'L3',
     },
   ]
@@ -65,12 +67,12 @@ export const StartPage = () => {
           🎯
         </Box>
         <Typography sx={{ fontSize: '15px', fontWeight: 600, flex: 1 }}>
-          AlignSpeak
+          {t('pages.start.appTitle')}
         </Typography>
         <Box
           component="button"
           type="button"
-          aria-label="我的"
+          aria-label={t('pages.start.meAriaLabel')}
           onClick={() => navigate('/me')}
           sx={{
             width: 36,
@@ -121,7 +123,10 @@ export const StartPage = () => {
       >
         <Box>
           <Typography sx={{ fontSize: '14px', color: 'text.secondary', mb: '4px' }}>
-            欢迎回来，<Box component="strong" sx={{ color: 'text.primary', fontWeight: 600 }}>张明</Box>
+            {t('pages.start.greetingPrefix')}
+            <Box component="strong" sx={{ color: 'text.primary', fontWeight: 600 }}>
+              {t('pages.start.userName')}
+            </Box>
           </Typography>
         </Box>
 
@@ -175,7 +180,7 @@ export const StartPage = () => {
                   color: 'text.disabled',
                 }}
               >
-                当前等级
+                {t('pages.start.currentArticle.currentLevel')}
               </Typography>
               <Typography sx={{ fontSize: '15px', fontWeight: 700, fontFamily: '"SF Mono", "Fira Code", monospace' }}>
                 <Box component="span" sx={{ color: 'primary.light' }}>L{currentArticle.level}</Box>
@@ -194,7 +199,7 @@ export const StartPage = () => {
                   color: 'text.disabled',
                 }}
               >
-                当前段落
+                {t('pages.start.currentArticle.currentSegment')}
               </Typography>
               <Typography sx={{ fontSize: '15px', fontWeight: 700, fontFamily: '"SF Mono", "Fira Code", monospace' }}>
                 {currentArticle.segment}
@@ -216,7 +221,7 @@ export const StartPage = () => {
                   color: 'text.disabled',
                 }}
               >
-                上次练习
+                {t('pages.start.currentArticle.lastPractice')}
               </Typography>
               <Typography sx={{ fontSize: '13px', color: 'text.secondary', fontWeight: 500 }}>
                 {currentArticle.lastPracticedAt}
@@ -227,10 +232,13 @@ export const StartPage = () => {
           <Box sx={{ mt: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'text.secondary' }}>
               <Typography component="span" sx={{ fontSize: '12px', color: 'text.secondary' }}>
-                L{currentArticle.level} 整体进度
+                {t('pages.start.currentArticle.overallProgress', { level: currentArticle.level })}
               </Typography>
               <Typography component="span" sx={{ fontSize: '12px', color: 'text.secondary' }}>
-                {currentArticle.passedSegments} / {currentArticle.totalSegments} 段达标
+                {t('pages.start.currentArticle.passedSegments', {
+                  passed: currentArticle.passedSegments,
+                  total: currentArticle.totalSegments,
+                })}
               </Typography>
             </Box>
             <Box sx={{ height: 4, bgcolor: '#22223a', borderRadius: '4px', overflow: 'hidden' }}>
@@ -260,7 +268,7 @@ export const StartPage = () => {
               },
             }}
           >
-            继续上次练习
+            {t('pages.start.continuePractice')}
           </Button>
 
           <Box
@@ -278,7 +286,7 @@ export const StartPage = () => {
               },
             }}
           >
-            或
+            {t('pages.start.or')}
           </Box>
 
           <Button
@@ -296,7 +304,7 @@ export const StartPage = () => {
               },
             }}
           >
-            导入新文章
+            {t('pages.start.importNewArticle')}
           </Button>
         </Box>
 
@@ -311,7 +319,7 @@ export const StartPage = () => {
               color: 'text.disabled',
             }}
           >
-            历史文章
+            {t('pages.start.historyTitle')}
           </Typography>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

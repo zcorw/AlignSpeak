@@ -1,6 +1,7 @@
 import { ArrowBackRounded, CloseRounded, NorthRounded } from '@mui/icons-material'
 import { Box, Button, TextField, Typography } from '@mui/material'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 type FilterType = 'all' | 'en' | 'zh' | 'done'
@@ -9,38 +10,29 @@ type Article = {
   id: string
   title: string
   lang: 'en' | 'zh'
-  langLabel: string
   langFlag: string
   icon: string
   level: number
   segment: number
   totalSegments: number
-  lastPracticed: string
+  lastPracticedKey: 'today' | 'twoDaysAgo' | 'thirteenDaysAgo'
   progress: number
   isActive: boolean
   isDone: boolean
   practiceCount: number
 }
 
-const FILTERS: { id: FilterType; label: string }[] = [
-  { id: 'all', label: '全部' },
-  { id: 'en', label: '🇺🇸 英语' },
-  { id: 'zh', label: '🇨🇳 中文' },
-  { id: 'done', label: '✓ 已完成' },
-]
-
 const ARTICLES: Article[] = [
   {
     id: 'a1',
     title: 'The Little Prince — Chapter I',
     lang: 'en',
-    langLabel: '英语',
     langFlag: '🇺🇸',
     icon: '📖',
     level: 2,
     segment: 3,
     totalSegments: 5,
-    lastPracticed: '今天',
+    lastPracticedKey: 'today',
     progress: 0.4,
     isActive: true,
     isDone: false,
@@ -50,13 +42,12 @@ const ARTICLES: Article[] = [
     id: 'a2',
     title: 'Pride and Prejudice — Opening',
     lang: 'en',
-    langLabel: '英语',
     langFlag: '🇺🇸',
     icon: '📗',
     level: 1,
     segment: 2,
     totalSegments: 4,
-    lastPracticed: '2天前',
+    lastPracticedKey: 'twoDaysAgo',
     progress: 0.5,
     isActive: false,
     isDone: false,
@@ -66,13 +57,12 @@ const ARTICLES: Article[] = [
     id: 'a3',
     title: '《围城》第一章节选',
     lang: 'zh',
-    langLabel: '中文',
     langFlag: '🇨🇳',
     icon: '📕',
     level: 4,
     segment: 8,
     totalSegments: 8,
-    lastPracticed: '13天前',
+    lastPracticedKey: 'thirteenDaysAgo',
     progress: 1,
     isActive: false,
     isDone: true,
@@ -96,6 +86,7 @@ const iconButtonSx = {
 } as const
 
 export const MePage = () => {
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
 
   const [filter, setFilter] = useState<FilterType>('all')
@@ -112,6 +103,8 @@ export const MePage = () => {
   }, [filter])
 
   const totalPractices = ARTICLES.reduce((sum, item) => sum + item.practiceCount, 0)
+  const currentLang = i18n.resolvedLanguage?.startsWith('zh') ? 'zh' : 'en'
+  const nextLang = currentLang === 'zh' ? 'en' : 'zh'
 
   const closePasswordModal = () => {
     setPasswordModalOpen(false)
@@ -120,7 +113,7 @@ export const MePage = () => {
   const submitPasswordChange = () => {
     if (!currentPwd || !newPwd || !confirmPwd) return
     if (newPwd !== confirmPwd) {
-      window.alert('两次密码不一致')
+      window.alert(t('pages.me.passwordModal.mismatchError'))
       return
     }
     setCurrentPwd('')
@@ -129,13 +122,22 @@ export const MePage = () => {
     closePasswordModal()
   }
 
+  const filters = [
+    { id: 'all' as const, label: t('pages.me.filters.all') },
+    { id: 'en' as const, label: t('pages.me.filters.en') },
+    { id: 'zh' as const, label: t('pages.me.filters.zh') },
+    { id: 'done' as const, label: t('pages.me.filters.done') },
+  ]
+
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', px: '20px', pt: '16px', pb: '12px' }}>
         <Box component="button" type="button" sx={iconButtonSx} onClick={() => navigate(-1)}>
           <ArrowBackRounded sx={{ fontSize: 16 }} />
         </Box>
-        <Typography sx={{ flex: 1, fontSize: '17px', fontWeight: 600 }}>我的</Typography>
+        <Typography sx={{ flex: 1, fontSize: '17px', fontWeight: 600 }}>
+          {t('pages.me.topbar.title')}
+        </Typography>
         <Button
           size="small"
           variant="contained"
@@ -143,7 +145,7 @@ export const MePage = () => {
           onClick={() => navigate('/editor')}
           sx={{ px: '14px', py: '7px' }}
         >
-          新建
+          {t('pages.me.topbar.create')}
         </Button>
       </Box>
 
@@ -164,34 +166,86 @@ export const MePage = () => {
               flexShrink: 0,
             }}
           >
-            张
+            {t('pages.me.account.avatar')}
           </Box>
           <Box sx={{ flex: 1 }}>
-            <Typography sx={{ fontSize: '16px', fontWeight: 600 }}>张明</Typography>
+            <Typography sx={{ fontSize: '16px', fontWeight: 600 }}>
+              {t('pages.me.account.name')}
+            </Typography>
             <Typography sx={{ mt: '2px', fontSize: '12px', color: 'text.secondary' }}>
-              共 {ARTICLES.length} 篇文章 · 已练 {totalPractices} 次
+              {t('pages.me.account.stats', { articles: ARTICLES.length, practices: totalPractices })}
             </Typography>
           </Box>
-          <Box
-            component="button"
-            type="button"
-            onClick={() => setPasswordModalOpen(true)}
-            sx={{
-              fontSize: '13px',
-              color: 'text.disabled',
-              border: 'none',
-              bgcolor: 'transparent',
-              cursor: 'pointer',
-              transition: 'color 0.15s',
-              '&:hover': { color: 'text.secondary' },
-            }}
-          >
-            修改密码
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+            <Box
+              component="button"
+              type="button"
+              onClick={() => setPasswordModalOpen(true)}
+              sx={{
+                fontSize: '13px',
+                color: 'text.disabled',
+                border: 'none',
+                bgcolor: 'transparent',
+                cursor: 'pointer',
+                transition: 'color 0.15s',
+                '&:hover': { color: 'text.secondary' },
+              }}
+            >
+              {t('pages.me.account.changePassword')}
+            </Box>
+            <Box
+              component="button"
+              type="button"
+              onClick={() => i18n.changeLanguage(nextLang)}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                p: '2px',
+                borderRadius: '999px',
+                border: '1px solid rgba(255,255,255,0.07)',
+                bgcolor: '#1a1a2c',
+                gap: '2px',
+                cursor: 'pointer',
+                transition: 'border-color 0.15s',
+                '&:hover': {
+                  borderColor: 'rgba(255,255,255,0.13)',
+                },
+              }}
+            >
+              <Box
+                component="span"
+                sx={{
+                  px: '8px',
+                  py: '2px',
+                  borderRadius: '999px',
+                  bgcolor: currentLang === 'zh' ? 'rgba(110,96,238,0.2)' : 'transparent',
+                  color: currentLang === 'zh' ? 'primary.light' : 'text.disabled',
+                  fontSize: '11px',
+                  lineHeight: 1.2,
+                }}
+              >
+                中
+              </Box>
+              <Box
+                component="span"
+                sx={{
+                  px: '8px',
+                  py: '2px',
+                  borderRadius: '999px',
+                  bgcolor: currentLang === 'en' ? 'rgba(110,96,238,0.2)' : 'transparent',
+                  color: currentLang === 'en' ? 'primary.light' : 'text.disabled',
+                  fontSize: '11px',
+                  lineHeight: 1.2,
+                }}
+              >
+                EN
+              </Box>
+            </Box>
           </Box>
         </Box>
 
         <Box sx={{ display: 'flex', gap: '8px', px: '20px', py: '14px', overflowX: 'auto', '&::-webkit-scrollbar': { display: 'none' } }}>
-          {FILTERS.map((item) => {
+          {filters.map((item) => {
             const active = item.id === filter
             return (
               <Box
@@ -229,7 +283,9 @@ export const MePage = () => {
           {filteredArticles.length === 0 ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', py: '60px', px: '32px', textAlign: 'center' }}>
               <Typography sx={{ fontSize: '40px' }}>📭</Typography>
-              <Typography sx={{ fontSize: '15px', color: 'text.secondary' }}>当前筛选条件下暂无文章</Typography>
+              <Typography sx={{ fontSize: '15px', color: 'text.secondary' }}>
+                {t('pages.me.emptyState')}
+              </Typography>
             </Box>
           ) : (
             filteredArticles.map((article) => (
@@ -265,11 +321,12 @@ export const MePage = () => {
                       {article.title}
                     </Typography>
                     <Typography sx={{ mt: '3px', fontSize: '12px', color: 'text.secondary' }}>
-                      {article.langFlag} {article.langLabel}
+                      {article.langFlag}{' '}
+                      {article.lang === 'en' ? t('common.languageEnglish') : t('common.languageChinese')}
                     </Typography>
                   </Box>
                   <Box sx={{ px: '9px', py: '3px', borderRadius: '999px', border: '1px solid rgba(110,96,238,0.25)', bgcolor: 'rgba(110,96,238,0.25)', color: 'primary.light', fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', flexShrink: 0 }}>
-                    {article.isDone ? '完成' : `L${article.level}`}
+                    {article.isDone ? t('pages.me.article.completed') : `L${article.level}`}
                   </Box>
                 </Box>
 
@@ -278,22 +335,28 @@ export const MePage = () => {
                     <Box sx={{ height: '100%', width: `${article.progress * 100}%`, borderRadius: '3px', background: 'linear-gradient(90deg, #6e60ee, #8b7fff)' }} />
                   </Box>
                   <Typography sx={{ fontSize: '11px', color: 'text.disabled', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                    {article.isDone ? '全部达标' : `§${article.segment}/${article.totalSegments}`}
+                    {article.isDone ? t('pages.me.article.allPassed') : `§${article.segment}/${article.totalSegments}`}
                   </Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>上次练习：{article.lastPracticed}</Typography>
+                  <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>
+                    {t('pages.me.article.lastPractice', {
+                      time: t(`pages.me.article.lastPracticeValues.${article.lastPracticedKey}`),
+                    })}
+                  </Typography>
                   <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>·</Typography>
-                  <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>练习 {article.practiceCount} 次</Typography>
+                  <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>
+                    {t('pages.me.article.practiceCount', { count: article.practiceCount })}
+                  </Typography>
                   {article.isDone && (
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px', px: '8px', py: '2px', borderRadius: '999px', bgcolor: 'rgba(29,201,138,0.1)', color: 'success.main', fontSize: '11px', fontWeight: 600 }}>
-                      ✓ 已完成
+                      {t('pages.me.article.doneBadge')}
                     </Box>
                   )}
                   {article.isActive && (
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'primary.light' }}>
-                      ▶ 当前
+                      {t('pages.me.article.currentBadge')}
                     </Box>
                   )}
                 </Box>
@@ -337,7 +400,9 @@ export const MePage = () => {
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Typography sx={{ fontSize: '16px', fontWeight: 600 }}>修改密码</Typography>
+            <Typography sx={{ fontSize: '16px', fontWeight: 600 }}>
+              {t('pages.me.passwordModal.title')}
+            </Typography>
             <Box sx={{ flex: 1 }} />
             <Box
               component="button"
@@ -360,7 +425,7 @@ export const MePage = () => {
               type="password"
               size="small"
               fullWidth
-              placeholder="当前密码"
+              placeholder={t('pages.me.passwordModal.currentPlaceholder')}
               sx={{
                 '.MuiOutlinedInput-root': {
                   bgcolor: '#22223a',
@@ -373,7 +438,7 @@ export const MePage = () => {
               type="password"
               size="small"
               fullWidth
-              placeholder="新密码"
+              placeholder={t('pages.me.passwordModal.newPlaceholder')}
               sx={{
                 '.MuiOutlinedInput-root': {
                   bgcolor: '#22223a',
@@ -386,7 +451,7 @@ export const MePage = () => {
               type="password"
               size="small"
               fullWidth
-              placeholder="确认新密码"
+              placeholder={t('pages.me.passwordModal.confirmPlaceholder')}
               sx={{
                 '.MuiOutlinedInput-root': {
                   bgcolor: '#22223a',
@@ -396,7 +461,7 @@ export const MePage = () => {
           </Box>
 
           <Button variant="contained" fullWidth onClick={submitPasswordChange}>
-            确认修改
+            {t('pages.me.passwordModal.submit')}
           </Button>
         </Box>
       </Box>

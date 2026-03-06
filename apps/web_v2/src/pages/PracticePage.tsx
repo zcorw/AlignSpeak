@@ -11,6 +11,7 @@ import {
 } from '@mui/icons-material'
 import { Box, Button, CircularProgress, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 type CellState = 'pass' | 'current' | 'skip' | 'fail'
@@ -130,6 +131,7 @@ const Matrix = ({ compact = false }: { compact?: boolean }) => (
 const formatTimer = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`
 
 export const PracticePage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [showSyncBar, setShowSyncBar] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -184,7 +186,7 @@ export const PracticePage = () => {
 
   const switchLevel = (nextLevel: Level) => {
     if (nextLevel === level) return
-    if (window.confirm(`切换到 ${nextLevel} 将重置当前等级进度。确认切换？`)) {
+    if (window.confirm(t('pages.practice.confirm.switchLevel', { level: nextLevel }))) {
       setLevel(nextLevel)
     }
   }
@@ -199,7 +201,9 @@ export const PracticePage = () => {
           <Typography sx={{ fontSize: '14px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             The Little Prince — Ch.I
           </Typography>
-          <Typography sx={{ fontSize: '11px', color: 'text.secondary' }}>英语</Typography>
+          <Typography sx={{ fontSize: '11px', color: 'text.secondary' }}>
+            {t('pages.practice.topbar.language')}
+          </Typography>
         </Box>
         <Box component="button" type="button" sx={iconButtonSx} onClick={() => setDrawerOpen(true)}>
           <GridViewRounded sx={{ fontSize: 15 }} />
@@ -231,7 +235,7 @@ export const PracticePage = () => {
             }}
           >
             {syncing ? <CircularProgress size={12} thickness={5} sx={{ color: 'warning.main' }} /> : <RefreshRounded sx={{ fontSize: 13 }} />}
-            {syncing ? '同步中…' : '未同步 · 点击重试'}
+            {syncing ? t('pages.practice.sync.syncing') : t('pages.practice.sync.unsyncedRetry')}
           </Box>
         </Box>
       )}
@@ -257,13 +261,17 @@ export const PracticePage = () => {
           <Box sx={{ px: '10px', py: '3px', borderRadius: '999px', bgcolor: 'rgba(110,96,238,0.25)', border: '1px solid rgba(110,96,238,0.3)', color: 'primary.light', fontSize: '12px', fontWeight: 600 }}>
             {level}
           </Box>
-          <Typography sx={{ fontSize: '13px', color: 'text.secondary' }}>段落 3 / 5</Typography>
-          <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>目标 ≥85%</Typography>
+          <Typography sx={{ fontSize: '13px', color: 'text.secondary' }}>
+            {t('pages.practice.meta.segmentProgress', { current: 3, total: 5 })}
+          </Typography>
+          <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>
+            {t('pages.practice.meta.targetAccuracy')}
+          </Typography>
         </Box>
 
         <Box sx={{ bgcolor: '#1a1a2c', border: '1px solid rgba(255,255,255,0.13)', borderRadius: '14px', p: '20px' }}>
           <Typography sx={{ mb: '10px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'text.disabled' }}>
-            §3 跟读段落
+            {t('pages.practice.segmentLabel', { segment: 3 })}
           </Typography>
           <Typography sx={{ fontSize: '17px', lineHeight: 1.75 }}>{segmentText}</Typography>
         </Box>
@@ -291,14 +299,18 @@ export const PracticePage = () => {
             >
               <MicRounded sx={{ fontSize: 24 }} />
             </Box>
-            <Typography sx={{ fontSize: '13px', color: 'text.secondary' }}>点击开始录音</Typography>
+            <Typography sx={{ fontSize: '13px', color: 'text.secondary' }}>
+              {t('pages.practice.startRecording')}
+            </Typography>
           </Box>
         )}
 
         {recognizing && (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', p: '32px' }}>
             <CircularProgress size={28} thickness={4} />
-            <Typography sx={{ fontSize: '14px', color: 'text.secondary' }}>识别中…</Typography>
+            <Typography sx={{ fontSize: '14px', color: 'text.secondary' }}>
+              {t('pages.practice.recognizing')}
+            </Typography>
           </Box>
         )}
 
@@ -327,20 +339,28 @@ export const PracticePage = () => {
                 >
                   {score}%
                 </Typography>
-                <Typography sx={{ fontSize: '11px', color: 'text.disabled' }}>{passed ? '达标' : '未达标'}</Typography>
+                <Typography sx={{ fontSize: '11px', color: 'text.disabled' }}>
+                  {passed ? t('pages.practice.score.passed') : t('pages.practice.score.failed')}
+                </Typography>
               </Box>
 
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                  <Typography component="span" sx={{ color: 'text.secondary' }}>正确词</Typography>
+                  <Typography component="span" sx={{ color: 'text.secondary' }}>
+                    {t('pages.practice.score.correctWords')}
+                  </Typography>
                   <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>11 / 18</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                  <Typography component="span" sx={{ color: 'text.secondary' }}>错误词</Typography>
+                  <Typography component="span" sx={{ color: 'text.secondary' }}>
+                    {t('pages.practice.score.wrongWords')}
+                  </Typography>
                   <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>3</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                  <Typography component="span" sx={{ color: 'text.secondary' }}>漏读词</Typography>
+                  <Typography component="span" sx={{ color: 'text.secondary' }}>
+                    {t('pages.practice.score.missedWords')}
+                  </Typography>
                   <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>4</Typography>
                 </Box>
               </Box>
@@ -390,7 +410,7 @@ export const PracticePage = () => {
                   background: 'linear-gradient(90deg, #6e60ee, #7a6cff)',
                 }}
               >
-                再练一次
+                {t('pages.practice.actions.practiceAgain')}
               </Button>
               <Button
                 variant="outlined"
@@ -406,7 +426,7 @@ export const PracticePage = () => {
                   },
                 }}
               >
-                提交查看
+                {t('pages.practice.actions.submitView')}
               </Button>
             </Box>
 
@@ -414,7 +434,7 @@ export const PracticePage = () => {
               component="button"
               type="button"
               onClick={() => {
-                if (window.confirm('跳过本段将标记为未完成，需要在本等级结束前补齐。确认跳过？')) setShowScore(false)
+                if (window.confirm(t('pages.practice.confirm.skipSegment'))) setShowScore(false)
               }}
               sx={{
                 border: 'none',
@@ -430,21 +450,21 @@ export const PracticePage = () => {
               }}
             >
               <ArrowForwardRounded sx={{ fontSize: 18 }} />
-              跳过本段（标记未完成）
+              {t('pages.practice.actions.skipSegment')}
             </Box>
           </Box>
         )}
 
         <Box component="button" type="button" onClick={() => setShowFullMode((prev) => !prev)} sx={{ border: 'none', bgcolor: 'transparent', p: '8px 0', color: 'text.secondary', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
           <ArrowBackRounded sx={{ fontSize: 14, transform: showFullMode ? 'rotate(-90deg)' : 'rotate(-270deg)', transition: 'transform 0.25s' }} />
-          {showFullMode ? '收起完整模式' : '展开完整模式'}
+          {showFullMode ? t('pages.practice.fullMode.collapse') : t('pages.practice.fullMode.expand')}
         </Box>
 
         {showFullMode && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <Box sx={{ p: '16px', bgcolor: '#22223a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px' }}>
               <Typography sx={{ mb: '12px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'text.disabled' }}>
-                最近成绩趋势
+                {t('pages.practice.fullMode.trend')}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
                 {TRENDS.map((item, i) => (
@@ -460,7 +480,7 @@ export const PracticePage = () => {
 
             <Box sx={{ p: '16px', bgcolor: '#22223a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px' }}>
               <Typography sx={{ mb: '12px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'text.disabled' }}>
-                等级达标矩阵
+                {t('pages.practice.fullMode.matrix')}
               </Typography>
               <Matrix />
             </Box>
@@ -468,7 +488,7 @@ export const PracticePage = () => {
             <Box sx={{ p: '16px', bgcolor: '#22223a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                 <Typography sx={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'text.disabled' }}>
-                  手动切换等级
+                  {t('pages.practice.fullMode.switchLevel')}
                 </Typography>
                 <Box sx={{ display: 'flex', gap: '6px' }}>
                   {LEVELS.map((item) => (
@@ -489,7 +509,9 @@ export const PracticePage = () => {
                   ))}
                 </Box>
               </Box>
-              <Typography sx={{ mt: '8px', fontSize: '12px', color: 'text.disabled' }}>切换等级将重置当前等级进度</Typography>
+              <Typography sx={{ mt: '8px', fontSize: '12px', color: 'text.disabled' }}>
+                {t('pages.practice.fullMode.switchLevelHint')}
+              </Typography>
             </Box>
           </Box>
         )}
@@ -514,13 +536,17 @@ export const PracticePage = () => {
           <Box component="button" type="button" sx={{ ...iconButtonSx, border: '1px solid transparent', bgcolor: 'transparent' }} onClick={() => setRecordOverlayOpen(false)}>
             <CloseRounded sx={{ fontSize: 16 }} />
           </Box>
-          <Typography sx={{ color: 'error.main', fontSize: '14px', fontWeight: 600 }}>录音中</Typography>
+          <Typography sx={{ color: 'error.main', fontSize: '14px', fontWeight: 600 }}>
+            {t('pages.practice.recording.status')}
+          </Typography>
           <Box sx={{ flex: 1 }} />
           <Typography sx={{ fontSize: '14px', fontWeight: 600, fontFamily: 'monospace', color: 'text.secondary' }}>{formatTimer(recordSeconds)}</Typography>
         </Box>
 
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: '32px 28px', gap: '32px' }}>
-          <Typography sx={{ fontSize: '12px', color: 'text.disabled', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>§3 · 跟读段落</Typography>
+          <Typography sx={{ fontSize: '12px', color: 'text.disabled', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+            {t('pages.practice.segmentLabel', { segment: 3 })}
+          </Typography>
           <Typography sx={{ fontSize: '20px', lineHeight: 1.7, textAlign: 'center' }}>{segmentText}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '3px', height: 32 }}>
             {Array.from({ length: 7 }).map((_, i) => (
@@ -541,7 +567,7 @@ export const PracticePage = () => {
 
         <Box sx={{ p: '20px 24px 40px' }}>
           <Button variant="contained" color="error" size="large" fullWidth startIcon={<StopRounded />} onClick={stopRecording}>
-            结束录音
+            {t('pages.practice.recording.stop')}
           </Button>
         </Box>
       </Box>
@@ -570,30 +596,34 @@ export const PracticePage = () => {
         <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.13)', borderRadius: '4px', m: '10px auto 0' }} />
         <Box sx={{ p: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <GridViewRounded sx={{ fontSize: 16, color: 'text.disabled' }} />
-          <Typography sx={{ flex: 1, fontSize: '15px', fontWeight: 600 }}>本文练习进度</Typography>
+          <Typography sx={{ flex: 1, fontSize: '15px', fontWeight: 600 }}>
+            {t('pages.practice.drawer.title')}
+          </Typography>
           <Box component="button" type="button" sx={{ ...iconButtonSx, border: '1px solid transparent', bgcolor: 'transparent' }} onClick={() => setDrawerOpen(false)}>
             <CloseRounded sx={{ fontSize: 14 }} />
           </Box>
         </Box>
         <Box sx={{ p: '4px 20px 32px', overflowY: 'auto' }}>
-          <Typography sx={{ mb: '16px', fontSize: '13px', color: 'text.secondary' }}>The Little Prince — Chapter I · 5 段</Typography>
+          <Typography sx={{ mb: '16px', fontSize: '13px', color: 'text.secondary' }}>
+            {t('pages.practice.drawer.articleInfo', { total: 5 })}
+          </Typography>
           <Matrix />
           <Box sx={{ mt: '20px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'text.disabled' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(29,201,138,0.1)', border: '1px solid rgba(29,201,138,0.2)', color: 'success.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>✓</Box>
-              已达标
+              {t('pages.practice.drawer.legend.pass')}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(110,96,238,0.25)', border: '1px solid #6e60ee', color: 'primary.light', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>→</Box>
-              当前
+              {t('pages.practice.drawer.legend.current')}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(240,166,35,0.1)', border: '1px solid rgba(240,166,35,0.2)', color: 'warning.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>↷</Box>
-              已跳过
+              {t('pages.practice.drawer.legend.skipped')}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: '#22223a', color: 'text.disabled', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>·</Box>
-              未完成
+              {t('pages.practice.drawer.legend.incomplete')}
             </Box>
           </Box>
         </Box>

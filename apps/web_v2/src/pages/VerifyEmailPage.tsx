@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react'
 import { Box, TextField, Button, Typography } from '@mui/material'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 
 interface LocationState {
@@ -8,6 +9,7 @@ interface LocationState {
 }
 
 export const VerifyEmailPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const state = (location.state as LocationState) ?? {}
@@ -26,7 +28,7 @@ export const VerifyEmailPage = () => {
     // TODO: Call verify-email API
     setTimeout(() => {
       setLoading(false)
-      setSuccessMessage('Email verified. You can now sign in.')
+      setSuccessMessage(t('pages.verifyEmail.success'))
       setTimeout(() => navigate('/login', { replace: true }), 1200)
     }, 1000)
   }
@@ -77,10 +79,10 @@ export const VerifyEmailPage = () => {
         }}
       >
         <Typography sx={{ fontSize: 24, fontWeight: 700, mb: 1 }}>
-          Verify Email
+          {t('pages.verifyEmail.title')}
         </Typography>
         <Typography sx={{ fontSize: 13, color: '#8888aa', mb: 3 }}>
-          Enter the verification code to activate your account.
+          {t('pages.verifyEmail.description')}
         </Typography>
 
         <Box
@@ -89,12 +91,12 @@ export const VerifyEmailPage = () => {
           sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
         >
           <Box>
-            <Typography component="label" sx={labelSx}>EMAIL</Typography>
+            <Typography component="label" sx={labelSx}>{t('pages.verifyEmail.email')}</Typography>
             <TextField
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t('pages.verifyEmail.emailPlaceholder')}
               required
               autoComplete="email"
               fullWidth
@@ -103,12 +105,12 @@ export const VerifyEmailPage = () => {
           </Box>
 
           <Box>
-            <Typography component="label" sx={labelSx}>VERIFICATION CODE</Typography>
+            <Typography component="label" sx={labelSx}>{t('pages.verifyEmail.code')}</Typography>
             <TextField
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.trim())}
-              placeholder="123456"
+              placeholder={t('pages.verifyEmail.codePlaceholder')}
               required
               inputProps={{ maxLength: 6, pattern: '[0-9]{6}' }}
               fullWidth
@@ -137,7 +139,7 @@ export const VerifyEmailPage = () => {
                 fontSize: 14,
               }}
             >
-              Dev verification code:{' '}
+              {t('pages.verifyEmail.devCodePrefix')}{' '}
               <Box
                 component="span"
                 sx={{ fontFamily: "'SF Mono', monospace", fontWeight: 600 }}
@@ -196,7 +198,7 @@ export const VerifyEmailPage = () => {
               '&:disabled': { opacity: 0.4 },
             }}
           >
-            {loading ? 'Verifying...' : 'Verify'}
+            {loading ? t('pages.verifyEmail.submitting') : t('pages.verifyEmail.submit')}
           </Button>
 
           <Box sx={{ display: 'flex', gap: 1.5 }}>
@@ -217,7 +219,7 @@ export const VerifyEmailPage = () => {
                 '&:hover': { color: '#eeeef6', borderColor: 'rgba(255,255,255,0.13)' },
               }}
             >
-              Back to register
+              {t('pages.verifyEmail.backToRegister')}
             </Button>
             <Button
               type="button"
@@ -236,7 +238,7 @@ export const VerifyEmailPage = () => {
                 '&:hover': { color: '#eeeef6', borderColor: 'rgba(255,255,255,0.13)' },
               }}
             >
-              Back to sign in
+              {t('pages.verifyEmail.backToLogin')}
             </Button>
           </Box>
         </Box>

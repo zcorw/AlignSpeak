@@ -1,8 +1,10 @@
 import { useState, FormEvent } from 'react'
 import { Box, TextField, Button, Typography } from '@mui/material'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 export const LoginPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -50,7 +52,7 @@ export const LoginPage = () => {
             mb: 1,
           }}
         >
-          Sign In to AlignSpeak
+          {t('pages.login.title')}
         </Typography>
         <Typography
           sx={{
@@ -59,7 +61,7 @@ export const LoginPage = () => {
             mb: 3,
           }}
         >
-          Use your email and password to continue.
+          {t('pages.login.description')}
         </Typography>
 
         <Box
@@ -84,13 +86,13 @@ export const LoginPage = () => {
                 mb: 0.75,
               }}
             >
-              EMAIL
+              {t('pages.login.email')}
             </Typography>
             <TextField
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t('pages.login.emailPlaceholder')}
               required
               autoComplete="email"
               fullWidth
@@ -126,13 +128,13 @@ export const LoginPage = () => {
                 mb: 0.75,
               }}
             >
-              PASSWORD
+              {t('pages.login.password')}
             </Typography>
             <TextField
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder={t('pages.login.passwordPlaceholder')}
               required
               autoComplete="current-password"
               fullWidth
@@ -192,7 +194,7 @@ export const LoginPage = () => {
               },
             }}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? t('pages.login.submitting') : t('pages.login.submit')}
           </Button>
 
           <Button
@@ -215,7 +217,7 @@ export const LoginPage = () => {
               },
             }}
           >
-            No account yet? Create one
+            {t('pages.login.switchToRegister')}
           </Button>
         </Box>
       </Box>

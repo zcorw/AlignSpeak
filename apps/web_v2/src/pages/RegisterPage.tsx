@@ -1,8 +1,10 @@
 import { useState, FormEvent } from 'react'
 import { Box, TextField, Button, Typography } from '@mui/material'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 export const RegisterPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,7 +22,7 @@ export const RegisterPage = () => {
     // TODO: Call register API
     setTimeout(() => {
       setLoading(false)
-      setSuccessMessage('Verification code sent. Please verify before login.')
+      setSuccessMessage(t('pages.register.success'))
       navigate('/register/verify', { state: { email, verificationCode: '123456' } })
     }, 1000)
   }
@@ -73,10 +75,10 @@ export const RegisterPage = () => {
         }}
       >
         <Typography sx={{ fontSize: 24, fontWeight: 700, mb: 1 }}>
-          Create AlignSpeak Account
+          {t('pages.register.title')}
         </Typography>
         <Typography sx={{ fontSize: 13, color: '#8888aa', mb: 3 }}>
-          Password must be at least 8 characters and include letters and numbers.
+          {t('pages.register.description')}
         </Typography>
 
         <Box
@@ -85,12 +87,12 @@ export const RegisterPage = () => {
           sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
         >
           <Box>
-            <Typography component="label" sx={labelSx}>EMAIL</Typography>
+            <Typography component="label" sx={labelSx}>{t('pages.register.email')}</Typography>
             <TextField
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t('pages.register.emailPlaceholder')}
               required
               autoComplete="email"
               fullWidth
@@ -99,12 +101,12 @@ export const RegisterPage = () => {
           </Box>
 
           <Box>
-            <Typography component="label" sx={labelSx}>PASSWORD</Typography>
+            <Typography component="label" sx={labelSx}>{t('pages.register.password')}</Typography>
             <TextField
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder={t('pages.register.passwordPlaceholder')}
               required
               autoComplete="new-password"
               fullWidth
@@ -113,12 +115,12 @@ export const RegisterPage = () => {
           </Box>
 
           <Box>
-            <Typography component="label" sx={labelSx}>DISPLAY NAME (OPTIONAL)</Typography>
+            <Typography component="label" sx={labelSx}>{t('pages.register.displayName')}</Typography>
             <TextField
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Alice"
+              placeholder={t('pages.register.displayNamePlaceholder')}
               autoComplete="nickname"
               fullWidth
               sx={inputSx}
@@ -174,7 +176,7 @@ export const RegisterPage = () => {
               '&:disabled': { opacity: 0.4 },
             }}
           >
-            {loading ? 'Registering...' : 'Register'}
+            {loading ? t('pages.register.submitting') : t('pages.register.submit')}
           </Button>
 
           <Button
@@ -194,7 +196,7 @@ export const RegisterPage = () => {
               '&:hover': { color: '#eeeef6', borderColor: 'rgba(255,255,255,0.13)' },
             }}
           >
-            Already have an account? Sign in
+            {t('pages.register.switchToLogin')}
           </Button>
         </Box>
       </Box>

@@ -13,7 +13,7 @@ services:
 
   web:
     image: node:20-alpine
-    working_dir: /workspace/apps/web
+    working_dir: /workspace/apps/web_v2
     command: sh -c "corepack enable && corepack prepare yarn@4.12.0 --activate && yarn --version && yarn install && yarn dev --host 0.0.0.0 --port 5173"
     environment:
       VITE_USE_MOCK: "false"
@@ -23,7 +23,7 @@ services:
       VITE_WATCH_POLLING: "true"
     volumes:
       - ./:/workspace
-      - web_node_modules:/workspace/apps/web/node_modules
+      - web_node_modules:/workspace/apps/web_v2/node_modules
     expose:
       - "5173"
     depends_on:

@@ -45,3 +45,5 @@ dist-ssr/
 .cache/
 tmp/
 temp/
+
+todo/

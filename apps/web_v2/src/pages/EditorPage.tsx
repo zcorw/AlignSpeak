@@ -6,6 +6,7 @@ import {
 } from '@mui/icons-material'
 import { Box, Button, CircularProgress, MenuItem, Select, Typography } from '@mui/material'
 import { ChangeEvent, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 type LanguageCode = 'en' | 'zh' | 'ja' | 'ko' | 'fr'
@@ -32,6 +33,7 @@ const detectLanguage = (value: string): LanguageCode => {
 }
 
 export const EditorPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -49,14 +51,14 @@ export const EditorPage = () => {
   const charCount = trimmedText.replace(/\s/g, '').length
 
   const validationMessage = useMemo(() => {
-    if (trimmedText.length < 20) return '文本不能少于 20 个字符'
-    if (segments.length < 1) return '至少需要 1 个段落'
-    if (segments.length > 30) return `段落数超出上限（${segments.length}/30），请在此手动拆分或精简`
+    if (trimmedText.length < 20) return t('pages.editor.validation.minChars')
+    if (segments.length < 1) return t('pages.editor.validation.minSegments')
+    if (segments.length > 30) return t('pages.editor.validation.maxSegments', { count: segments.length })
     return ''
-  }, [segments.length, trimmedText.length])
+  }, [segments.length, t, trimmedText.length])
 
   const canConfirm = validationMessage.length === 0
-  const statsWarn = segments.length > 30 ? '超出上限' : segments.length > 20 ? '接近上限' : ''
+  const statsWarn = segments.length > 30 ? 'overLimit' : segments.length > 20 ? 'nearLimit' : ''
 
   const applyImportedText = (value: string) => {
     setText(value)
@@ -131,7 +133,7 @@ export const EditorPage = () => {
         <Box
           component="button"
           type="button"
-          aria-label="返回"
+          aria-label={t('pages.editor.topbar.backAriaLabel')}
           onClick={() => navigate('/start')}
           sx={{
             width: 36,
@@ -153,11 +155,13 @@ export const EditorPage = () => {
         >
           <ArrowBackRounded sx={{ fontSize: 16 }} />
         </Box>
-        <Typography sx={{ flex: 1, fontSize: '16px', fontWeight: 600 }}>新建文章</Typography>
+        <Typography sx={{ flex: 1, fontSize: '16px', fontWeight: 600 }}>
+          {t('pages.editor.topbar.title')}
+        </Typography>
         <Box
           component="button"
           type="button"
-          aria-label="我的"
+          aria-label={t('pages.editor.topbar.meAriaLabel')}
           onClick={() => navigate('/me')}
           sx={{
             width: 36,
@@ -206,10 +210,10 @@ export const EditorPage = () => {
       >
         <Box>
           <Typography component="h1" sx={{ fontSize: '22px', fontWeight: 700, lineHeight: 1.3 }}>
-            选择导入方式
+            {t('pages.editor.headline')}
           </Typography>
           <Typography sx={{ mt: '6px', fontSize: '14px', color: 'text.secondary', lineHeight: 1.6 }}>
-            将文章导入后，你可以进行校对和分段确认。
+            {t('pages.editor.description')}
           </Typography>
         </Box>
 
@@ -252,9 +256,11 @@ export const EditorPage = () => {
               📋
             </Box>
             <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'text.primary' }}>从剪贴板粘贴</Typography>
+              <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'text.primary' }}>
+                {t('pages.editor.methods.clipboard.name')}
+              </Typography>
               <Typography sx={{ mt: '2px', fontSize: '12px', color: 'text.secondary' }}>
-                直接粘贴已复制的文本
+                {t('pages.editor.methods.clipboard.desc')}
               </Typography>
             </Box>
             <Box
@@ -269,7 +275,7 @@ export const EditorPage = () => {
                 flexShrink: 0,
               }}
             >
-              推荐
+              {t('pages.editor.methods.clipboard.recommended')}
             </Box>
           </Box>
 
@@ -311,9 +317,11 @@ export const EditorPage = () => {
               📄
             </Box>
             <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'text.primary' }}>上传文件</Typography>
+              <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'text.primary' }}>
+                {t('pages.editor.methods.upload.name')}
+              </Typography>
               <Typography sx={{ mt: '2px', fontSize: '12px', color: 'text.secondary' }}>
-                支持 .txt · .md · 图片 OCR
+                {t('pages.editor.methods.upload.desc')}
               </Typography>
             </Box>
           </Box>
@@ -341,7 +349,7 @@ export const EditorPage = () => {
             },
           }}
         >
-          或手动输入
+          {t('pages.editor.manualDivider')}
         </Box>
 
         <Box
@@ -368,7 +376,7 @@ export const EditorPage = () => {
           }}
         >
           <EditOutlined sx={{ fontSize: 16 }} />
-          输入文本内容
+          {t('pages.editor.manualInput')}
         </Box>
       </Box>
 
@@ -401,7 +409,7 @@ export const EditorPage = () => {
           <Box
             component="button"
             type="button"
-            aria-label="关闭"
+            aria-label={t('pages.editor.overlay.closeAriaLabel')}
             onClick={() => setOverlayOpen(false)}
             sx={{
               width: 36,
@@ -418,7 +426,9 @@ export const EditorPage = () => {
           >
             <CloseRounded sx={{ fontSize: 16 }} />
           </Box>
-          <Typography sx={{ flex: 1, fontSize: '16px', fontWeight: 600 }}>校对文本</Typography>
+          <Typography sx={{ flex: 1, fontSize: '16px', fontWeight: 600 }}>
+            {t('pages.editor.overlay.title')}
+          </Typography>
           <Box
             sx={{
               fontSize: '12px',
@@ -426,13 +436,13 @@ export const EditorPage = () => {
               fontFamily: '"SF Mono", "Fira Code", monospace',
             }}
           >
-            {charCount} 字 · {segments.length} 段{' '}
+            {t('pages.editor.overlay.stats', { chars: charCount, segments: segments.length })}{' '}
             {statsWarn && (
               <Box
                 component="span"
                 sx={{ color: segments.length > 30 ? 'error.main' : 'warning.main' }}
               >
-                {statsWarn}
+                {t(`pages.editor.overlay.${statsWarn}`)}
               </Box>
             )}
           </Box>
@@ -451,7 +461,9 @@ export const EditorPage = () => {
             }}
           >
             <CircularProgress size={32} thickness={4} />
-            <Typography sx={{ fontSize: '14px', color: 'text.secondary' }}>正在识别图片文字…</Typography>
+            <Typography sx={{ fontSize: '14px', color: 'text.secondary' }}>
+              {t('pages.editor.overlay.ocrLoading')}
+            </Typography>
           </Box>
         ) : (
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -494,7 +506,9 @@ export const EditorPage = () => {
                   <MenuItem value="ko">🇰🇷 한국어</MenuItem>
                   <MenuItem value="fr">🇫🇷 Français</MenuItem>
                 </Select>
-                <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>自动检测 · 可修改</Typography>
+                <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>
+                  {t('pages.editor.overlay.autoDetectEditable')}
+                </Typography>
               </Box>
 
               <Box
@@ -502,7 +516,7 @@ export const EditorPage = () => {
                 ref={textareaRef}
                 value={text}
                 onChange={(event) => setText(event.target.value)}
-                placeholder={'在此输入或粘贴文章内容…\n\n以换行分隔段落。'}
+                placeholder={t('pages.editor.overlay.placeholder')}
                 sx={{
                   flex: 1,
                   minHeight: 0,
@@ -548,7 +562,7 @@ export const EditorPage = () => {
                       color: 'text.disabled',
                     }}
                   >
-                    段落预览
+                    {t('pages.editor.overlay.segmentPreview')}
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {segments.slice(0, 4).map((item, index) => (
@@ -583,7 +597,7 @@ export const EditorPage = () => {
                           color: 'text.disabled',
                         }}
                       >
-                        +{segments.length - 4} 段
+                        {t('pages.editor.overlay.moreSegments', { count: segments.length - 4 })}
                       </Box>
                     )}
                   </Box>
@@ -607,7 +621,7 @@ export const EditorPage = () => {
                   },
                 }}
               >
-                确认并开始练习
+                {t('pages.editor.overlay.confirmStart')}
               </Button>
             </Box>
           </Box>
