@@ -1,10 +1,11 @@
-import { useState, FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Box, TextField, Button, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { verifyEmailSchema } from '../utils/validation'
 import { Alert, FieldError } from '../components/Alert'
 import { ZodError } from 'zod'
+import { authService, getApiErrorMessage } from '../services/authService'
 
 interface LocationState {
   email?: string
@@ -33,15 +34,10 @@ export const VerifyEmailPage = () => {
     try {
       // Validate form data
       const validatedData = verifyEmailSchema.parse({ email, code })
-
-      // TODO: Call verify-email API with validatedData
-      setTimeout(() => {
-        setLoading(false)
-        setSuccessMessage(t('pages.verifyEmail.success'))
-        setTimeout(() => navigate('/login', { replace: true }), 1200)
-      }, 1000)
+      const result = await authService.verifyEmail(validatedData)
+      setSuccessMessage(result.message || t('pages.verifyEmail.success'))
+      setTimeout(() => navigate('/login', { replace: true }), 1200)
     } catch (err) {
-      setLoading(false)
       if (err instanceof ZodError) {
         // Handle validation errors
         const errors: Record<string, string> = {}
@@ -52,9 +48,10 @@ export const VerifyEmailPage = () => {
         })
         setFieldErrors(errors)
       } else {
-        // Handle API errors
-        setError('An unexpected error occurred. Please try again.')
+        setError(getApiErrorMessage(err, 'Verification failed. Please try again.'))
       }
+    } finally {
+      setLoading(false)
     }
   }
 

@@ -1,14 +1,19 @@
-import { useState, FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Box, TextField, Button, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { loginSchema } from '../utils/validation'
 import { Alert, FieldError } from '../components/Alert'
 import { ZodError } from 'zod'
+import { authService, getApiErrorMessage } from '../services/authService'
+import { useAuthStore } from '../stores/authStore'
 
 export const LoginPage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const setAccessToken = useAuthStore((state) => state.setAccessToken)
+  const setUser = useAuthStore((state) => state.setUser)
+  const clearAuth = useAuthStore((state) => state.clearAuth)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -24,15 +29,18 @@ export const LoginPage = () => {
     try {
       // Validate form data
       const validatedData = loginSchema.parse({ email, password })
-
-      // TODO: Call login API with validatedData
-      setTimeout(() => {
-        setLoading(false)
-        // Mock: navigate to start page
-        navigate('/start')
-      }, 1000)
+      const result = await authService.login(validatedData)
+      setAccessToken(result.accessToken)
+      const me = await authService.me()
+      setUser({
+        id: me.userId,
+        email: me.email,
+        role: me.role,
+        displayName: me.displayName,
+        status: me.status,
+      })
+      navigate('/start', { replace: true })
     } catch (err) {
-      setLoading(false)
       if (err instanceof ZodError) {
         // Handle validation errors
         const errors: Record<string, string> = {}
@@ -43,9 +51,11 @@ export const LoginPage = () => {
         })
         setFieldErrors(errors)
       } else {
-        // Handle API errors
-        setError('An unexpected error occurred. Please try again.')
+        clearAuth()
+        setError(getApiErrorMessage(err, 'Sign in failed. Please try again.'))
       }
+    } finally {
+      setLoading(false)
     }
   }
 

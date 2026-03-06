@@ -15,7 +15,7 @@ const EXPIRY_HOURS = 24
 export const useSyncStore = create<SyncState>()(
   devtools(
     persist(
-      (set, get) => ({
+      (set) => ({
         pendingActions: [],
         addPendingAction: (action) =>
           set((state) => ({

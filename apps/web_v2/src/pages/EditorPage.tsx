@@ -5,7 +5,7 @@ import {
   PersonOutlineRounded,
 } from '@mui/icons-material'
 import { Box, Button, CircularProgress, MenuItem, Select, Typography } from '@mui/material'
-import { ChangeEvent, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 

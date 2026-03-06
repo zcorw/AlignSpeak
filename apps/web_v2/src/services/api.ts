@@ -25,10 +25,20 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      // Handle token refresh or redirect to login
-      useAuthStore.getState().clearAuth()
-      window.location.href = '/login'
+    const status = error.response?.status
+    const requestUrl = error.config?.url as string | undefined
+    const isAuthRequest =
+      typeof requestUrl === 'string' &&
+      (requestUrl.includes('/auth/login') ||
+        requestUrl.includes('/auth/register') ||
+        requestUrl.includes('/auth/verify-email'))
+
+    const { accessToken, clearAuth } = useAuthStore.getState()
+    if (status === 401 && accessToken && !isAuthRequest) {
+      clearAuth()
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

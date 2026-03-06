@@ -1,10 +1,11 @@
-import { useState, FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Box, TextField, Button, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { registerSchema } from '../utils/validation'
 import { Alert, FieldError } from '../components/Alert'
 import { ZodError } from 'zod'
+import { authService, getApiErrorMessage } from '../services/authService'
 
 export const RegisterPage = () => {
   const { t } = useTranslation()
@@ -27,15 +28,23 @@ export const RegisterPage = () => {
     try {
       // Validate form data
       const validatedData = registerSchema.parse({ email, password, displayName })
-
-      // TODO: Call register API with validatedData
-      setTimeout(() => {
-        setLoading(false)
-        setSuccessMessage(t('pages.register.success'))
-        navigate('/register/verify', { state: { email, verificationCode: '123456' } })
-      }, 1000)
+      const result = await authService.register({
+        ...validatedData,
+        displayName: validatedData.displayName?.trim() || undefined,
+      })
+      setSuccessMessage(result.message || t('pages.register.success'))
+      if (result.verificationRequired) {
+        navigate('/register/verify', {
+          state: {
+            email: validatedData.email,
+            verificationCode: result.verificationCode,
+          },
+          replace: true,
+        })
+      } else {
+        navigate('/login', { replace: true })
+      }
     } catch (err) {
-      setLoading(false)
       if (err instanceof ZodError) {
         // Handle validation errors
         const errors: Record<string, string> = {}
@@ -46,9 +55,10 @@ export const RegisterPage = () => {
         })
         setFieldErrors(errors)
       } else {
-        // Handle API errors
-        setError('An unexpected error occurred. Please try again.')
+        setError(getApiErrorMessage(err, 'Registration failed. Please try again.'))
       }
+    } finally {
+      setLoading(false)
     }
   }
 
