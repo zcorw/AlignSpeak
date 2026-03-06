@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In - AlignSpeak</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Login Screen -->
+    <div class="page fade-up">
+      <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div class="card" style="width: 100%; max-width: 400px;">
+          <div style="padding: 24px;">
+            <h1 style="font-size: 24px; font-weight: 700; margin: 0 0 8px 0;">Sign In to AlignSpeak</h1>
+            <p class="caption" style="margin: 0 0 24px 0;">Use your email and password to continue.</p>
+
+            <form style="display: flex; flex-direction: column; gap: 16px;">
+              <div>
+                <label class="label" style="display: block; margin-bottom: 6px;">EMAIL</label>
+                <input
+                  type="email"
+                  class="input"
+                  placeholder="you@example.com"
+                  required
+                  autocomplete="email"
+                >
+              </div>
+
+              <div>
+                <label class="label" style="display: block; margin-bottom: 6px;">PASSWORD</label>
+                <input
+                  type="password"
+                  class="input"
+                  placeholder="••••••••"
+                  required
+                  autocomplete="current-password"
+                >
+              </div>
+
+              <!-- Error message (hidden by default) -->
+              <div style="display: none; padding: 12px; background: var(--danger-bg); border: 1px solid rgba(240,82,82,0.3); border-radius: var(--r-sm); color: var(--danger); font-size: 14px;">
+                Invalid email or password.
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-full">
+                Sign In
+              </button>
+
+              <button type="button" class="btn btn-ghost btn-full" onclick="window.location.href='auth-register.html'">
+                No account yet? Create one
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

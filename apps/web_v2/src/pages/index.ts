@@ -1,0 +1,8 @@
+export { StartPage } from './StartPage'
+export { EditorPage } from './EditorPage'
+export { PracticePage } from './PracticePage'
+export { ResultPage } from './ResultPage'
+export { MePage } from './MePage'
+export { LoginPage } from './LoginPage'
+export { RegisterPage } from './RegisterPage'
+export { VerifyEmailPage } from './VerifyEmailPage'

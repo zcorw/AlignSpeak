@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create vite@latest web_v2_temp -- --template react-ts)",
+      "Bash(mv web_v2_temp/* .)",
+      "Bash(mv web_v2_temp/.* .)",
+      "Bash(.env.example:*)",
+      "Bash(.gitignore:*)",
+      "Bash(ls -la .yarn*)",
+      "Bash(yarn --version)",
+      "Bash(yarn install)",
+      "Bash(yarn dev)",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(xargs grep -l \"register\\\\|Register\\\\|login\\\\|Login\")"
+    ]
+  }
+}

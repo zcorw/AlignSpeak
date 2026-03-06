@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Email - AlignSpeak</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Verify Email Screen -->
+    <div class="page fade-up">
+      <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div class="card" style="width: 100%; max-width: 400px;">
+          <div style="padding: 24px;">
+            <h1 style="font-size: 24px; font-weight: 700; margin: 0 0 8px 0;">Verify Email</h1>
+            <p class="caption" style="margin: 0 0 24px 0;">Enter the verification code to activate your account.</p>
+
+            <form style="display: flex; flex-direction: column; gap: 16px;">
+              <div>
+                <label class="label" style="display: block; margin-bottom: 6px;">EMAIL</label>
+                <input
+                  type="email"
+                  class="input"
+                  placeholder="you@example.com"
+                  value="you@example.com"
+                  required
+                  autocomplete="email"
+                >
+              </div>
+
+              <div>
+                <label class="label" style="display: block; margin-bottom: 6px;">VERIFICATION CODE</label>
+                <input
+                  type="text"
+                  class="input"
+                  placeholder="123456"
+                  required
+                  maxlength="6"
+                  pattern="[0-9]{6}"
+                  style="font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: 0.5em; text-align: center; font-size: 18px;"
+                >
+              </div>
+
+              <!-- Dev code display (only in development) -->
+              <div style="padding: 12px; background: rgba(110,96,238,0.15); border: 1px solid rgba(110,96,238,0.3); border-radius: var(--r-sm); color: var(--accent-2); font-size: 14px;">
+                <strong>Dev verification code:</strong> <span class="mono">123456</span>
+              </div>
+
+              <!-- Success message (hidden by default) -->
+              <div style="display: none; padding: 12px; background: var(--success-bg); border: 1px solid rgba(29,201,138,0.3); border-radius: var(--r-sm); color: var(--success); font-size: 14px;">
+                Email verified. You can now sign in.
+              </div>
+
+              <!-- Error message (hidden by default) -->
+              <div style="display: none; padding: 12px; background: var(--danger-bg); border: 1px solid rgba(240,82,82,0.3); border-radius: var(--r-sm); color: var(--danger); font-size: 14px;">
+                Invalid verification code.
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-full">
+                Verify
+              </button>
+
+              <div style="display: flex; gap: 12px;">
+                <button type="button" class="btn btn-ghost" style="flex: 1;" onclick="window.location.href='auth-register.html'">
+                  Back to register
+                </button>
+                <button type="button" class="btn btn-ghost" style="flex: 1;" onclick="window.location.href='auth-login.html'">
+                  Back to sign in
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
