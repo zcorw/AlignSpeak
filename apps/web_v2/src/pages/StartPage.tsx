@@ -1,41 +1,109 @@
 import { NorthRounded, PersonOutlineRounded } from '@mui/icons-material'
-import { Box, Button, Typography } from '@mui/material'
+import { Box, Button, CircularProgress, Typography } from '@mui/material'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link } from 'react-router-dom'
+import { getApiErrorMessage } from '../services/authService'
+import { practiceService, type PracticeArticleDetail } from '../services/practiceService'
+import { startService, type StartOverview } from '../services/startService'
+import { useAuthStore } from '../stores/authStore'
+
+const languageToLabel = (language: PracticeArticleDetail['language'] | null, english: string, chinese: string): string => {
+  if (language === 'zh') return chinese
+  if (language === 'ja') return 'Japanese'
+  if (language === 'en') return english
+  return '-'
+}
+
+const formatLastPracticedAt = (value: string | null): string => {
+  if (!value) return '-'
+  const time = Date.parse(value)
+  if (Number.isNaN(time)) return '-'
+  return new Intl.DateTimeFormat(undefined, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(time))
+}
+
+const buildArticleBadge = (title: string): string => {
+  const letter = title.trim().charAt(0).toUpperCase()
+  return letter || 'A'
+}
 
 export const StartPage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [overview, setOverview] = useState<StartOverview | null>(null)
+  const [currentArticleDetail, setCurrentArticleDetail] = useState<PracticeArticleDetail | null>(null)
 
-  const currentArticle = {
-    title: t('pages.start.currentArticle.title'),
-    language: t('pages.start.currentArticle.language'),
-    level: 2,
-    segment: 3,
-    totalSegments: 5,
-    passedSegments: 2,
-    lastPracticedAt: t('pages.start.currentArticle.lastPracticeValue'),
+  useEffect(() => {
+    let active = true
+
+    const loadStartData = async () => {
+      setLoading(true)
+      setLoadError(null)
+      try {
+        const nextOverview = await startService.getOverview()
+        if (!active) return
+        setOverview(nextOverview)
+
+        const currentArticleId = nextOverview.historyDocs[0]?.id
+        if (!currentArticleId) {
+          setCurrentArticleDetail(null)
+          return
+        }
+
+        const detail = await practiceService.getPracticeArticle(currentArticleId)
+        if (!active) return
+        setCurrentArticleDetail(detail)
+        sessionStorage.setItem('article_id', detail.articleId)
+        sessionStorage.setItem('article_lang', detail.language)
+      } catch (error: unknown) {
+        if (!active) return
+        setLoadError(getApiErrorMessage(error, t('common.error')))
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadStartData()
+    return () => {
+      active = false
+    }
+  }, [t])
+
+  const currentHistoryDoc = overview?.historyDocs[0] ?? null
+  const fallbackLevel = overview?.currentLevel ?? 1
+  const currentLevel = currentHistoryDoc?.level ?? fallbackLevel
+  const totalSegments = Math.max(currentArticleDetail?.segments.length ?? 0, 0)
+  const passedSegments = useMemo(() => {
+    if (!currentHistoryDoc || totalSegments <= 0) return 0
+    return Math.min(totalSegments, Math.max(0, Math.round(currentHistoryDoc.progressRate * totalSegments)))
+  }, [currentHistoryDoc, totalSegments])
+  const currentSegment = totalSegments > 0 ? Math.min(totalSegments, passedSegments + 1) : 1
+  const progress = totalSegments > 0
+    ? Math.round((passedSegments / totalSegments) * 100)
+    : Math.round((currentHistoryDoc?.progressRate ?? 0) * 100)
+  const languageLabel = languageToLabel(
+    currentArticleDetail?.language ?? null,
+    t('common.languageEnglish'),
+    t('common.languageChinese')
+  )
+  const displayName = user?.displayName?.trim() || t('pages.start.userName')
+  const recentArticles = overview?.historyDocs ?? []
+
+  const handleContinue = () => {
+    if (!currentHistoryDoc) {
+      navigate('/editor')
+      return
+    }
+    navigate(`/practice?a=${currentHistoryDoc.id}&seg=${currentSegment}`)
   }
-  const progress = Math.round((currentArticle.passedSegments / currentArticle.totalSegments) * 100)
-
-  const recentArticles = [
-    {
-      id: '2',
-      to: '/practice',
-      icon: '📖',
-      title: t('pages.start.recent.article1.title'),
-      meta: t('pages.start.recent.article1.meta'),
-      level: 'L1',
-    },
-    {
-      id: '3',
-      to: '/practice',
-      icon: '📗',
-      title: t('pages.start.recent.article2.title'),
-      meta: t('pages.start.recent.article2.meta'),
-      level: 'L3',
-    },
-  ]
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -64,7 +132,7 @@ export const StartPage = () => {
             flexShrink: 0,
           }}
         >
-          🎯
+          A
         </Box>
         <Typography sx={{ fontSize: '15px', fontWeight: 600, flex: 1 }}>
           {t('pages.start.appTitle')}
@@ -121,11 +189,24 @@ export const StartPage = () => {
           },
         }}
       >
+        {loading && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', p: '12px 14px', bgcolor: '#1a1a2c', border: '1px solid rgba(255,255,255,0.13)', borderRadius: '12px' }}>
+            <CircularProgress size={16} thickness={5} />
+            <Typography sx={{ fontSize: '13px', color: 'text.secondary' }}>{t('common.loading')}</Typography>
+          </Box>
+        )}
+
+        {loadError && (
+          <Box sx={{ p: '12px 14px', bgcolor: 'rgba(240,82,82,0.08)', border: '1px solid rgba(240,82,82,0.25)', borderRadius: '12px' }}>
+            <Typography sx={{ fontSize: '13px', color: 'error.main' }}>{loadError}</Typography>
+          </Box>
+        )}
+
         <Box>
           <Typography sx={{ fontSize: '14px', color: 'text.secondary', mb: '4px' }}>
             {t('pages.start.greetingPrefix')}
             <Box component="strong" sx={{ color: 'text.primary', fontWeight: 600 }}>
-              {t('pages.start.userName')}
+              {displayName}
             </Box>
           </Typography>
         </Box>
@@ -162,49 +243,33 @@ export const StartPage = () => {
               color: 'text.disabled',
             }}
           >
-            {currentArticle.language}
+            {languageLabel}
           </Typography>
 
           <Typography sx={{ mb: '20px', fontSize: '17px', fontWeight: 600, lineHeight: 1.4 }}>
-            {currentArticle.title}
+            {currentHistoryDoc?.title ?? '-'}
           </Typography>
 
           <Box sx={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-              <Typography
-                sx={{
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  letterSpacing: '0.7px',
-                  textTransform: 'uppercase',
-                  color: 'text.disabled',
-                }}
-              >
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'text.disabled' }}>
                 {t('pages.start.currentArticle.currentLevel')}
               </Typography>
               <Typography sx={{ fontSize: '15px', fontWeight: 700, fontFamily: '"SF Mono", "Fira Code", monospace' }}>
-                <Box component="span" sx={{ color: 'primary.light' }}>L{currentArticle.level}</Box>
+                <Box component="span" sx={{ color: 'primary.light' }}>L{currentLevel}</Box>
               </Typography>
             </Box>
 
             <Box sx={{ width: 1, alignSelf: 'stretch', mx: '4px', bgcolor: 'divider' }} />
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-              <Typography
-                sx={{
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  letterSpacing: '0.7px',
-                  textTransform: 'uppercase',
-                  color: 'text.disabled',
-                }}
-              >
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'text.disabled' }}>
                 {t('pages.start.currentArticle.currentSegment')}
               </Typography>
               <Typography sx={{ fontSize: '15px', fontWeight: 700, fontFamily: '"SF Mono", "Fira Code", monospace' }}>
-                {currentArticle.segment}
+                {currentSegment}
                 <Box component="span" sx={{ ml: 0.5, fontSize: '13px', color: 'text.secondary', fontWeight: 400 }}>
-                  / {currentArticle.totalSegments}
+                  / {Math.max(totalSegments, 1)}
                 </Box>
               </Typography>
             </Box>
@@ -212,19 +277,11 @@ export const StartPage = () => {
             <Box sx={{ width: 1, alignSelf: 'stretch', mx: '4px', bgcolor: 'divider' }} />
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-              <Typography
-                sx={{
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  letterSpacing: '0.7px',
-                  textTransform: 'uppercase',
-                  color: 'text.disabled',
-                }}
-              >
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'text.disabled' }}>
                 {t('pages.start.currentArticle.lastPractice')}
               </Typography>
               <Typography sx={{ fontSize: '13px', color: 'text.secondary', fontWeight: 500 }}>
-                {currentArticle.lastPracticedAt}
+                {formatLastPracticedAt(currentHistoryDoc?.lastPracticedAt ?? null)}
               </Typography>
             </Box>
           </Box>
@@ -232,19 +289,19 @@ export const StartPage = () => {
           <Box sx={{ mt: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'text.secondary' }}>
               <Typography component="span" sx={{ fontSize: '12px', color: 'text.secondary' }}>
-                {t('pages.start.currentArticle.overallProgress', { level: currentArticle.level })}
+                {t('pages.start.currentArticle.overallProgress', { level: currentLevel })}
               </Typography>
               <Typography component="span" sx={{ fontSize: '12px', color: 'text.secondary' }}>
                 {t('pages.start.currentArticle.passedSegments', {
-                  passed: currentArticle.passedSegments,
-                  total: currentArticle.totalSegments,
+                  passed: passedSegments,
+                  total: Math.max(totalSegments, 1),
                 })}
               </Typography>
             </Box>
             <Box sx={{ height: 4, bgcolor: '#22223a', borderRadius: '4px', overflow: 'hidden' }}>
               <Box
                 sx={{
-                  width: `${progress}%`,
+                  width: `${Math.max(0, Math.min(100, progress))}%`,
                   height: '100%',
                   borderRadius: '4px',
                   transition: 'width 0.4s ease',
@@ -260,7 +317,7 @@ export const StartPage = () => {
             variant="contained"
             size="large"
             fullWidth
-            onClick={() => navigate('/practice')}
+            onClick={handleContinue}
             sx={{
               boxShadow: '0 2px 12px rgba(110,96,238,0.25)',
               '&:hover': {
@@ -309,25 +366,21 @@ export const StartPage = () => {
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <Typography
-            sx={{
-              px: '2px',
-              fontSize: '11px',
-              fontWeight: 600,
-              letterSpacing: '0.7px',
-              textTransform: 'uppercase',
-              color: 'text.disabled',
-            }}
-          >
+          <Typography sx={{ px: '2px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'text.disabled' }}>
             {t('pages.start.historyTitle')}
           </Typography>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {recentArticles.length === 0 && (
+              <Box sx={{ p: '12px 14px', bgcolor: '#1a1a2c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px' }}>
+                <Typography sx={{ fontSize: '12px', color: 'text.secondary' }}>No practice history yet.</Typography>
+              </Box>
+            )}
             {recentArticles.map((article) => (
               <Box
                 key={article.id}
                 component={Link}
-                to={article.to}
+                to={`/practice?a=${article.id}`}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -354,40 +407,26 @@ export const StartPage = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '16px',
+                    fontSize: '13px',
+                    fontWeight: 700,
                     flexShrink: 0,
+                    color: 'text.secondary',
                   }}
                 >
-                  {article.icon}
+                  {buildArticleBadge(article.title)}
                 </Box>
 
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography
-                    sx={{
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
+                  <Typography sx={{ fontSize: '14px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {article.title}
                   </Typography>
                   <Typography sx={{ mt: '2px', fontSize: '12px', color: 'text.secondary' }}>
-                    {article.meta}
+                    {formatLastPracticedAt(article.lastPracticedAt)}
                   </Typography>
                 </Box>
 
-                <Typography
-                  sx={{
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    color: 'primary.light',
-                    fontFamily: '"SF Mono", "Fira Code", monospace',
-                    flexShrink: 0,
-                  }}
-                >
-                  {article.level}
+                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: 'primary.light', fontFamily: '"SF Mono", "Fira Code", monospace', flexShrink: 0 }}>
+                  L{article.level}
                 </Typography>
               </Box>
             ))}
