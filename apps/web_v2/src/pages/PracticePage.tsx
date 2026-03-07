@@ -249,6 +249,9 @@ export const PracticePage = () => {
   const renderRecordingSegmentText = (): ReactNode => {
     if (articleLanguage !== 'ja' || !currentSegment?.tokens?.length) return segmentText
     return currentSegment.tokens.map((token, index) => {
+      if (!token.surface.trim()) {
+        return null
+      }
       if (!token.yomi) {
         return <span key={`${token.surface}-${index}`}>{token.surface}</span>
       }
@@ -458,6 +461,7 @@ export const PracticePage = () => {
   }
 
   const stopRecording = () => {
+    stopSpeaking()
     setRecordOverlayOpen(false)
     const recorder = mediaRecorderRef.current
     if (!recorder) return
@@ -926,11 +930,25 @@ export const PracticePage = () => {
           <Typography sx={{ fontSize: '14px', fontWeight: 600, fontFamily: 'monospace', color: 'text.secondary' }}>{formatTimer(recordSeconds)}</Typography>
         </Box>
 
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: '32px 28px', gap: '32px' }}>
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', p: '24px 28px 12px', gap: '14px' }}>
           <Typography sx={{ fontSize: '12px', color: 'text.disabled', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
             {t('pages.practice.segmentLabel', { segment: currentSegmentOrder })}
           </Typography>
-          <Typography sx={{ fontSize: '20px', lineHeight: 1.7, textAlign: 'center', whiteSpace: 'pre-wrap' }}>{renderRecordingSegmentText()}</Typography>
+          <Box sx={{ width: '100%', maxWidth: '360px', flex: 1, minHeight: 0, overflowY: 'auto', px: '2px' }}>
+            <Typography
+              sx={{
+                fontSize: '20px',
+                lineHeight: 1.9,
+                textAlign: 'justify',
+                textAlignLast: 'left',
+                whiteSpace: 'normal',
+                wordBreak: 'keep-all',
+                lineBreak: 'strict',
+              }}
+            >
+              {renderRecordingSegmentText()}
+            </Typography>
+          </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '3px', height: 32 }}>
             {Array.from({ length: 7 }).map((_, i) => (
               <Box
@@ -946,9 +964,30 @@ export const PracticePage = () => {
               />
             ))}
           </Box>
+          <Button
+            variant="text"
+            size="small"
+            startIcon={ttsLoading ? <CircularProgress size={12} thickness={5} sx={{ color: 'inherit' }} /> : <VolumeUpRounded sx={{ fontSize: 15 }} />}
+            onClick={speakSegment}
+            disabled={!canPractice || ttsLoading}
+            sx={{
+              mt: '2px',
+              color: 'text.secondary',
+              fontSize: '12px',
+              fontWeight: 500,
+              minHeight: '28px',
+              opacity: 0.85,
+              '&:hover': {
+                bgcolor: 'rgba(255,255,255,0.05)',
+                color: 'text.primary',
+              },
+            }}
+          >
+            {ttsLoading ? t('common.loading') : isSpeaking ? t('pages.practice.readAloud.stop') : t('pages.practice.readAloud.play')}
+          </Button>
         </Box>
 
-        <Box sx={{ p: '20px 24px 40px' }}>
+        <Box sx={{ p: '16px 24px calc(24px + env(safe-area-inset-bottom, 0px))' }}>
           <Button variant="contained" color="error" size="large" fullWidth startIcon={<StopRounded />} onClick={stopRecording}>
             {t('pages.practice.recording.stop')}
           </Button>
