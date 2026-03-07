@@ -174,11 +174,12 @@ export const PracticePage = () => {
     })
   }, [articleId, canPractice, currentSegment, speakSegment])
 
+  const searchKey = searchParams.toString()
+  const queryArticleId = searchParams.get('a') ?? searchParams.get('articleId')
+  const querySegment = Number.parseInt(searchParams.get('seg') ?? '', 10)
+  const queryLevel = parseLevelFromQuery(searchParams.get('lv'))
+
   useEffect(() => {
-    const searchKey = searchParams.toString()
-    const queryArticleId = searchParams.get('a') ?? searchParams.get('articleId')
-    const querySegment = Number.parseInt(searchParams.get('seg') ?? '', 10)
-    const queryLevel = parseLevelFromQuery(searchParams.get('lv'))
     let active = true
 
     const loadPracticeArticle = async () => {
@@ -200,9 +201,14 @@ export const PracticePage = () => {
         sessionStorage.setItem('article_id', practiceArticle.articleId)
         sessionStorage.setItem('article_lang', practiceArticle.language)
 
-        const requestedIndex = Number.isFinite(querySegment) ? querySegment - 1 : 0
-        const clampedIndex = Math.min(Math.max(requestedIndex, 0), Math.max(practiceArticle.segments.length - 1, 0))
-        setSegmentIndex(clampedIndex)
+        const total = practiceArticle.segments.length
+        const maxIndex = Math.max(total - 1, 0)
+        const matchedByOrder = Number.isFinite(querySegment)
+          ? practiceArticle.segments.findIndex((segment) => segment.order === querySegment)
+          : -1
+        const fallbackIndex = Number.isFinite(querySegment) ? querySegment - 1 : 0
+        const resolvedIndex = matchedByOrder >= 0 ? matchedByOrder : Math.min(Math.max(fallbackIndex, 0), maxIndex)
+        setSegmentIndex(resolvedIndex)
       } catch (error: unknown) {
         if (!active) return
         setLoadError(getApiErrorMessage(error, t('common.error')))
@@ -219,7 +225,7 @@ export const PracticePage = () => {
     return () => {
       active = false
     }
-  }, [searchParams, t])
+  }, [queryArticleId, queryLevel, querySegment, searchKey, t])
 
   useEffect(() => {
     let active = true
@@ -480,4 +486,3 @@ export const PracticePage = () => {
     </Box>
   )
 }
-
