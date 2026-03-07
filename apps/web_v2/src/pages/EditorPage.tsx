@@ -1,15 +1,15 @@
 import {
   ArrowBackRounded,
-  CloseRounded,
+  ContentPasteRounded,
   EditOutlined,
   PersonOutlineRounded,
+  UploadFileRounded,
 } from '@mui/icons-material'
-import { Box, Button, CircularProgress, MenuItem, Select, Typography } from '@mui/material'
-import { type ChangeEvent, useMemo, useRef, useState } from 'react'
+import { Box, Typography } from '@mui/material'
+import { type ChangeEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-
-type LanguageCode = 'en' | 'zh' | 'ja' | 'ko' | 'fr'
+import { EditorTextOverlay, type OverlayLanguageCode } from '../components/EditorTextOverlay'
 
 const SAMPLE_TEXT = `Once when I was six years old I saw a magnificent picture in a book about the primeval forest.
 
@@ -21,54 +21,45 @@ I showed my masterpiece to the grown-ups, and asked them whether the drawing fri
 
 They answered: "Why should anyone be frightened by a hat?"`
 
-const detectLanguage = (value: string): LanguageCode => {
-  const cjk = (value.match(/[\u4e00-\u9fff]/g) ?? []).length
-  const jp = (value.match(/[\u3040-\u30ff]/g) ?? []).length
-  const kr = (value.match(/[\uac00-\ud7af]/g) ?? []).length
-
-  if (jp > 5) return 'ja'
-  if (kr > 5) return 'ko'
-  if (cjk > 10) return 'zh'
-  return 'en'
-}
-
 export const EditorPage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const ocrTimerRef = useRef<number | null>(null)
 
   const [overlayOpen, setOverlayOpen] = useState(false)
   const [ocrLoading, setOcrLoading] = useState(false)
-  const [language, setLanguage] = useState<LanguageCode>('en')
-  const [text, setText] = useState('')
-
-  const trimmedText = text.trim()
-  const segments = useMemo(
-    () => (trimmedText ? trimmedText.split(/\n+/).map((item) => item.trim()).filter(Boolean) : []),
-    [trimmedText]
-  )
-  const charCount = trimmedText.replace(/\s/g, '').length
-
-  const validationMessage = useMemo(() => {
-    if (trimmedText.length < 20) return t('pages.editor.validation.minChars')
-    if (segments.length < 1) return t('pages.editor.validation.minSegments')
-    if (segments.length > 30) return t('pages.editor.validation.maxSegments', { count: segments.length })
-    return ''
-  }, [segments.length, t, trimmedText.length])
-
-  const canConfirm = validationMessage.length === 0
-  const statsWarn = segments.length > 30 ? 'overLimit' : segments.length > 20 ? 'nearLimit' : ''
+  const [importedText, setImportedText] = useState('')
+  const [importVersion, setImportVersion] = useState(0)
+  const [focusVersion, setFocusVersion] = useState(0)
 
   const applyImportedText = (value: string) => {
-    setText(value)
-    setLanguage(detectLanguage(value))
+    setImportedText(value)
+    setImportVersion((prev) => prev + 1)
+    setFocusVersion((prev) => prev + 1)
   }
+
+  const closeOverlay = () => {
+    if (ocrTimerRef.current !== null) {
+      window.clearTimeout(ocrTimerRef.current)
+      ocrTimerRef.current = null
+    }
+    setOcrLoading(false)
+    setOverlayOpen(false)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (ocrTimerRef.current !== null) {
+        window.clearTimeout(ocrTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleOpenOverlay = (source: 'clipboard' | 'manual') => {
     setOverlayOpen(true)
     if (source === 'manual') {
-      window.setTimeout(() => textareaRef.current?.focus(), 350)
+      setFocusVersion((prev) => prev + 1)
       return
     }
 
@@ -94,9 +85,10 @@ export const EditorPage = () => {
     setOverlayOpen(true)
     if (file.type.startsWith('image/')) {
       setOcrLoading(true)
-      window.setTimeout(() => {
+      ocrTimerRef.current = window.setTimeout(() => {
         setOcrLoading(false)
         applyImportedText(SAMPLE_TEXT)
+        ocrTimerRef.current = null
       }, 2200)
       return
     }
@@ -109,10 +101,9 @@ export const EditorPage = () => {
     reader.readAsText(file)
   }
 
-  const handleConfirm = () => {
-    if (!canConfirm) return
-    sessionStorage.setItem('article_text', text)
-    sessionStorage.setItem('article_lang', language)
+  const handleConfirm = (payload: { text: string; language: OverlayLanguageCode }) => {
+    sessionStorage.setItem('article_text', payload.text)
+    sessionStorage.setItem('article_lang', payload.language)
     navigate('/practice?new=1')
   }
 
@@ -250,10 +241,9 @@ export const EditorPage = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                fontSize: '20px',
               }}
             >
-              📋
+              <ContentPasteRounded sx={{ fontSize: 20, color: 'text.secondary' }} />
             </Box>
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'text.primary' }}>
@@ -311,10 +301,9 @@ export const EditorPage = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                fontSize: '20px',
               }}
             >
-              📄
+              <UploadFileRounded sx={{ fontSize: 20, color: 'text.secondary' }} />
             </Box>
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'text.primary' }}>
@@ -380,253 +369,15 @@ export const EditorPage = () => {
         </Box>
       </Box>
 
-      <Box
-        sx={{
-          position: 'fixed',
-          inset: 0,
-          left: '50%',
-          width: '100%',
-          maxWidth: '430px',
-          transform: overlayOpen ? 'translate(-50%, 0)' : 'translate(-50%, 100%)',
-          transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-          zIndex: 200,
-          bgcolor: 'background.default',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            p: '16px 20px',
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            flexShrink: 0,
-          }}
-        >
-          <Box
-            component="button"
-            type="button"
-            aria-label={t('pages.editor.overlay.closeAriaLabel')}
-            onClick={() => setOverlayOpen(false)}
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: '999px',
-              border: '1px solid transparent',
-              bgcolor: 'transparent',
-              color: 'text.secondary',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            <CloseRounded sx={{ fontSize: 16 }} />
-          </Box>
-          <Typography sx={{ flex: 1, fontSize: '16px', fontWeight: 600 }}>
-            {t('pages.editor.overlay.title')}
-          </Typography>
-          <Box
-            sx={{
-              fontSize: '12px',
-              color: 'text.disabled',
-              fontFamily: '"SF Mono", "Fira Code", monospace',
-            }}
-          >
-            {t('pages.editor.overlay.stats', { chars: charCount, segments: segments.length })}{' '}
-            {statsWarn && (
-              <Box
-                component="span"
-                sx={{ color: segments.length > 30 ? 'error.main' : 'warning.main' }}
-              >
-                {t(`pages.editor.overlay.${statsWarn}`)}
-              </Box>
-            )}
-          </Box>
-        </Box>
-
-        {ocrLoading ? (
-          <Box
-            sx={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '16px',
-              p: '40px',
-            }}
-          >
-            <CircularProgress size={32} thickness={4} />
-            <Typography sx={{ fontSize: '14px', color: 'text.secondary' }}>
-              {t('pages.editor.overlay.ocrLoading')}
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <Box
-              sx={{
-                flex: 1,
-                minHeight: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                p: '16px 20px',
-                gap: '12px',
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                <Select
-                  value={language}
-                  onChange={(event) => setLanguage(event.target.value as LanguageCode)}
-                  size="small"
-                  sx={{
-                    minWidth: 140,
-                    height: 34,
-                    borderRadius: '999px',
-                    bgcolor: '#22223a',
-                    color: 'text.primary',
-                    '.MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(255,255,255,0.13)',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'primary.main',
-                    },
-                    '.MuiSelect-select': {
-                      py: '6px',
-                      fontSize: '13px',
-                    },
-                  }}
-                >
-                  <MenuItem value="en">🇺🇸 English</MenuItem>
-                  <MenuItem value="zh">🇨🇳 中文</MenuItem>
-                  <MenuItem value="ja">🇯🇵 日本語</MenuItem>
-                  <MenuItem value="ko">🇰🇷 한국어</MenuItem>
-                  <MenuItem value="fr">🇫🇷 Français</MenuItem>
-                </Select>
-                <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>
-                  {t('pages.editor.overlay.autoDetectEditable')}
-                </Typography>
-              </Box>
-
-              <Box
-                component="textarea"
-                ref={textareaRef}
-                value={text}
-                onChange={(event) => setText(event.target.value)}
-                placeholder={t('pages.editor.overlay.placeholder')}
-                sx={{
-                  flex: 1,
-                  minHeight: 0,
-                  px: '14px',
-                  py: '12px',
-                  bgcolor: '#22223a',
-                  border: '1px solid rgba(255,255,255,0.13)',
-                  borderRadius: '8px',
-                  outline: 'none',
-                  resize: 'none',
-                  color: 'text.primary',
-                  fontSize: '15px',
-                  lineHeight: 1.7,
-                  fontFamily: 'inherit',
-                  '&::placeholder': {
-                    color: 'text.disabled',
-                  },
-                  '&:focus': {
-                    borderColor: 'primary.main',
-                  },
-                }}
-              />
-            </Box>
-
-            <Box
-              sx={{
-                p: '16px 20px 32px',
-                borderTop: '1px solid',
-                borderColor: 'divider',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-              }}
-            >
-              {segments.length > 0 && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <Typography
-                    sx={{
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      letterSpacing: '0.7px',
-                      textTransform: 'uppercase',
-                      color: 'text.disabled',
-                    }}
-                  >
-                    {t('pages.editor.overlay.segmentPreview')}
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {segments.slice(0, 4).map((item, index) => (
-                      <Box
-                        key={`${item}-${index}`}
-                        sx={{
-                          px: '10px',
-                          py: '4px',
-                          maxWidth: 120,
-                          borderRadius: '999px',
-                          bgcolor: '#22223a',
-                          border: '1px solid rgba(255,255,255,0.07)',
-                          fontSize: '12px',
-                          color: 'text.secondary',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {`§${index + 1} ${item.slice(0, 12)}${item.length > 12 ? '…' : ''}`}
-                      </Box>
-                    ))}
-                    {segments.length > 4 && (
-                      <Box
-                        sx={{
-                          px: '10px',
-                          py: '4px',
-                          borderRadius: '999px',
-                          bgcolor: '#22223a',
-                          border: '1px solid rgba(255,255,255,0.07)',
-                          fontSize: '12px',
-                          color: 'text.disabled',
-                        }}
-                      >
-                        {t('pages.editor.overlay.moreSegments', { count: segments.length - 4 })}
-                      </Box>
-                    )}
-                  </Box>
-                </Box>
-              )}
-
-              {validationMessage && (
-                <Typography sx={{ fontSize: '13px', color: 'error.main' }}>{validationMessage}</Typography>
-              )}
-
-              <Button
-                variant="contained"
-                size="large"
-                fullWidth
-                disabled={!canConfirm}
-                onClick={handleConfirm}
-                sx={{
-                  boxShadow: '0 2px 12px rgba(110,96,238,0.25)',
-                  '&:hover': {
-                    bgcolor: 'primary.light',
-                  },
-                }}
-              >
-                {t('pages.editor.overlay.confirmStart')}
-              </Button>
-            </Box>
-          </Box>
-        )}
-      </Box>
+      <EditorTextOverlay
+        key={importVersion}
+        open={overlayOpen}
+        ocrLoading={ocrLoading}
+        importedText={importedText}
+        focusVersion={focusVersion}
+        onClose={closeOverlay}
+        onConfirm={handleConfirm}
+      />
     </Box>
   )
 }
