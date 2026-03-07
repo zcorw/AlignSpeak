@@ -33,3 +33,8 @@ def health_with_prefix() -> dict[str, str]:
 app.include_router(auth_router, prefix=API_PREFIX)
 app.include_router(articles_router, prefix=API_PREFIX)
 app.include_router(protected_router, prefix=API_PREFIX)
+
+# BFF v1 article aliases for frontend integration:
+# /api/bff/v1/articles, /api/bff/v1/articles/{article_id},
+# /api/bff/v1/articles/detect-language
+app.include_router(articles_router, prefix=f"{API_PREFIX}/bff/v1")

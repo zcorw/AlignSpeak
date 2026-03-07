@@ -61,3 +61,16 @@ As of this update, `/api/me-summary` and `/api/bff/v1/me` have been migrated to:
 - Usecase: `app/application/usecases/protected_me_usecase.py`
 - Router: `app/routers/protected.py` (presentation-only for these endpoints)
 
+As of this update, article module endpoints have also been migrated:
+
+- Endpoints:
+  - `/api/articles`
+  - `/api/articles/{article_id}`
+  - `/api/articles/detect-language`
+  - `/api/bff/v1/articles`
+  - `/api/bff/v1/articles/{article_id}`
+  - `/api/bff/v1/articles/detect-language`
+- Repository: `app/infrastructure/repositories/article_repository.py`
+- Usecase: `app/application/usecases/article_usecase.py`
+- Router helpers (request parsing): `app/routers/article_request_parser.py`
+- Router: `app/routers/articles.py` (presentation-only)
