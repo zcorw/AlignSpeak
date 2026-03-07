@@ -195,6 +195,41 @@ class PracticeRepository:
             return None
         return row[0], row[1]
 
+    def count_segments_for_article(self, *, article_id: str) -> int:
+        statement = select(func.count(ArticleSegment.id)).where(ArticleSegment.article_id == article_id)
+        return int(self.db.scalar(statement) or 0)
+
+    def count_attempts_for_segment(
+        self,
+        *,
+        user_id: str,
+        article_id: str,
+        segment_id: str,
+    ) -> int:
+        statement = select(func.count(PracticeAttempt.id)).where(
+            PracticeAttempt.user_id == user_id,
+            PracticeAttempt.article_id == article_id,
+            PracticeAttempt.segment_id == segment_id,
+        )
+        return int(self.db.scalar(statement) or 0)
+
+    def list_compare_tokens_by_attempt_and_side(
+        self,
+        *,
+        attempt_id: str,
+        side: str,
+    ) -> list[AttemptCompareToken]:
+        statement = (
+            select(AttemptCompareToken)
+            .join(AttemptCompareBlock, AttemptCompareBlock.id == AttemptCompareToken.block_id)
+            .where(
+                AttemptCompareBlock.attempt_id == attempt_id,
+                AttemptCompareToken.side == side,
+            )
+            .order_by(AttemptCompareBlock.block_order.asc(), AttemptCompareToken.token_order.asc())
+        )
+        return list(self.db.scalars(statement).all())
+
     def upsert_attempt_recognition(
         self,
         *,

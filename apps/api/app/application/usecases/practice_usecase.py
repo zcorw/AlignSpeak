@@ -23,6 +23,7 @@ from app.schemas.practice import (
     AlignToken,
     CompareBlock,
     FinishRecordingResponse,
+    PracticeAttemptResultResponse,
     PracticeArticleProgressResponse,
     PracticeProgressCell,
     PracticeProgressLevel,
@@ -35,6 +36,63 @@ from app.services.alignment_service import align_segment_text
 from app.services.stt_service import transcribe_audio_by_provider
 
 PRACTICE_LEVELS = ("L1", "L2", "L3", "L4")
+
+
+def get_attempt_result(
+    *,
+    repository: PracticeRepository,
+    current_user: User,
+    attempt_id: str,
+) -> PracticeAttemptResultResponse:
+    attempt = repository.get_attempt_for_user(attempt_id=attempt_id, user_id=current_user.id)
+    if attempt is None:
+        raise AppError(
+            code="NOT_FOUND",
+            message="Practice attempt not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    article_segment = repository.get_article_and_segment_for_attempt(attempt_id=attempt.id)
+    if article_segment is None:
+        raise AppError(
+            code="SEGMENT_NOT_FOUND",
+            message="Segment not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    article, segment = article_segment
+    total_segments = repository.count_segments_for_article(article_id=article.id)
+    attempt_count = repository.count_attempts_for_segment(
+        user_id=current_user.id,
+        article_id=article.id,
+        segment_id=segment.id,
+    )
+    ref_compare_tokens = repository.list_compare_tokens_by_attempt_and_side(attempt_id=attempt.id, side="ref")
+    hyp_compare_tokens = repository.list_compare_tokens_by_attempt_and_side(attempt_id=attempt.id, side="rec")
+
+    ref_tokens = [AlignToken(text=token.text, status=token.diff_kind or "correct") for token in ref_compare_tokens]
+    hyp_tokens = [AlignToken(text=token.text, status=token.diff_kind or "correct") for token in hyp_compare_tokens]
+
+    correct_count = sum(1 for token in ref_tokens if token.status == "correct")
+    wrong_count = sum(1 for token in ref_tokens if token.status == "substitute")
+    missed_count = sum(1 for token in ref_tokens if token.status == "missing")
+    inserted_count = sum(1 for token in hyp_tokens if token.status == "insert")
+    accuracy_rate = max(0.0, min(1.0, float(attempt.accuracy_rate or 0.0) / 100.0))
+
+    return PracticeAttemptResultResponse(
+        attempt_id=attempt.id,
+        article_id=article.id,
+        article_title=article.title,
+        segment_id=segment.id,
+        segment_order=segment.segment_order,
+        total_segments=total_segments,
+        attempt_count=attempt_count,
+        accuracy_rate=accuracy_rate,
+        ref_tokens=ref_tokens,
+        hyp_tokens=hyp_tokens,
+        correct_count=correct_count,
+        wrong_count=wrong_count,
+        missed_count=missed_count,
+        inserted_count=inserted_count,
+    )
 
 
 def get_article_progress(

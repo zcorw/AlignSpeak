@@ -86,3 +86,20 @@ class PracticeArticleProgressResponse(BaseModel):
     pass_threshold: float
     current_level: str
     levels: list[PracticeProgressLevel]
+
+
+class PracticeAttemptResultResponse(BaseModel):
+    attempt_id: str
+    article_id: str
+    article_title: str
+    segment_id: str
+    segment_order: int = Field(ge=1)
+    total_segments: int = Field(ge=0)
+    attempt_count: int = Field(ge=0)
+    accuracy_rate: float = Field(ge=0)
+    ref_tokens: list[AlignToken]
+    hyp_tokens: list[AlignToken]
+    correct_count: int = Field(ge=0)
+    wrong_count: int = Field(ge=0)
+    missed_count: int = Field(ge=0)
+    inserted_count: int = Field(ge=0)

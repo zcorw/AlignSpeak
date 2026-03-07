@@ -406,7 +406,22 @@ export const PracticePage = () => {
               setShowScore(false)
               setAlignmentResult(null)
             }}
-            onSubmitView={() => navigate(articleId ? `/result?a=${articleId}&seg=${currentSegmentOrder}` : '/result')}
+            onSubmitView={() => {
+              if (!articleId) {
+                navigate('/result')
+                return
+              }
+              const params = new URLSearchParams({
+                a: articleId,
+                seg: String(currentSegmentOrder),
+                lv: level,
+              })
+              if (lastAttemptId) {
+                params.set('attempt', lastAttemptId)
+                sessionStorage.setItem('last_attempt_id', lastAttemptId)
+              }
+              navigate(`/result?${params.toString()}`)
+            }}
             onSkipSegment={() => {
               if (window.confirm(t('pages.practice.confirm.skipSegment'))) setShowScore(false)
             }}

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.application.usecases.practice_usecase import (
     align_attempt,
     finish_recording,
+    get_attempt_result,
     get_article_progress,
     get_stt_job_status,
     process_stt_job,
@@ -19,6 +20,7 @@ from app.schemas.practice import (
     AlignResultResponse,
     FinishRecordingPayload,
     FinishRecordingResponse,
+    PracticeAttemptResultResponse,
     PracticeArticleProgressResponse,
     StartRecordingPayload,
     StartRecordingResponse,
@@ -27,6 +29,20 @@ from app.schemas.practice import (
 )
 
 router = APIRouter(tags=["practice"])
+
+
+@router.get("/practice/attempts/{attempt_id}/result", response_model=PracticeAttemptResultResponse)
+def get_practice_attempt_result(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PracticeAttemptResultResponse:
+    repository = PracticeRepository(db=db)
+    return get_attempt_result(
+        repository=repository,
+        current_user=current_user,
+        attempt_id=attempt_id,
+    )
 
 
 @router.get("/practice/articles/{article_id}/progress", response_model=PracticeArticleProgressResponse)
