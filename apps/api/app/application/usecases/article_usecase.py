@@ -14,9 +14,11 @@ from app.schemas.article import (
     ArticleListItem,
     ArticleListResponse,
     DetectLanguageResponse,
+    UploadParseResponse,
 )
 from app.services.article_service import (
     ParsedArticleInput,
+    ParsedUploadFileInput,
     decode_cursor,
     encode_cursor,
     estimate_token_count,
@@ -119,6 +121,27 @@ def detect_article_language(raw_text: str) -> DetectLanguageResponse:
     )
 
 
+def parse_uploaded_file(parsed: ParsedUploadFileInput) -> UploadParseResponse:
+    normalized_text = normalize_text(parsed.raw_text)
+    if not normalized_text:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Uploaded file does not contain valid text.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    detection = detect_language(normalized_text)
+    return UploadParseResponse(
+        text=normalized_text,
+        source_type=parsed.source_type,
+        detected_language=detection.detected_language,
+        detected_confidence=detection.confidence,
+        detected_reliable=detection.reliable,
+        detected_raw_language=detection.raw_language,
+        text_length=len(normalized_text),
+    )
+
+
 def get_article_detail(
     *,
     repository: ArticleRepository,
@@ -181,4 +204,3 @@ def list_articles(
         next_cursor = encode_cursor(last_article.created_at, last_article.id)
 
     return ArticleListResponse(items=items, next_cursor=next_cursor)
-

@@ -54,7 +54,6 @@ class ArticleListResponse(BaseModel):
 class CreateArticlePayload(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     language: str
-    source_type: str
     text: str
 
 
@@ -63,6 +62,16 @@ class DetectLanguagePayload(BaseModel):
 
 
 class DetectLanguageResponse(BaseModel):
+    detected_language: str
+    detected_confidence: float | None = None
+    detected_reliable: bool
+    detected_raw_language: str
+    text_length: int
+
+
+class UploadParseResponse(BaseModel):
+    text: str
+    source_type: str
     detected_language: str
     detected_confidence: float | None = None
     detected_reliable: bool

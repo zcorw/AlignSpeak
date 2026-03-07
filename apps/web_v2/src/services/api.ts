@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { AxiosHeaders } from 'axios'
 import { useAuthStore } from '../stores/authStore'
 
 const api = axios.create({
@@ -12,6 +12,14 @@ const api = axios.create({
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
+    if (config.data instanceof FormData) {
+      if (config.headers instanceof AxiosHeaders) {
+        config.headers.delete('Content-Type')
+      } else if (config.headers) {
+        delete (config.headers as Record<string, unknown>)['Content-Type']
+      }
+    }
+
     const { accessToken } = useAuthStore.getState()
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`

@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { articleService } from '../services/articleService'
 
-export type OverlayLanguageCode = 'en' | 'zh' | 'ja' | 'ko' | 'fr'
-type DetectableLanguageCode = Extract<OverlayLanguageCode, 'en' | 'zh' | 'ja'>
+export type OverlayLanguageCode = 'en' | 'zh' | 'ja'
+type DetectableLanguageCode = OverlayLanguageCode
 type DetectedLanguage = DetectableLanguageCode | 'unknown'
 
 interface EditorTextOverlayProps {
@@ -13,6 +13,7 @@ interface EditorTextOverlayProps {
   ocrLoading: boolean
   importedText: string
   focusVersion: number
+  submitting: boolean
   onClose: () => void
   onConfirm: (payload: { text: string; language: OverlayLanguageCode }) => void
 }
@@ -20,10 +21,8 @@ interface EditorTextOverlayProps {
 const fallbackDetectLanguage = (value: string): OverlayLanguageCode => {
   const cjk = (value.match(/[\u4e00-\u9fff]/g) ?? []).length
   const jp = (value.match(/[\u3040-\u30ff]/g) ?? []).length
-  const kr = (value.match(/[\uac00-\ud7af]/g) ?? []).length
 
   if (jp > 5) return 'ja'
-  if (kr > 5) return 'ko'
   if (cjk > 10) return 'zh'
   return 'en'
 }
@@ -36,6 +35,7 @@ export const EditorTextOverlay = ({
   ocrLoading,
   importedText,
   focusVersion,
+  submitting,
   onClose,
   onConfirm,
 }: EditorTextOverlayProps) => {
@@ -83,12 +83,11 @@ export const EditorTextOverlay = ({
   }, [detectedLanguage, detectedReliable, detectingLanguage, t])
 
   useEffect(() => {
-    console.log('state changed', { open, ocrLoading, text })
     if (!open || ocrLoading) return
 
     const timer = window.setTimeout(() => {
       const normalized = text.trim()
-      if (normalized.length < 20) {
+      if (normalized.length < 8) {
         setDetectingLanguage(false)
         setDetectedLanguage(null)
         setDetectedReliable(true)
@@ -253,8 +252,6 @@ export const EditorTextOverlay = ({
                 <MenuItem value="en">English</MenuItem>
                 <MenuItem value="zh">中文</MenuItem>
                 <MenuItem value="ja">日本語</MenuItem>
-                <MenuItem value="ko">한국어</MenuItem>
-                <MenuItem value="fr">Français</MenuItem>
               </Select>
               <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>{detectedLanguageHint}</Typography>
             </Box>
@@ -360,7 +357,7 @@ export const EditorTextOverlay = ({
               variant="contained"
               size="large"
               fullWidth
-              disabled={!canConfirm}
+              disabled={!canConfirm || submitting}
               onClick={() => {
                 if (!canConfirm) return
                 onConfirm({ text, language })
@@ -372,7 +369,7 @@ export const EditorTextOverlay = ({
                 },
               }}
             >
-              {t('pages.editor.overlay.confirmStart')}
+              {submitting ? t('common.loading') : t('pages.editor.overlay.confirmStart')}
             </Button>
           </Box>
         </Box>

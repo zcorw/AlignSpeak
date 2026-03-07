@@ -25,6 +25,13 @@ class ParsedArticleInput:
 
 
 @dataclass
+class ParsedUploadFileInput:
+    language: str
+    source_type: str
+    raw_text: str
+
+
+@dataclass
 class CursorPosition:
     created_at: datetime
     article_id: str

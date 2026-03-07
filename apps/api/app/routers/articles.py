@@ -6,17 +6,23 @@ from app.application.usecases.article_usecase import (
     detect_article_language as detect_article_language_usecase,
     get_article_detail as get_article_detail_usecase,
     list_articles as list_articles_usecase,
+    parse_uploaded_file as parse_uploaded_file_usecase,
 )
 from app.db import get_db
 from app.deps import get_current_user
 from app.infrastructure.repositories.article_repository import ArticleRepository
 from app.models import User
-from app.routers.article_request_parser import parse_create_article_input, parse_detect_language_text
+from app.routers.article_request_parser import (
+    parse_create_article_input,
+    parse_detect_language_text,
+    parse_upload_file_input,
+)
 from app.schemas.article import (
     ArticleCreateResponse,
     ArticleDetailResponse,
     ArticleListResponse,
     DetectLanguageResponse,
+    UploadParseResponse,
 )
 
 router = APIRouter(prefix="/articles", tags=["articles"])
@@ -43,6 +49,15 @@ async def detect_article_language(
 ) -> DetectLanguageResponse:
     raw_text = await parse_detect_language_text(request=request)
     return detect_article_language_usecase(raw_text=raw_text)
+
+
+@router.post("/parse-upload", response_model=UploadParseResponse)
+async def parse_uploaded_file(
+    request: Request,
+    _current_user: User = Depends(get_current_user),
+) -> UploadParseResponse:
+    parsed = await parse_upload_file_input(request=request)
+    return parse_uploaded_file_usecase(parsed=parsed)
 
 
 @router.get("/{article_id}", response_model=ArticleDetailResponse)

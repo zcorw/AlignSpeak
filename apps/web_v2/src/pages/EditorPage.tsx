@@ -6,10 +6,12 @@ import {
   UploadFileRounded,
 } from '@mui/icons-material'
 import { Box, Typography } from '@mui/material'
-import { type ChangeEvent, useEffect, useRef, useState } from 'react'
+import { type ChangeEvent, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { EditorTextOverlay, type OverlayLanguageCode } from '../components/EditorTextOverlay'
+import { getApiErrorMessage } from '../services/authService'
+import { articleService } from '../services/articleService'
 
 const SAMPLE_TEXT = `Once when I was six years old I saw a magnificent picture in a book about the primeval forest.
 
@@ -21,17 +23,26 @@ I showed my masterpiece to the grown-ups, and asked them whether the drawing fri
 
 They answered: "Why should anyone be frightened by a hat?"`
 
+const buildArticleTitle = (text: string) => {
+  const firstLine = text
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.length > 0)
+  if (!firstLine) return 'Untitled Article'
+  return firstLine.length <= 50 ? firstLine : `${firstLine.slice(0, 50)}...`
+}
+
 export const EditorPage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const ocrTimerRef = useRef<number | null>(null)
 
   const [overlayOpen, setOverlayOpen] = useState(false)
   const [ocrLoading, setOcrLoading] = useState(false)
   const [importedText, setImportedText] = useState('')
   const [importVersion, setImportVersion] = useState(0)
   const [focusVersion, setFocusVersion] = useState(0)
+  const [creatingArticle, setCreatingArticle] = useState(false)
 
   const applyImportedText = (value: string) => {
     setImportedText(value)
@@ -40,21 +51,9 @@ export const EditorPage = () => {
   }
 
   const closeOverlay = () => {
-    if (ocrTimerRef.current !== null) {
-      window.clearTimeout(ocrTimerRef.current)
-      ocrTimerRef.current = null
-    }
     setOcrLoading(false)
     setOverlayOpen(false)
   }
-
-  useEffect(() => {
-    return () => {
-      if (ocrTimerRef.current !== null) {
-        window.clearTimeout(ocrTimerRef.current)
-      }
-    }
-  }, [])
 
   const handleOpenOverlay = (source: 'clipboard' | 'manual') => {
     setOverlayOpen(true)
@@ -83,28 +82,49 @@ export const EditorPage = () => {
     if (!file) return
 
     setOverlayOpen(true)
-    if (file.type.startsWith('image/')) {
-      setOcrLoading(true)
-      ocrTimerRef.current = window.setTimeout(() => {
-        setOcrLoading(false)
-        applyImportedText(SAMPLE_TEXT)
-        ocrTimerRef.current = null
-      }, 2200)
-      return
-    }
+    setOcrLoading(true)
 
-    const reader = new FileReader()
-    reader.onload = (loadEvent) => {
-      const value = typeof loadEvent.target?.result === 'string' ? loadEvent.target.result : ''
-      applyImportedText(value)
-    }
-    reader.readAsText(file)
+    const locale = navigator.language.toLowerCase()
+    const languageHint = locale.startsWith('zh') ? 'zh' : locale.startsWith('ja') ? 'ja' : 'en'
+
+    void articleService
+      .parseUploadFile(file, languageHint)
+      .then((result) => {
+        applyImportedText(result.text || SAMPLE_TEXT)
+      })
+      .catch((error: unknown) => {
+        const message = getApiErrorMessage(error, t('common.error'))
+        window.alert(message)
+      })
+      .finally(() => {
+        setOcrLoading(false)
+      })
   }
 
   const handleConfirm = (payload: { text: string; language: OverlayLanguageCode }) => {
-    sessionStorage.setItem('article_text', payload.text)
-    sessionStorage.setItem('article_lang', payload.language)
-    navigate('/practice?new=1')
+    if (creatingArticle) return
+    setCreatingArticle(true)
+
+    const title = buildArticleTitle(payload.text)
+    void articleService
+      .createArticle({
+        title,
+        language: payload.language,
+        text: payload.text,
+      })
+      .then((article) => {
+        sessionStorage.setItem('article_id', article.articleId)
+        sessionStorage.setItem('article_text', payload.text)
+        sessionStorage.setItem('article_lang', payload.language)
+        navigate('/practice?new=1')
+      })
+      .catch((error: unknown) => {
+        const message = getApiErrorMessage(error, t('common.error'))
+        window.alert(message)
+      })
+      .finally(() => {
+        setCreatingArticle(false)
+      })
   }
 
   return (
@@ -375,6 +395,7 @@ export const EditorPage = () => {
         ocrLoading={ocrLoading}
         importedText={importedText}
         focusVersion={focusVersion}
+        submitting={creatingArticle}
         onClose={closeOverlay}
         onConfirm={handleConfirm}
       />

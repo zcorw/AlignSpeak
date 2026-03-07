@@ -28,10 +28,47 @@ export interface DetectLanguageResult {
   textLength: number
 }
 
+export type ArticleLanguage = 'ja' | 'en' | 'zh'
+
+export interface CreateArticlePayload {
+  title: string
+  language: ArticleLanguage
+  text: string
+}
+
+export interface CreateArticleResult {
+  articleId: string
+  title: string
+  language: ArticleLanguage
+  detectedLanguage: string
+  detectedConfidence?: number | null
+  detectedReliable: boolean
+  detectedRawLanguage: string
+  segments: Array<{
+    id: string
+    order: number
+    preview: string
+  }>
+}
+
+export interface UploadParseResult {
+  text: string
+  sourceType: 'upload' | 'ocr'
+  detectedLanguage: string
+  detectedConfidence?: number | null
+  detectedReliable: boolean
+  detectedRawLanguage: string
+  textLength: number
+}
+
 export const articleService = {
-  async createArticle(data: { text: string; language: string }): Promise<Article> {
-    const response = await api.post<ApiResponse<unknown>>('/bff/v1/articles', data)
-    return toCamelCase<Article>(response.data.data)
+  async createArticle(data: CreateArticlePayload): Promise<CreateArticleResult> {
+    const response = await api.post('/bff/v1/articles', {
+      title: data.title,
+      language: data.language,
+      text: data.text,
+    })
+    return toCamelCase<CreateArticleResult>(response.data)
   },
 
   async getArticle(id: string): Promise<Article> {
@@ -47,5 +84,15 @@ export const articleService = {
   async detectLanguage(text: string): Promise<DetectLanguageResult> {
     const response = await api.post('/bff/v1/articles/detect-language', { text })
     return toCamelCase<DetectLanguageResult>(response.data)
+  },
+
+  async parseUploadFile(file: File, language?: string): Promise<UploadParseResult> {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (language) {
+      formData.append('language', language)
+    }
+    const response = await api.post('/bff/v1/articles/parse-upload', formData)
+    return toCamelCase<UploadParseResult>(response.data)
   },
 }
