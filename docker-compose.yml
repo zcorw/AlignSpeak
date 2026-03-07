@@ -32,10 +32,14 @@ services:
   api:
     build:
       context: ./apps/api
+    env_file:
+      - ./apps/api/.env.secrets
     environment:
       APP_ENV: development
-      DATABASE_URL: postgresql+psycopg://alignspeak:alignspeak@db:5432/alignspeak
-      JWT_SECRET: alignspeak-dev-secret
+      OCR_PROVIDER: ${OCR_PROVIDER:-openai}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_OCR_MODEL: ${OPENAI_OCR_MODEL:-gpt-4.1-mini}
+      OPENAI_OCR_TIMEOUT_SECONDS: ${OPENAI_OCR_TIMEOUT_SECONDS:-45}
     expose:
       - "8000"
     depends_on:
@@ -44,10 +48,11 @@ services:
 
   db:
     image: postgres:15-alpine
+    env_file:
+      - ./apps/api/.env.secrets
     environment:
       POSTGRES_DB: alignspeak
       POSTGRES_USER: alignspeak
-      POSTGRES_PASSWORD: alignspeak
     ports:
       - "5432:5432"
     volumes:
@@ -62,10 +67,14 @@ services:
     build:
       context: ./apps/api
     command: ["python", "-c", "import time; print('worker placeholder started'); time.sleep(3600)"]
+    env_file:
+      - ./apps/api/.env.secrets
     environment:
       APP_ENV: development
-      DATABASE_URL: postgresql+psycopg://alignspeak:alignspeak@db:5432/alignspeak
-      JWT_SECRET: alignspeak-dev-secret
+      OCR_PROVIDER: ${OCR_PROVIDER:-openai}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_OCR_MODEL: ${OPENAI_OCR_MODEL:-gpt-4.1-mini}
+      OPENAI_OCR_TIMEOUT_SECONDS: ${OPENAI_OCR_TIMEOUT_SECONDS:-45}
     depends_on:
       db:
         condition: service_healthy

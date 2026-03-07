@@ -2,12 +2,12 @@ import base64
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from io import BytesIO
 from pathlib import Path
 
 from fastapi import status
 
 from app.core.errors import AppError
+from app.services.ocr_service import extract_text_from_image_by_provider
 
 SUPPORTED_LANGUAGES = {"ja", "en", "zh"}
 SUPPORTED_SOURCE_TYPES = {"manual", "upload", "ocr"}
@@ -111,24 +111,7 @@ def extract_text_from_image(filename: str, content: bytes, language: str) -> str
     extension = Path(filename).suffix.lower()
     if extension not in SUPPORTED_IMAGE_EXTENSIONS:
         raise AppError("UNSUPPORTED_FILE_TYPE", "Unsupported image file type.", status.HTTP_400_BAD_REQUEST)
-
-    try:
-        from PIL import Image  # type: ignore
-        import pytesseract  # type: ignore
-    except Exception:
-        return ""
-
-    try:
-        lang_map = {
-            "en": "eng",
-            "ja": "jpn",
-            "zh": "chi_sim",
-        }
-        tesseract_lang = lang_map.get(language, "eng")
-        image = Image.open(BytesIO(content))
-        return str(pytesseract.image_to_string(image, lang=tesseract_lang))
-    except Exception:
-        return ""
+    return extract_text_from_image_by_provider(filename=filename, content=content, language=language)
 
 
 def encode_cursor(created_at: datetime, article_id: str) -> str:
