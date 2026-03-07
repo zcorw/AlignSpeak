@@ -123,7 +123,7 @@ export default {
         },
         actions: {
           practiceAgain: 'Practice again',
-          submitView: 'Submit and view',
+          submitView: 'Submit',
           skipSegment: 'Skip this segment (mark incomplete)',
         },
         fullMode: {
