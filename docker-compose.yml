@@ -40,6 +40,8 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_OCR_MODEL: ${OPENAI_OCR_MODEL:-gpt-4.1-mini}
       OPENAI_OCR_TIMEOUT_SECONDS: ${OPENAI_OCR_TIMEOUT_SECONDS:-45}
+    volumes:
+      - ./data/media/tts:/app/media/tts
     expose:
       - "8000"
     depends_on:
@@ -75,6 +77,8 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_OCR_MODEL: ${OPENAI_OCR_MODEL:-gpt-4.1-mini}
       OPENAI_OCR_TIMEOUT_SECONDS: ${OPENAI_OCR_TIMEOUT_SECONDS:-45}
+    volumes:
+      - ./data/media/tts:/app/media/tts
     depends_on:
       db:
         condition: service_healthy

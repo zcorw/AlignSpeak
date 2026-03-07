@@ -106,6 +106,12 @@ export default {
           targetAccuracy: '目标 ≥85%',
         },
         segmentLabel: '§{{segment}} 跟读段落',
+        readAloud: {
+          play: '朗读本段',
+          stop: '停止朗读',
+          unsupported: '当前浏览器不支持语音朗读。',
+          failed: '朗读失败，请重试。',
+        },
         startRecording: '点击开始录音',
         recognizing: '识别中…',
         score: {

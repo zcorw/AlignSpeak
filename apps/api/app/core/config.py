@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     openai_ocr_model: str = "gpt-4.1-mini"
     openai_ocr_timeout_seconds: float = 45.0
 
+    # TTS configuration
+    tts_media_dir: str = "./media/tts"
+    tts_default_voice: str = "default"
+
     # In-memory rate limit defaults (window seconds + max attempts)
     register_ip_limit_window: int = 60 * 10
     register_ip_limit_max: int = 30

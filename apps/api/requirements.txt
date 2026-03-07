@@ -9,6 +9,7 @@ PyJWT==2.10.1
 argon2-cffi==23.1.0
 email-validator==2.2.0
 httpx==0.28.1
+edge-tts==7.2.7
 Pillow==10.4.0
 pytesseract==0.3.13
 pycld2==0.42

@@ -106,6 +106,12 @@ export default {
           targetAccuracy: 'Target ≥85%',
         },
         segmentLabel: '§{{segment}} Shadowing Segment',
+        readAloud: {
+          play: 'Read this segment',
+          stop: 'Stop reading',
+          unsupported: 'This browser does not support text-to-speech.',
+          failed: 'Failed to read aloud. Please try again.',
+        },
         startRecording: 'Tap to start recording',
         recognizing: 'Recognizing…',
         score: {

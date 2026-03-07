@@ -8,11 +8,15 @@ import {
   RefreshRounded,
   ReplayRounded,
   StopRounded,
+  VolumeUpRounded,
 } from '@mui/icons-material'
 import { Box, Button, CircularProgress, Typography } from '@mui/material'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { getApiErrorMessage } from '../services/authService'
+import { practiceService, type PracticeLanguage, type PracticeSegment } from '../services/practiceService'
+import { ttsService } from '../services/ttsService'
 
 type CellState = 'pass' | 'current' | 'skip' | 'fail'
 type Level = 'L1' | 'L2' | 'L3' | 'L4'
@@ -130,9 +134,20 @@ const Matrix = ({ compact = false }: { compact?: boolean }) => (
 
 const formatTimer = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`
 
+const parseLevelFromQuery = (value: string | null): Level | null => {
+  if (value === 'L1' || value === '1') return 'L1'
+  if (value === 'L2' || value === '2') return 'L2'
+  if (value === 'L3' || value === '3') return 'L3'
+  if (value === 'L4' || value === '4') return 'L4'
+  return null
+}
+
 export const PracticePage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioObjectUrlRef = useRef<string | null>(null)
   const [showSyncBar, setShowSyncBar] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [recognizing, setRecognizing] = useState(false)
@@ -141,7 +156,16 @@ export const PracticePage = () => {
   const [recordOverlayOpen, setRecordOverlayOpen] = useState(false)
   const [recordSeconds, setRecordSeconds] = useState(0)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [level, setLevel] = useState<Level>('L2')
+  const [level, setLevel] = useState<Level>(parseLevelFromQuery(searchParams.get('lv')) ?? 'L2')
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [ttsLoading, setTtsLoading] = useState(false)
+  const [articleId, setArticleId] = useState<string | null>(null)
+  const [articleTitle, setArticleTitle] = useState('')
+  const [articleLanguage, setArticleLanguage] = useState<PracticeLanguage>('en')
+  const [segments, setSegments] = useState<PracticeSegment[]>([])
+  const [segmentIndex, setSegmentIndex] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!recordOverlayOpen) return undefined
@@ -155,12 +179,149 @@ export const PracticePage = () => {
     return () => window.clearTimeout(timer)
   }, [showSyncBar, syncing])
 
-  const segmentText =
-    'After that I used to think a lot about jungle adventures, and eventually managed to make my first drawing with colored pencils.'
+  const searchKey = searchParams.toString()
+  const queryArticleId = searchParams.get('a') ?? searchParams.get('articleId')
+  const querySegment = Number.parseInt(searchParams.get('seg') ?? '', 10)
+  const queryLevel = parseLevelFromQuery(searchParams.get('lv'))
+
+  useEffect(() => {
+    let active = true
+
+    const loadPracticeArticle = async () => {
+      setLoading(true)
+      setLoadError(null)
+      try {
+        const resolvedArticleId = await practiceService.resolveArticleId(queryArticleId)
+        if (!resolvedArticleId) {
+          throw new Error('No article available for practice.')
+        }
+
+        const practiceArticle = await practiceService.getPracticeArticle(resolvedArticleId)
+        if (!active) return
+
+        setArticleId(practiceArticle.articleId)
+        setArticleTitle(practiceArticle.title)
+        setArticleLanguage(practiceArticle.language)
+        setSegments(practiceArticle.segments)
+        sessionStorage.setItem('article_id', practiceArticle.articleId)
+        sessionStorage.setItem('article_lang', practiceArticle.language)
+
+        const requestedIndex = Number.isFinite(querySegment) ? querySegment - 1 : 0
+        const clampedIndex = Math.min(Math.max(requestedIndex, 0), Math.max(practiceArticle.segments.length - 1, 0))
+        setSegmentIndex(clampedIndex)
+      } catch (error: unknown) {
+        if (!active) return
+        setLoadError(getApiErrorMessage(error, t('common.error')))
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    if (queryLevel) {
+      setLevel(queryLevel)
+    }
+
+    void loadPracticeArticle()
+    return () => {
+      active = false
+    }
+  }, [queryArticleId, queryLevel, querySegment, searchKey, t])
+
+  const currentSegment = segments[segmentIndex] ?? null
+  const segmentText = currentSegment?.plainText ?? ''
+  const totalSegments = segments.length
+  const currentSegmentOrder = currentSegment?.order ?? segmentIndex + 1
+  const tokenTotal = Math.max(currentSegment?.tokenCount ?? 18, 1)
+  const languageLabel =
+    articleLanguage === 'zh' ? t('common.languageChinese') : articleLanguage === 'ja' ? '日本語' : t('common.languageEnglish')
+  const canPractice = Boolean(currentSegment) && !loading && !loadError
+
   const score = 78
   const passed = score >= 85
 
+  const stopSpeaking = () => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.pause()
+      audio.currentTime = 0
+      audioRef.current = null
+    }
+    if (audioObjectUrlRef.current) {
+      URL.revokeObjectURL(audioObjectUrlRef.current)
+      audioObjectUrlRef.current = null
+    }
+    setIsSpeaking(false)
+  }
+
+  const isInterruptedPlayError = (error: unknown): boolean => {
+    if (!(error instanceof Error)) return false
+    const message = error.message.toLowerCase()
+    return message.includes('play() request was interrupted') || message.includes('interrupted by a call to pause()')
+  }
+
+  const speakSegment = async () => {
+    if (!canPractice || !articleId || !currentSegment) return
+    if (isSpeaking) {
+      stopSpeaking()
+      return
+    }
+
+    setTtsLoading(true)
+    try {
+      const job = await ttsService.createTtsJob(articleId, currentSegment.id, 1.0)
+      const finalStatus = await ttsService.waitForDone(job.jobId)
+      if (finalStatus.status !== 'done' || !finalStatus.audioUrl) {
+        const message =
+          finalStatus.errorCode === 'TTS_TIMEOUT'
+            ? 'TTS timeout.'
+            : finalStatus.errorCode
+              ? `TTS failed: ${finalStatus.errorCode}`
+              : t('pages.practice.readAloud.failed')
+        throw new Error(message)
+      }
+
+      const sourceUrl = await ttsService.fetchAudioObjectUrl(finalStatus.audioUrl)
+      const audio = new Audio(sourceUrl)
+      audioObjectUrlRef.current = sourceUrl
+      audio.onended = () => {
+        if (audioObjectUrlRef.current) {
+          URL.revokeObjectURL(audioObjectUrlRef.current)
+          audioObjectUrlRef.current = null
+        }
+        setIsSpeaking(false)
+        audioRef.current = null
+      }
+      audio.onerror = () => {
+        if (audioObjectUrlRef.current) {
+          URL.revokeObjectURL(audioObjectUrlRef.current)
+          audioObjectUrlRef.current = null
+        }
+        setIsSpeaking(false)
+        audioRef.current = null
+      }
+      audioRef.current = audio
+      setIsSpeaking(true)
+      await audio.play()
+    } catch (error: unknown) {
+      if (!isInterruptedPlayError(error)) {
+        const alertFn = (globalThis as { alert?: (message?: string) => void }).alert
+        alertFn?.(getApiErrorMessage(error, t('pages.practice.readAloud.failed')))
+      }
+      if (audioObjectUrlRef.current) {
+        URL.revokeObjectURL(audioObjectUrlRef.current)
+        audioObjectUrlRef.current = null
+      }
+      setIsSpeaking(false)
+      audioRef.current = null
+    } finally {
+      setTtsLoading(false)
+    }
+  }
+
   const startRecording = () => {
+    if (ttsLoading) return
+    if (!canPractice) return
+    if (isSpeaking) stopSpeaking()
     setRecordSeconds(0)
     setRecordOverlayOpen(true)
   }
@@ -191,6 +352,24 @@ export const PracticePage = () => {
     }
   }
 
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current
+      if (!audio) return
+      audio.pause()
+      audio.currentTime = 0
+      audioRef.current = null
+      if (audioObjectUrlRef.current) {
+        URL.revokeObjectURL(audioObjectUrlRef.current)
+        audioObjectUrlRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    stopSpeaking()
+  }, [segmentIndex])
+
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', px: '20px', pt: '16px', pb: '12px' }}>
@@ -199,10 +378,10 @@ export const PracticePage = () => {
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontSize: '14px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            The Little Prince — Ch.I
+            {articleTitle || '...'}
           </Typography>
           <Typography sx={{ fontSize: '11px', color: 'text.secondary' }}>
-            {t('pages.practice.topbar.language')}
+            {languageLabel}
           </Typography>
         </Box>
         <Box component="button" type="button" sx={iconButtonSx} onClick={() => setDrawerOpen(true)}>
@@ -257,12 +436,28 @@ export const PracticePage = () => {
           },
         }}
       >
+        {loading && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', p: '12px 14px', bgcolor: '#1a1a2c', border: '1px solid rgba(255,255,255,0.13)', borderRadius: '12px' }}>
+            <CircularProgress size={16} thickness={5} />
+            <Typography sx={{ fontSize: '13px', color: 'text.secondary' }}>{t('common.loading')}</Typography>
+          </Box>
+        )}
+
+        {loadError && (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', p: '12px 14px', bgcolor: 'rgba(240,82,82,0.08)', border: '1px solid rgba(240,82,82,0.25)', borderRadius: '12px' }}>
+            <Typography sx={{ fontSize: '13px', color: 'error.main' }}>{loadError}</Typography>
+            <Button size="small" variant="outlined" onClick={() => navigate('/editor')}>
+              {t('pages.start.importNewArticle')}
+            </Button>
+          </Box>
+        )}
+
         <Box sx={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <Box sx={{ px: '10px', py: '3px', borderRadius: '999px', bgcolor: 'rgba(110,96,238,0.25)', border: '1px solid rgba(110,96,238,0.3)', color: 'primary.light', fontSize: '12px', fontWeight: 600 }}>
             {level}
           </Box>
           <Typography sx={{ fontSize: '13px', color: 'text.secondary' }}>
-            {t('pages.practice.meta.segmentProgress', { current: 3, total: 5 })}
+            {t('pages.practice.meta.segmentProgress', { current: currentSegmentOrder, total: totalSegments })}
           </Typography>
           <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>
             {t('pages.practice.meta.targetAccuracy')}
@@ -271,9 +466,39 @@ export const PracticePage = () => {
 
         <Box sx={{ bgcolor: '#1a1a2c', border: '1px solid rgba(255,255,255,0.13)', borderRadius: '14px', p: '20px' }}>
           <Typography sx={{ mb: '10px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'text.disabled' }}>
-            {t('pages.practice.segmentLabel', { segment: 3 })}
+            {t('pages.practice.segmentLabel', { segment: currentSegmentOrder })}
           </Typography>
-          <Typography sx={{ fontSize: '17px', lineHeight: 1.75 }}>{segmentText}</Typography>
+          <Typography sx={{ fontSize: '17px', lineHeight: 1.75 }}>{segmentText || '...'}</Typography>
+          <Box
+            component="button"
+            type="button"
+            onClick={speakSegment}
+            disabled={recordOverlayOpen || !canPractice || ttsLoading}
+            sx={{
+              mt: '14px',
+              px: '10px',
+              py: '6px',
+              borderRadius: '999px',
+              border: '1px solid rgba(255,255,255,0.13)',
+              bgcolor: isSpeaking ? 'rgba(110,96,238,0.25)' : '#22223a',
+              color: isSpeaking ? 'primary.light' : 'text.secondary',
+              fontSize: '12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: recordOverlayOpen || !canPractice || ttsLoading ? 'default' : 'pointer',
+              transition: 'all 0.15s',
+              '&:hover': recordOverlayOpen || !canPractice || ttsLoading
+                ? undefined
+                : {
+                    borderColor: 'rgba(110,96,238,0.3)',
+                    color: 'text.primary',
+                  },
+            }}
+          >
+            {ttsLoading ? <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} /> : <VolumeUpRounded sx={{ fontSize: 14 }} />}
+            {ttsLoading ? t('common.loading') : isSpeaking ? t('pages.practice.readAloud.stop') : t('pages.practice.readAloud.play')}
+          </Box>
         </Box>
 
         {!recognizing && !showScore && (
@@ -282,6 +507,7 @@ export const PracticePage = () => {
               component="button"
               type="button"
               onClick={startRecording}
+              disabled={!canPractice}
               sx={{
                 width: 72,
                 height: 72,
@@ -292,9 +518,10 @@ export const PracticePage = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer',
+                cursor: canPractice ? 'pointer' : 'default',
+                opacity: canPractice ? 1 : 0.5,
                 transition: 'transform 0.15s',
-                '&:hover': { transform: 'scale(1.05)' },
+                '&:hover': canPractice ? { transform: 'scale(1.05)' } : undefined,
               }}
             >
               <MicRounded sx={{ fontSize: 24 }} />
@@ -349,7 +576,7 @@ export const PracticePage = () => {
                   <Typography component="span" sx={{ color: 'text.secondary' }}>
                     {t('pages.practice.score.correctWords')}
                   </Typography>
-                  <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>11 / 18</Typography>
+                  <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>{`11 / ${tokenTotal}`}</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                   <Typography component="span" sx={{ color: 'text.secondary' }}>
@@ -414,7 +641,7 @@ export const PracticePage = () => {
               </Button>
               <Button
                 variant="outlined"
-                onClick={() => navigate('/result')}
+                onClick={() => navigate(articleId ? `/result?a=${articleId}&seg=${currentSegmentOrder}` : '/result')}
                 sx={{
                   flex: 1,
                   bgcolor: '#22223a',
@@ -545,7 +772,7 @@ export const PracticePage = () => {
 
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: '32px 28px', gap: '32px' }}>
           <Typography sx={{ fontSize: '12px', color: 'text.disabled', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-            {t('pages.practice.segmentLabel', { segment: 3 })}
+            {t('pages.practice.segmentLabel', { segment: currentSegmentOrder })}
           </Typography>
           <Typography sx={{ fontSize: '20px', lineHeight: 1.7, textAlign: 'center' }}>{segmentText}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '3px', height: 32 }}>
@@ -605,7 +832,7 @@ export const PracticePage = () => {
         </Box>
         <Box sx={{ p: '4px 20px 32px', overflowY: 'auto' }}>
           <Typography sx={{ mb: '16px', fontSize: '13px', color: 'text.secondary' }}>
-            {t('pages.practice.drawer.articleInfo', { total: 5 })}
+            {t('pages.practice.drawer.articleInfo', { total: totalSegments })}
           </Typography>
           <Matrix />
           <Box sx={{ mt: '20px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'text.disabled' }}>
