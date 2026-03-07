@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.application.usecases.practice_usecase import (
     align_attempt,
     finish_recording,
+    get_article_progress,
     get_stt_job_status,
     process_stt_job,
     start_recording,
@@ -18,6 +19,7 @@ from app.schemas.practice import (
     AlignResultResponse,
     FinishRecordingPayload,
     FinishRecordingResponse,
+    PracticeArticleProgressResponse,
     StartRecordingPayload,
     StartRecordingResponse,
     SttJobStatusResponse,
@@ -25,6 +27,24 @@ from app.schemas.practice import (
 )
 
 router = APIRouter(tags=["practice"])
+
+
+@router.get("/practice/articles/{article_id}/progress", response_model=PracticeArticleProgressResponse)
+def get_article_practice_progress(
+    article_id: str,
+    level: str = Query(default="L1", pattern="^L[1-4]$"),
+    current_segment_order: int | None = Query(default=None, ge=1),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PracticeArticleProgressResponse:
+    repository = PracticeRepository(db=db)
+    return get_article_progress(
+        repository=repository,
+        current_user=current_user,
+        article_id=article_id,
+        current_level=level,
+        current_segment_order=current_segment_order,
+    )
 
 
 @router.post("/practice/segments/{segment_id}/recordings/start", response_model=StartRecordingResponse, status_code=status.HTTP_201_CREATED)

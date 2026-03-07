@@ -20,21 +20,39 @@ import {
   type AlignmentResult,
   type AlignmentStatus,
 } from '../services/practiceAttemptService'
-import { practiceService, type PracticeLanguage, type PracticeSegment } from '../services/practiceService'
+import {
+  practiceService,
+  type PracticeLanguage,
+  type PracticeLevel,
+  type PracticeProgressCellState,
+  type PracticeSegment,
+} from '../services/practiceService'
 import { ttsService } from '../services/ttsService'
 
-type CellState = 'pass' | 'current' | 'skip' | 'fail'
-type Level = 'L1' | 'L2' | 'L3' | 'L4'
-
-const PROGRESS: Record<Level, CellState[]> = {
-  L1: ['pass', 'pass', 'pass', 'pass', 'pass'],
-  L2: ['pass', 'pass', 'current', 'fail', 'fail'],
-  L3: ['fail', 'fail', 'fail', 'fail', 'fail'],
-  L4: ['fail', 'fail', 'fail', 'fail', 'fail'],
-}
+type CellState = PracticeProgressCellState
+type Level = PracticeLevel
 
 const TRENDS = [62, 70, 75, 78]
 const LEVELS: Level[] = ['L1', 'L2', 'L3', 'L4']
+
+const createFallbackProgressMatrix = (
+  totalSegments: number,
+  currentLevel: Level,
+  currentSegmentOrder: number
+): Record<Level, CellState[]> => {
+  const safeTotalSegments = Math.max(totalSegments, 0)
+  const matrix = LEVELS.reduce(
+    (acc, level) => {
+      acc[level] = Array.from({ length: safeTotalSegments }, () => 'fail')
+      return acc
+    },
+    {} as Record<Level, CellState[]>
+  )
+  if (safeTotalSegments <= 0) return matrix
+  const currentIndex = Math.min(Math.max(currentSegmentOrder - 1, 0), safeTotalSegments - 1)
+  matrix[currentLevel][currentIndex] = 'current'
+  return matrix
+}
 
 const iconButtonSx = {
   width: 36,
@@ -51,7 +69,7 @@ const iconButtonSx = {
   '&:hover': { bgcolor: '#22223a', color: 'text.primary' },
 } as const
 
-const Matrix = ({ compact = false }: { compact?: boolean }) => (
+const Matrix = ({ matrix, compact = false }: { matrix: Record<Level, CellState[]>; compact?: boolean }) => (
   <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
     {LEVELS.map((level) => (
       <Box key={level} sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -67,7 +85,7 @@ const Matrix = ({ compact = false }: { compact?: boolean }) => (
           {level}
         </Typography>
         <Box sx={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-          {PROGRESS[level].map((state, i) => (
+          {(matrix[level] ?? []).map((state, i) => (
             <Box
               key={`${level}-${i}`}
               sx={{
@@ -151,7 +169,7 @@ export const PracticePage = () => {
   const [recordOverlayOpen, setRecordOverlayOpen] = useState(false)
   const [recordSeconds, setRecordSeconds] = useState(0)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [level, setLevel] = useState<Level>(parseLevelFromQuery(searchParams.get('lv')) ?? 'L2')
+  const [level, setLevel] = useState<Level>(parseLevelFromQuery(searchParams.get('lv')) ?? 'L1')
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [ttsLoading, setTtsLoading] = useState(false)
   const [articleId, setArticleId] = useState<string | null>(null)
@@ -164,6 +182,11 @@ export const PracticePage = () => {
   const [resultError, setResultError] = useState<string | null>(null)
   const [alignmentResult, setAlignmentResult] = useState<AlignmentResult | null>(null)
   const [lastAttemptId, setLastAttemptId] = useState<string | null>(null)
+  const [progressRefreshVersion, setProgressRefreshVersion] = useState(0)
+  const [progressLoading, setProgressLoading] = useState(false)
+  const [progressMatrix, setProgressMatrix] = useState<Record<Level, CellState[]>>(
+    createFallbackProgressMatrix(0, level, 1)
+  )
 
   useEffect(() => {
     if (!recordOverlayOpen) return undefined
@@ -245,6 +268,50 @@ export const PracticePage = () => {
   const missedCount = refTokens.filter((token) => token.status === 'missing').length
   const score = alignmentResult ? Math.round(alignmentResult.accuracyRate * 100) : 0
   const passed = score >= 85
+
+  useEffect(() => {
+    let active = true
+
+    if (!articleId || totalSegments <= 0) {
+      setProgressLoading(false)
+      setProgressMatrix(createFallbackProgressMatrix(totalSegments, level, currentSegmentOrder))
+      return () => {
+        active = false
+      }
+    }
+
+    const loadProgress = async () => {
+      setProgressLoading(true)
+      try {
+        const progress = await practiceService.getArticleProgress(articleId, {
+          level,
+          currentSegmentOrder,
+        })
+        if (!active) return
+        const resolvedTotalSegments = progress.totalSegments > 0 ? progress.totalSegments : totalSegments
+        const fallback = createFallbackProgressMatrix(resolvedTotalSegments, level, currentSegmentOrder)
+        const matrix = LEVELS.reduce(
+          (acc, item) => {
+            const source = progress.matrix[item]
+            acc[item] = Array.isArray(source) && source.length > 0 ? source : fallback[item]
+            return acc
+          },
+          {} as Record<Level, CellState[]>
+        )
+        setProgressMatrix(matrix)
+      } catch {
+        if (!active) return
+        setProgressMatrix(createFallbackProgressMatrix(totalSegments, level, currentSegmentOrder))
+      } finally {
+        if (active) setProgressLoading(false)
+      }
+    }
+
+    void loadProgress()
+    return () => {
+      active = false
+    }
+  }, [articleId, currentSegmentOrder, level, progressRefreshVersion, totalSegments])
 
   const renderRecordingSegmentText = (): ReactNode => {
     if (articleLanguage !== 'ja' || !currentSegment?.tokens?.length) return segmentText
@@ -393,6 +460,7 @@ export const PracticePage = () => {
       const alignResult = await practiceAttemptService.alignAttempt(sttStatus.attempt_id, segmentId, sttStatus.recognized_text)
       setAlignmentResult(alignResult)
       setShowScore(true)
+      setProgressRefreshVersion((prev) => prev + 1)
     } catch (error: unknown) {
       setResultError(getApiErrorMessage(error, t('common.error')))
       setShowSyncBar(true)
@@ -481,6 +549,7 @@ export const PracticePage = () => {
       setShowScore(true)
       setShowSyncBar(false)
       setResultError(null)
+      setProgressRefreshVersion((prev) => prev + 1)
     } catch (error: unknown) {
       setResultError(getApiErrorMessage(error, t('common.error')))
       setShowSyncBar(true)
@@ -869,7 +938,7 @@ export const PracticePage = () => {
               <Typography sx={{ mb: '12px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'text.disabled' }}>
                 {t('pages.practice.fullMode.matrix')}
               </Typography>
-              <Matrix />
+              <Matrix matrix={progressMatrix} />
             </Box>
 
             <Box sx={{ p: '16px', bgcolor: '#22223a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px' }}>
@@ -1029,7 +1098,12 @@ export const PracticePage = () => {
           <Typography sx={{ mb: '16px', fontSize: '13px', color: 'text.secondary' }}>
             {t('pages.practice.drawer.articleInfo', { total: totalSegments })}
           </Typography>
-          <Matrix />
+          {progressLoading && (
+            <Typography sx={{ mb: '10px', fontSize: '12px', color: 'text.disabled' }}>
+              {t('common.loading')}
+            </Typography>
+          )}
+          <Matrix matrix={progressMatrix} />
           <Box sx={{ mt: '20px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'text.disabled' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(29,201,138,0.1)', border: '1px solid rgba(29,201,138,0.2)', color: 'success.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>OK</Box>

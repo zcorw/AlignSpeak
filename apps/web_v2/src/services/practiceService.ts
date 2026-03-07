@@ -19,6 +19,8 @@ function toCamelCase<T>(obj: unknown): T {
 }
 
 export type PracticeLanguage = 'ja' | 'en' | 'zh'
+export type PracticeProgressCellState = 'pass' | 'current' | 'skip' | 'fail'
+export type PracticeLevel = 'L1' | 'L2' | 'L3' | 'L4'
 
 export interface PracticeReadingToken {
   surface: string
@@ -40,10 +42,55 @@ export interface PracticeArticleDetail {
   segments: PracticeSegment[]
 }
 
+export interface PracticeArticleProgress {
+  articleId: string
+  totalSegments: number
+  passThreshold: number
+  currentLevel: PracticeLevel
+  matrix: Record<PracticeLevel, PracticeProgressCellState[]>
+}
+
 interface BffMeResponse {
   historyDocs?: Array<{ id?: string }>
   history_docs?: Array<{ id?: string }>
 }
+
+interface RawPracticeProgressLevel {
+  level?: string
+  cells?: Array<{
+    segmentOrder?: number
+    state?: string
+  }>
+}
+
+interface RawPracticeArticleProgress {
+  articleId?: string
+  totalSegments?: number
+  passThreshold?: number
+  currentLevel?: string
+  levels?: RawPracticeProgressLevel[]
+}
+
+const LEVELS: PracticeLevel[] = ['L1', 'L2', 'L3', 'L4']
+
+const toValidCellState = (value: string | undefined): PracticeProgressCellState => {
+  if (value === 'pass' || value === 'current' || value === 'skip' || value === 'fail') return value
+  return 'fail'
+}
+
+const toValidLevel = (value: string | undefined): PracticeLevel => {
+  if (value === 'L1' || value === 'L2' || value === 'L3' || value === 'L4') return value
+  return 'L1'
+}
+
+const createEmptyMatrix = (size: number): Record<PracticeLevel, PracticeProgressCellState[]> =>
+  LEVELS.reduce(
+    (acc, level) => {
+      acc[level] = Array.from({ length: Math.max(size, 0) }, () => 'fail')
+      return acc
+    },
+    {} as Record<PracticeLevel, PracticeProgressCellState[]>
+  )
 
 export const practiceService = {
   async resolveArticleId(preferredId?: string | null): Promise<string | null> {
@@ -64,5 +111,37 @@ export const practiceService = {
       params: { include_reading: true },
     })
     return toCamelCase<PracticeArticleDetail>(response.data)
+  },
+
+  async getArticleProgress(
+    articleId: string,
+    options?: {
+      level?: PracticeLevel
+      currentSegmentOrder?: number
+    }
+  ): Promise<PracticeArticleProgress> {
+    const response = await api.get(`/practice/articles/${articleId}/progress`, {
+      params: {
+        level: options?.level,
+        current_segment_order: options?.currentSegmentOrder,
+      },
+    })
+    const payload = toCamelCase<RawPracticeArticleProgress>(response.data)
+    const totalSegments =
+      typeof payload.totalSegments === 'number' && payload.totalSegments >= 0 ? Math.floor(payload.totalSegments) : 0
+    const matrix = createEmptyMatrix(totalSegments)
+    const levels = Array.isArray(payload.levels) ? payload.levels : []
+    for (const item of levels) {
+      const level = toValidLevel(item.level)
+      const cells = Array.isArray(item.cells) ? item.cells : []
+      matrix[level] = cells.map((cell) => toValidCellState(cell.state))
+    }
+    return {
+      articleId: typeof payload.articleId === 'string' ? payload.articleId : articleId,
+      totalSegments,
+      passThreshold: typeof payload.passThreshold === 'number' ? payload.passThreshold : 85,
+      currentLevel: toValidLevel(payload.currentLevel),
+      matrix,
+    }
   },
 }

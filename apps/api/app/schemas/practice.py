@@ -66,3 +66,23 @@ class AlignResultResponse(BaseModel):
     hyp_tokens: list[AlignToken]
     compare_blocks: list[CompareBlock]
     noise_spans: list[NoiseSpan]
+
+
+class PracticeProgressCell(BaseModel):
+    segment_order: int = Field(ge=1)
+    state: str
+    attempt_count: int = Field(default=0, ge=0)
+    best_accuracy: float | None = None
+
+
+class PracticeProgressLevel(BaseModel):
+    level: str
+    cells: list[PracticeProgressCell]
+
+
+class PracticeArticleProgressResponse(BaseModel):
+    article_id: str
+    total_segments: int = Field(ge=0)
+    pass_threshold: float
+    current_level: str
+    levels: list[PracticeProgressLevel]

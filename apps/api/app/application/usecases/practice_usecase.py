@@ -23,6 +23,9 @@ from app.schemas.practice import (
     AlignToken,
     CompareBlock,
     FinishRecordingResponse,
+    PracticeArticleProgressResponse,
+    PracticeProgressCell,
+    PracticeProgressLevel,
     NoiseSpan,
     StartRecordingResponse,
     SttJobStatusResponse,
@@ -30,6 +33,102 @@ from app.schemas.practice import (
 )
 from app.services.alignment_service import align_segment_text
 from app.services.stt_service import transcribe_audio_by_provider
+
+PRACTICE_LEVELS = ("L1", "L2", "L3", "L4")
+
+
+def get_article_progress(
+    *,
+    repository: PracticeRepository,
+    current_user: User,
+    article_id: str,
+    current_level: str,
+    current_segment_order: int | None = None,
+    pass_threshold: float = 85.0,
+) -> PracticeArticleProgressResponse:
+    if current_level not in PRACTICE_LEVELS:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Unsupported level.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    segments = repository.list_article_segments_for_user(article_id=article_id, user_id=current_user.id)
+    if not segments:
+        raise AppError(
+            code="NOT_FOUND",
+            message="Article not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    snapshots = repository.get_segment_attempt_snapshots(article_id=article_id, user_id=current_user.id)
+
+    resolved_current_segment_order = current_segment_order
+    if resolved_current_segment_order is None:
+        resolved_current_segment_order = segments[0].segment_order
+        for segment in segments:
+            snapshot = snapshots.get(segment.id, {})
+            best_accuracy = snapshot.get("best_accuracy")
+            if not isinstance(best_accuracy, (int, float)) or float(best_accuracy) < pass_threshold:
+                resolved_current_segment_order = segment.segment_order
+                break
+
+    base_cells: list[PracticeProgressCell] = []
+    for segment in segments:
+        snapshot = snapshots.get(segment.id, {})
+        attempt_count = int(snapshot.get("attempt_count", 0) or 0)
+        best_accuracy_raw = snapshot.get("best_accuracy")
+        best_accuracy = float(best_accuracy_raw) if isinstance(best_accuracy_raw, (int, float)) else None
+
+        if best_accuracy is not None and best_accuracy >= pass_threshold:
+            state = "pass"
+        elif resolved_current_segment_order == segment.segment_order:
+            state = "current"
+        elif attempt_count > 0:
+            state = "fail"
+        else:
+            state = "fail"
+
+        base_cells.append(
+            PracticeProgressCell(
+                segment_order=segment.segment_order,
+                state=state,
+                attempt_count=attempt_count,
+                best_accuracy=best_accuracy,
+            )
+        )
+
+    levels: list[PracticeProgressLevel] = []
+    for level in PRACTICE_LEVELS:
+        if level == current_level:
+            level_cells = [
+                PracticeProgressCell(
+                    segment_order=cell.segment_order,
+                    state=cell.state,
+                    attempt_count=cell.attempt_count,
+                    best_accuracy=cell.best_accuracy,
+                )
+                for cell in base_cells
+            ]
+        else:
+            level_cells = [
+                PracticeProgressCell(
+                    segment_order=cell.segment_order,
+                    state="fail",
+                    attempt_count=0,
+                    best_accuracy=None,
+                )
+                for cell in base_cells
+            ]
+        levels.append(PracticeProgressLevel(level=level, cells=level_cells))
+
+    return PracticeArticleProgressResponse(
+        article_id=article_id,
+        total_segments=len(segments),
+        pass_threshold=pass_threshold,
+        current_level=current_level,
+        levels=levels,
+    )
 
 
 def start_recording(

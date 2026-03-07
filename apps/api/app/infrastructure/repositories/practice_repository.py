@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -34,6 +34,45 @@ class PracticeRepository:
         if row is None:
             return None
         return row[0], row[1]
+
+    def list_article_segments_for_user(self, *, article_id: str, user_id: str) -> list[ArticleSegment]:
+        statement = (
+            select(ArticleSegment)
+            .join(Article, Article.id == ArticleSegment.article_id)
+            .where(
+                Article.id == article_id,
+                Article.user_id == user_id,
+            )
+            .order_by(ArticleSegment.segment_order.asc())
+        )
+        return list(self.db.scalars(statement).all())
+
+    def get_segment_attempt_snapshots(
+        self,
+        *,
+        article_id: str,
+        user_id: str,
+    ) -> dict[str, dict[str, int | float | None]]:
+        statement = (
+            select(
+                PracticeAttempt.segment_id,
+                func.count(PracticeAttempt.id).label("attempt_count"),
+                func.max(PracticeAttempt.accuracy_rate).label("best_accuracy"),
+            )
+            .where(
+                PracticeAttempt.article_id == article_id,
+                PracticeAttempt.user_id == user_id,
+                PracticeAttempt.status == "done",
+            )
+            .group_by(PracticeAttempt.segment_id)
+        )
+        snapshots: dict[str, dict[str, int | float | None]] = {}
+        for segment_id, attempt_count, best_accuracy in self.db.execute(statement).all():
+            snapshots[str(segment_id)] = {
+                "attempt_count": int(attempt_count or 0),
+                "best_accuracy": float(best_accuracy) if best_accuracy is not None else None,
+            }
+        return snapshots
 
     def create_recording(self, recording: PracticeRecording) -> PracticeRecording:
         self.db.add(recording)
