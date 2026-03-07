@@ -314,6 +314,7 @@ def align_attempt(
             id=f"blk_{uuid4().hex[:12]}",
             attempt_id=attempt.id,
             block_order=1,
+            created_at=datetime.now(tz=timezone.utc),
         )
     )
     compare_tokens: list[AttemptCompareToken] = []

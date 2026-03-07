@@ -176,7 +176,9 @@ class AttemptCompareBlock(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     attempt_id: Mapped[str] = mapped_column(String(32), ForeignKey("practice_attempts.id"), nullable=False, index=True)
     block_order: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
+    )
 
 
 class AttemptCompareToken(Base):

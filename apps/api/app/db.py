@@ -38,6 +38,22 @@ def apply_runtime_schema_fixes() -> None:
         conn.execute(
             text(
                 """
+                ALTER TABLE IF EXISTS attempt_compare_blocks
+                ALTER COLUMN created_at SET DEFAULT now()
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE IF EXISTS attempt_recognition
+                ALTER COLUMN created_at SET DEFAULT now()
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
                 ALTER TABLE IF EXISTS practice_attempts
                 ADD COLUMN IF NOT EXISTS alignment_mode VARCHAR(16)
                 """
