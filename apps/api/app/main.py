@@ -13,6 +13,7 @@ from app.routers.auth import router as auth_router
 from app.routers.protected import router as protected_router
 
 app = FastAPI(title="AlignSpeak API", version="0.1.0")
+API_PREFIX = "/api"
 
 app.add_exception_handler(AppError, app_error_handler)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
@@ -24,11 +25,11 @@ def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
+@app.get(f"{API_PREFIX}/health")
+def health_with_prefix() -> dict[str, str]:
     return {"status": "ok"}
 
 
-app.include_router(auth_router)
-app.include_router(articles_router)
-app.include_router(protected_router)
+app.include_router(auth_router, prefix=API_PREFIX)
+app.include_router(articles_router, prefix=API_PREFIX)
+app.include_router(protected_router, prefix=API_PREFIX)

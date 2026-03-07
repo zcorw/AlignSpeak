@@ -12,6 +12,7 @@ import {
   VerifyEmailPage,
 } from './pages'
 import { authService } from './services/authService'
+import { entryService } from './services/entryService'
 import { useAuthStore } from './stores/authStore'
 
 function App() {
@@ -20,12 +21,14 @@ function App() {
   const setUser = useAuthStore((state) => state.setUser)
   const clearAuth = useAuthStore((state) => state.clearAuth)
   const [checkingAuth, setCheckingAuth] = useState(true)
+  const [hasPreviousUnfinishedArticle, setHasPreviousUnfinishedArticle] = useState(false)
 
   useEffect(() => {
     let active = true
 
     const bootstrapAuth = async () => {
       if (!accessToken) {
+        setHasPreviousUnfinishedArticle(false)
         if (active) setCheckingAuth(false)
         return
       }
@@ -41,9 +44,13 @@ function App() {
           displayName: me.displayName,
           status: me.status,
         })
+        const hasUnfinished = await entryService.hasPreviousUnfinishedArticle()
+        if (!active) return
+        setHasPreviousUnfinishedArticle(hasUnfinished)
       } catch {
         if (!active) return
         clearAuth()
+        setHasPreviousUnfinishedArticle(false)
       } finally {
         if (active) setCheckingAuth(false)
       }
@@ -56,6 +63,7 @@ function App() {
   }, [accessToken, clearAuth, setUser])
 
   const isAuthenticated = Boolean(accessToken && user)
+  const defaultAuthedRoute = hasPreviousUnfinishedArticle ? '/start' : '/editor'
 
   if (checkingAuth) {
     return (
@@ -92,15 +100,15 @@ function App() {
         {/* Auth routes */}
         <Route
           path="/login"
-          element={isAuthenticated ? <Navigate to="/start" replace /> : <LoginPage />}
+          element={isAuthenticated ? <Navigate to={defaultAuthedRoute} replace /> : <LoginPage />}
         />
         <Route
           path="/register"
-          element={isAuthenticated ? <Navigate to="/start" replace /> : <RegisterPage />}
+          element={isAuthenticated ? <Navigate to={defaultAuthedRoute} replace /> : <RegisterPage />}
         />
         <Route
           path="/register/verify"
-          element={isAuthenticated ? <Navigate to="/start" replace /> : <VerifyEmailPage />}
+          element={isAuthenticated ? <Navigate to={defaultAuthedRoute} replace /> : <VerifyEmailPage />}
         />
 
         {/* Protected routes */}
@@ -108,7 +116,7 @@ function App() {
           path="/"
           element={
             isAuthenticated ? (
-              <Navigate to="/start" replace />
+              <Navigate to={defaultAuthedRoute} replace />
             ) : (
               <Navigate to="/login" replace />
             )
@@ -116,7 +124,17 @@ function App() {
         />
         <Route
           path="/start"
-          element={isAuthenticated ? <StartPage /> : <Navigate to="/login" replace />}
+          element={
+            isAuthenticated ? (
+              hasPreviousUnfinishedArticle ? (
+                <StartPage />
+              ) : (
+                <Navigate to="/editor" replace />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
         <Route
           path="/editor"
@@ -131,7 +149,7 @@ function App() {
           element={isAuthenticated ? <ResultPage /> : <Navigate to="/login" replace />}
         />
         <Route path="/me" element={isAuthenticated ? <MePage /> : <Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to={isAuthenticated ? '/start' : '/login'} replace />} />
+        <Route path="*" element={<Navigate to={isAuthenticated ? defaultAuthedRoute : '/login'} replace />} />
       </Routes>
     </Box>
   )

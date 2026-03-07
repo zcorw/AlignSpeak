@@ -39,7 +39,7 @@ export const LoginPage = () => {
         displayName: me.displayName,
         status: me.status,
       })
-      navigate('/start', { replace: true })
+      navigate('/', { replace: true })
     } catch (err) {
       if (err instanceof ZodError) {
         // Handle validation errors
