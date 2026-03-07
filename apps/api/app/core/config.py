@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     tts_media_dir: str = "./media/tts"
     tts_default_voice: str = "default"
 
+    # STT configuration
+    stt_provider: str = "openai"
+    stt_media_dir: str = "./media/stt"
+    openai_stt_model: str = "gpt-4o-mini-transcribe"
+    openai_stt_timeout_seconds: float = 120.0
+    stt_max_duration_ms: int = 600_000
+
     # In-memory rate limit defaults (window seconds + max attempts)
     register_ip_limit_window: int = 60 * 10
     register_ip_limit_max: int = 30

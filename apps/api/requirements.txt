@@ -13,3 +13,4 @@ edge-tts==7.2.7
 Pillow==10.4.0
 pytesseract==0.3.13
 pycld2==0.42
+pykakasi==2.3.0

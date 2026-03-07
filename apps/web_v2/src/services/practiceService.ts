@@ -20,11 +20,17 @@ function toCamelCase<T>(obj: unknown): T {
 
 export type PracticeLanguage = 'ja' | 'en' | 'zh'
 
+export interface PracticeReadingToken {
+  surface: string
+  yomi?: string | null
+}
+
 export interface PracticeSegment {
   id: string
   order: number
   plainText: string
   tokenCount: number
+  tokens?: PracticeReadingToken[]
 }
 
 export interface PracticeArticleDetail {
@@ -54,8 +60,9 @@ export const practiceService = {
   },
 
   async getPracticeArticle(articleId: string): Promise<PracticeArticleDetail> {
-    const response = await api.get(`/bff/v1/articles/${articleId}`)
+    const response = await api.get(`/bff/v1/articles/${articleId}`, {
+      params: { include_reading: true },
+    })
     return toCamelCase<PracticeArticleDetail>(response.data)
   },
 }
-

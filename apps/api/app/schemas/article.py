@@ -20,11 +20,17 @@ class ArticleCreateResponse(BaseModel):
     segments: list[ArticleCreateSegment]
 
 
+class ArticleReadingToken(BaseModel):
+    surface: str
+    yomi: str | None = None
+
+
 class ArticleDetailSegment(BaseModel):
     id: str
     order: int
     plain_text: str
     token_count: int
+    tokens: list[ArticleReadingToken] | None = None
 
 
 class ArticleDetailResponse(BaseModel):

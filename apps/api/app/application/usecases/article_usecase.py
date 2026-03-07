@@ -10,6 +10,7 @@ from app.schemas.article import (
     ArticleCreateResponse,
     ArticleCreateSegment,
     ArticleDetailResponse,
+    ArticleReadingToken,
     ArticleDetailSegment,
     ArticleListItem,
     ArticleListResponse,
@@ -27,6 +28,7 @@ from app.services.article_service import (
     split_segments,
 )
 from app.services.language_detection_service import detect_language
+from app.services.reading_service import build_segment_reading_tokens
 
 
 def _not_found_error() -> AppError:
@@ -147,6 +149,7 @@ def get_article_detail(
     repository: ArticleRepository,
     current_user: User,
     article_id: str,
+    include_reading: bool = False,
 ) -> ArticleDetailResponse:
     article = repository.get_article_by_id_for_user(article_id=article_id, user_id=current_user.id)
     if article is None:
@@ -166,6 +169,17 @@ def get_article_detail(
                 order=segment.segment_order,
                 plain_text=segment.plain_text,
                 token_count=segment.token_count,
+                tokens=(
+                    [
+                        ArticleReadingToken(surface=token.surface, yomi=token.yomi)
+                        for token in build_segment_reading_tokens(
+                            text=segment.plain_text,
+                            language=article.language,
+                        )
+                    ]
+                    if include_reading and article.language == "ja"
+                    else None
+                ),
             )
             for segment in segments
         ],

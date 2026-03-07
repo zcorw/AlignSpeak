@@ -11,16 +11,20 @@ import {
   VolumeUpRounded,
 } from '@mui/icons-material'
 import { Box, Button, CircularProgress, Typography } from '@mui/material'
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getApiErrorMessage } from '../services/authService'
+import {
+  practiceAttemptService,
+  type AlignmentResult,
+  type AlignmentStatus,
+} from '../services/practiceAttemptService'
 import { practiceService, type PracticeLanguage, type PracticeSegment } from '../services/practiceService'
 import { ttsService } from '../services/ttsService'
 
 type CellState = 'pass' | 'current' | 'skip' | 'fail'
 type Level = 'L1' | 'L2' | 'L3' | 'L4'
-type AlignmentType = 'ok' | 'err' | 'miss' | 'ins'
 
 const PROGRESS: Record<Level, CellState[]> = {
   L1: ['pass', 'pass', 'pass', 'pass', 'pass'],
@@ -31,32 +35,6 @@ const PROGRESS: Record<Level, CellState[]> = {
 
 const TRENDS = [62, 70, 75, 78]
 const LEVELS: Level[] = ['L1', 'L2', 'L3', 'L4']
-
-const TOKENS: { word: string; type: AlignmentType }[] = [
-  { word: 'After', type: 'ok' },
-  { word: 'that', type: 'ok' },
-  { word: 'I', type: 'ok' },
-  { word: 'use', type: 'err' },
-  { word: 'used', type: 'miss' },
-  { word: 'to', type: 'ok' },
-  { word: 'think', type: 'ok' },
-  { word: 'a', type: 'ok' },
-  { word: 'lot', type: 'ok' },
-  { word: 'about', type: 'ok' },
-  { word: 'jungle', type: 'ok' },
-  { word: 'adventure', type: 'err' },
-  { word: 'adventures', type: 'miss' },
-  { word: ',', type: 'ok' },
-  { word: 'and', type: 'ok' },
-  { word: 'eventually', type: 'ok' },
-  { word: 'managed', type: 'ok' },
-  { word: 'to', type: 'ok' },
-  { word: 'make', type: 'ok' },
-  { word: 'my', type: 'miss' },
-  { word: 'first', type: 'ok' },
-  { word: 'drawing', type: 'ok' },
-  { word: '…', type: 'ins' },
-]
 
 const iconButtonSx = {
   width: 36,
@@ -123,7 +101,7 @@ const Matrix = ({ compact = false }: { compact?: boolean }) => (
                 }),
               }}
             >
-              {state === 'pass' ? '✓' : state === 'current' ? i + 1 : state === 'skip' ? '↷' : '·'}
+              {state === 'pass' ? 'OK' : state === 'current' ? i + 1 : state === 'skip' ? '->' : '-'}
             </Box>
           ))}
         </Box>
@@ -142,12 +120,29 @@ const parseLevelFromQuery = (value: string | null): Level | null => {
   return null
 }
 
+const CHUNK_DURATION_MS = 1200
+
+const tokenStyleFromStatus = (status: AlignmentStatus): { bg: string; color?: string; strike?: boolean } => {
+  if (status === 'correct') return { bg: 'rgba(29,201,138,0.12)' }
+  if (status === 'substitute') return { bg: 'rgba(240,82,82,0.2)', color: 'error.main', strike: true }
+  if (status === 'missing') return { bg: 'rgba(240,166,35,0.18)', color: 'warning.main' }
+  return { bg: 'rgba(240,82,82,0.1)', color: 'text.secondary' }
+}
+
 export const PracticePage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioObjectUrlRef = useRef<string | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const recordingIdRef = useRef<string | null>(null)
+  const recordingSegmentIdRef = useRef<string | null>(null)
+  const chunkSeqRef = useRef(0)
+  const uploadTasksRef = useRef<Array<Promise<void>>>([])
+  const recordingStartAtRef = useRef<number | null>(null)
+  const finalizingRef = useRef(false)
   const [showSyncBar, setShowSyncBar] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [recognizing, setRecognizing] = useState(false)
@@ -166,6 +161,9 @@ export const PracticePage = () => {
   const [segmentIndex, setSegmentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [resultError, setResultError] = useState<string | null>(null)
+  const [alignmentResult, setAlignmentResult] = useState<AlignmentResult | null>(null)
+  const [lastAttemptId, setLastAttemptId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!recordOverlayOpen) return undefined
@@ -231,13 +229,37 @@ export const PracticePage = () => {
   const segmentText = currentSegment?.plainText ?? ''
   const totalSegments = segments.length
   const currentSegmentOrder = currentSegment?.order ?? segmentIndex + 1
-  const tokenTotal = Math.max(currentSegment?.tokenCount ?? 18, 1)
+  const defaultTokenTotal = Math.max(currentSegment?.tokenCount ?? 1, 1)
   const languageLabel =
-    articleLanguage === 'zh' ? t('common.languageChinese') : articleLanguage === 'ja' ? '日本語' : t('common.languageEnglish')
+    articleLanguage === 'zh' ? t('common.languageChinese') : articleLanguage === 'ja' ? 'Japanese' : t('common.languageEnglish')
   const canPractice = Boolean(currentSegment) && !loading && !loadError
-
-  const score = 78
+  const isRecording = Boolean(mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive')
+  const refTokens = alignmentResult?.refTokens ?? []
+  const hypTokens = alignmentResult?.hypTokens ?? []
+  const displayTokens = alignmentResult?.compareBlocks?.[0]?.recognized?.length
+    ? alignmentResult.compareBlocks[0].recognized
+    : hypTokens
+  const tokenTotal = Math.max(refTokens.length || defaultTokenTotal, 1)
+  const correctCount = refTokens.filter((token) => token.status === 'correct').length
+  const wrongCount = refTokens.filter((token) => token.status === 'substitute').length
+  const missedCount = refTokens.filter((token) => token.status === 'missing').length
+  const score = alignmentResult ? Math.round(alignmentResult.accuracyRate * 100) : 0
   const passed = score >= 85
+
+  const renderRecordingSegmentText = (): ReactNode => {
+    if (articleLanguage !== 'ja' || !currentSegment?.tokens?.length) return segmentText
+    return currentSegment.tokens.map((token, index) => {
+      if (!token.yomi) {
+        return <span key={`${token.surface}-${index}`}>{token.surface}</span>
+      }
+      return (
+        <ruby key={`${token.surface}-${index}`} style={{ marginInline: '1px' }}>
+          {token.surface}
+          <rt style={{ fontSize: '0.56em', color: 'rgba(255,255,255,0.68)', fontWeight: 500 }}>{token.yomi}</rt>
+        </ruby>
+      )
+    })
+  }
 
   const stopSpeaking = () => {
     const audio = audioRef.current
@@ -251,6 +273,27 @@ export const PracticePage = () => {
       audioObjectUrlRef.current = null
     }
     setIsSpeaking(false)
+  }
+
+  const cleanupRecordingMedia = () => {
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop()
+    }
+    mediaRecorderRef.current = null
+    const stream = mediaStreamRef.current
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop())
+    }
+    mediaStreamRef.current = null
+  }
+
+  const resetRecordingState = () => {
+    recordingIdRef.current = null
+    recordingSegmentIdRef.current = null
+    chunkSeqRef.current = 0
+    uploadTasksRef.current = []
+    recordingStartAtRef.current = null
   }
 
   const isInterruptedPlayError = (error: unknown): boolean => {
@@ -318,31 +361,128 @@ export const PracticePage = () => {
     }
   }
 
-  const startRecording = () => {
-    if (ttsLoading) return
-    if (!canPractice) return
+  const runFinishAndAlign = async () => {
+    if (finalizingRef.current) return
+    finalizingRef.current = true
+    setRecognizing(true)
+    setShowScore(false)
+    setShowSyncBar(false)
+    setResultError(null)
+    try {
+      const recordingId = recordingIdRef.current
+      const segmentId = recordingSegmentIdRef.current
+      if (!recordingId || !segmentId) {
+        throw new Error('Recording session is missing.')
+      }
+      await Promise.all(uploadTasksRef.current)
+      const totalChunks = chunkSeqRef.current
+      if (totalChunks <= 0) {
+        throw new Error('No recording chunks uploaded.')
+      }
+      const elapsedMs = recordingStartAtRef.current ? Date.now() - recordingStartAtRef.current : recordSeconds * 1000
+      const finishRes = await practiceAttemptService.finishRecording(recordingId, totalChunks, Math.max(elapsedMs, 1))
+      const sttStatus = await practiceAttemptService.waitSttDone(finishRes.jobId)
+      if (sttStatus.status !== 'done' || !sttStatus.attempt_id) {
+        const reason = sttStatus.error_code ?? 'STT_PROVIDER_ERROR'
+        throw new Error(`STT failed: ${reason}`)
+      }
+      setLastAttemptId(sttStatus.attempt_id)
+      const alignResult = await practiceAttemptService.alignAttempt(sttStatus.attempt_id, segmentId, sttStatus.recognized_text)
+      setAlignmentResult(alignResult)
+      setShowScore(true)
+    } catch (error: unknown) {
+      setResultError(getApiErrorMessage(error, t('common.error')))
+      setShowSyncBar(true)
+    } finally {
+      setRecognizing(false)
+      cleanupRecordingMedia()
+      resetRecordingState()
+      finalizingRef.current = false
+    }
+  }
+
+  const startRecording = async () => {
+    if (ttsLoading || !canPractice || !currentSegment || recognizing || isRecording) return
     if (isSpeaking) stopSpeaking()
-    setRecordSeconds(0)
-    setRecordOverlayOpen(true)
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      const alertFn = (globalThis as { alert?: (message?: string) => void }).alert
+      alertFn?.('MediaRecorder is not supported in this browser.')
+      return
+    }
+    try {
+      setResultError(null)
+      setShowSyncBar(false)
+      setShowScore(false)
+      setAlignmentResult(null)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const started = await practiceAttemptService.startRecording(currentSegment.id)
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : undefined
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+
+      mediaStreamRef.current = stream
+      mediaRecorderRef.current = recorder
+      recordingIdRef.current = started.recordingId
+      recordingSegmentIdRef.current = currentSegment.id
+      chunkSeqRef.current = 0
+      uploadTasksRef.current = []
+      recordingStartAtRef.current = Date.now()
+      setRecordSeconds(0)
+      setRecordOverlayOpen(true)
+
+      recorder.ondataavailable = (event: BlobEvent) => {
+        if (!recordingIdRef.current || event.data.size <= 0) return
+        const seq = chunkSeqRef.current
+        chunkSeqRef.current += 1
+        const task = practiceAttemptService.uploadChunk(recordingIdRef.current, seq, event.data, CHUNK_DURATION_MS)
+        uploadTasksRef.current.push(task)
+      }
+      recorder.onstop = () => {
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach((track) => track.stop())
+        }
+        void runFinishAndAlign()
+      }
+      recorder.start(CHUNK_DURATION_MS)
+    } catch (error: unknown) {
+      cleanupRecordingMedia()
+      resetRecordingState()
+      setRecordOverlayOpen(false)
+      setRecognizing(false)
+      setShowSyncBar(true)
+      setResultError(getApiErrorMessage(error, t('common.error')))
+    }
   }
 
   const stopRecording = () => {
     setRecordOverlayOpen(false)
-    setRecognizing(true)
-    window.setTimeout(() => {
-      setRecognizing(false)
-      setShowScore(true)
-      setShowSyncBar(true)
-    }, 1800)
+    const recorder = mediaRecorderRef.current
+    if (!recorder) return
+    if (recorder.state !== 'inactive') {
+      recorder.stop()
+      return
+    }
+    void runFinishAndAlign()
   }
 
-  const retrySync = () => {
+  const retrySync = async () => {
+    if (!lastAttemptId || !currentSegment) return
     setSyncing(true)
-    setShowSyncBar(true)
-    window.setTimeout(() => {
-      setSyncing(false)
+    try {
+      const alignResult = await practiceAttemptService.alignAttempt(lastAttemptId, currentSegment.id)
+      setAlignmentResult(alignResult)
+      setShowScore(true)
       setShowSyncBar(false)
-    }, 1500)
+      setResultError(null)
+    } catch (error: unknown) {
+      setResultError(getApiErrorMessage(error, t('common.error')))
+      setShowSyncBar(true)
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const switchLevel = (nextLevel: Level) => {
@@ -354,20 +494,19 @@ export const PracticePage = () => {
 
   useEffect(() => {
     return () => {
-      const audio = audioRef.current
-      if (!audio) return
-      audio.pause()
-      audio.currentTime = 0
-      audioRef.current = null
-      if (audioObjectUrlRef.current) {
-        URL.revokeObjectURL(audioObjectUrlRef.current)
-        audioObjectUrlRef.current = null
-      }
+      stopSpeaking()
+      cleanupRecordingMedia()
+      resetRecordingState()
     }
   }, [])
 
   useEffect(() => {
     stopSpeaking()
+    setShowScore(false)
+    setAlignmentResult(null)
+    setResultError(null)
+    setShowSyncBar(false)
+    setLastAttemptId(null)
   }, [segmentIndex])
 
   return (
@@ -398,7 +537,7 @@ export const PracticePage = () => {
             component="button"
             type="button"
             onClick={retrySync}
-            disabled={syncing}
+            disabled={syncing || !lastAttemptId}
             sx={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -410,7 +549,7 @@ export const PracticePage = () => {
               borderRadius: '999px',
               color: 'warning.main',
               fontSize: '12px',
-              cursor: syncing ? 'default' : 'pointer',
+              cursor: syncing || !lastAttemptId ? 'default' : 'pointer',
             }}
           >
             {syncing ? <CircularProgress size={12} thickness={5} sx={{ color: 'warning.main' }} /> : <RefreshRounded sx={{ fontSize: 13 }} />}
@@ -449,6 +588,12 @@ export const PracticePage = () => {
             <Button size="small" variant="outlined" onClick={() => navigate('/editor')}>
               {t('pages.start.importNewArticle')}
             </Button>
+          </Box>
+        )}
+
+        {resultError && (
+          <Box sx={{ p: '10px 12px', bgcolor: 'rgba(240,82,82,0.08)', border: '1px solid rgba(240,82,82,0.25)', borderRadius: '12px' }}>
+            <Typography sx={{ fontSize: '12px', color: 'error.main' }}>{resultError}</Typography>
           </Box>
         )}
 
@@ -506,8 +651,10 @@ export const PracticePage = () => {
             <Box
               component="button"
               type="button"
-              onClick={startRecording}
-              disabled={!canPractice}
+              onClick={() => {
+                void startRecording()
+              }}
+              disabled={!canPractice || isRecording}
               sx={{
                 width: 72,
                 height: 72,
@@ -518,10 +665,10 @@ export const PracticePage = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: canPractice ? 'pointer' : 'default',
-                opacity: canPractice ? 1 : 0.5,
+                cursor: canPractice && !isRecording ? 'pointer' : 'default',
+                opacity: canPractice && !isRecording ? 1 : 0.5,
                 transition: 'transform 0.15s',
-                '&:hover': canPractice ? { transform: 'scale(1.05)' } : undefined,
+                '&:hover': canPractice && !isRecording ? { transform: 'scale(1.05)' } : undefined,
               }}
             >
               <MicRounded sx={{ fontSize: 24 }} />
@@ -576,19 +723,19 @@ export const PracticePage = () => {
                   <Typography component="span" sx={{ color: 'text.secondary' }}>
                     {t('pages.practice.score.correctWords')}
                   </Typography>
-                  <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>{`11 / ${tokenTotal}`}</Typography>
+                  <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>{`${correctCount} / ${tokenTotal}`}</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                   <Typography component="span" sx={{ color: 'text.secondary' }}>
                     {t('pages.practice.score.wrongWords')}
                   </Typography>
-                  <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>3</Typography>
+                  <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>{wrongCount}</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                   <Typography component="span" sx={{ color: 'text.secondary' }}>
                     {t('pages.practice.score.missedWords')}
                   </Typography>
-                  <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>4</Typography>
+                  <Typography component="span" sx={{ minWidth: 72, textAlign: 'right', color: 'text.primary', fontFamily: 'monospace' }}>{missedCount}</Typography>
                 </Box>
               </Box>
             </Box>
@@ -603,34 +750,43 @@ export const PracticePage = () => {
                 gap: '6px',
               }}
             >
-              {TOKENS.map((token, i) => (
-                <Box
-                  key={`${token.word}-${i}`}
-                  component="span"
-                  sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    px: '4px',
-                    py: '1px',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    lineHeight: 1.3,
-                    ...(token.type === 'ok' && { bgcolor: 'rgba(29,201,138,0.12)' }),
-                    ...(token.type === 'err' && { bgcolor: 'rgba(240,82,82,0.2)', color: 'error.main', textDecoration: 'line-through' }),
-                    ...(token.type === 'miss' && { bgcolor: 'rgba(240,166,35,0.18)', color: 'warning.main' }),
-                    ...(token.type === 'ins' && { bgcolor: 'rgba(240,82,82,0.1)', color: 'text.secondary' }),
-                  }}
-                >
-                  {token.word}
-                </Box>
-              ))}
+              {displayTokens.length === 0 && (
+                <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>No alignment tokens available.</Typography>
+              )}
+              {displayTokens.map((token, i) => {
+                const style = tokenStyleFromStatus(token.status)
+                return (
+                  <Box
+                    key={`${token.text}-${i}`}
+                    component="span"
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      px: '4px',
+                      py: '1px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      lineHeight: 1.3,
+                      bgcolor: style.bg,
+                      color: style.color ?? 'text.primary',
+                      textDecoration: style.strike ? 'line-through' : 'none',
+                    }}
+                  >
+                    {token.text}
+                  </Box>
+                )
+              })}
             </Box>
 
             <Box sx={{ display: 'flex', gap: '10px' }}>
               <Button
                 variant="contained"
                 startIcon={<ReplayRounded sx={{ fontSize: '14px !important' }} />}
-                onClick={() => setShowScore(false)}
+                onClick={() => {
+                  setShowScore(false)
+                  setAlignmentResult(null)
+                  setResultError(null)
+                }}
                 sx={{
                   flex: 1.8,
                   boxShadow: '0 8px 24px rgba(110,96,238,0.3)',
@@ -760,7 +916,7 @@ export const PracticePage = () => {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px', p: '16px 20px' }}>
-          <Box component="button" type="button" sx={{ ...iconButtonSx, border: '1px solid transparent', bgcolor: 'transparent' }} onClick={() => setRecordOverlayOpen(false)}>
+          <Box component="button" type="button" sx={{ ...iconButtonSx, border: '1px solid transparent', bgcolor: 'transparent' }} onClick={stopRecording}>
             <CloseRounded sx={{ fontSize: 16 }} />
           </Box>
           <Typography sx={{ color: 'error.main', fontSize: '14px', fontWeight: 600 }}>
@@ -774,7 +930,7 @@ export const PracticePage = () => {
           <Typography sx={{ fontSize: '12px', color: 'text.disabled', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
             {t('pages.practice.segmentLabel', { segment: currentSegmentOrder })}
           </Typography>
-          <Typography sx={{ fontSize: '20px', lineHeight: 1.7, textAlign: 'center' }}>{segmentText}</Typography>
+          <Typography sx={{ fontSize: '20px', lineHeight: 1.7, textAlign: 'center', whiteSpace: 'pre-wrap' }}>{renderRecordingSegmentText()}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '3px', height: 32 }}>
             {Array.from({ length: 7 }).map((_, i) => (
               <Box
@@ -837,19 +993,19 @@ export const PracticePage = () => {
           <Matrix />
           <Box sx={{ mt: '20px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'text.disabled' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(29,201,138,0.1)', border: '1px solid rgba(29,201,138,0.2)', color: 'success.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>✓</Box>
+              <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(29,201,138,0.1)', border: '1px solid rgba(29,201,138,0.2)', color: 'success.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>OK</Box>
               {t('pages.practice.drawer.legend.pass')}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(110,96,238,0.25)', border: '1px solid #6e60ee', color: 'primary.light', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>→</Box>
+              <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(110,96,238,0.25)', border: '1px solid #6e60ee', color: 'primary.light', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>-&gt;</Box>
               {t('pages.practice.drawer.legend.current')}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(240,166,35,0.1)', border: '1px solid rgba(240,166,35,0.2)', color: 'warning.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>↷</Box>
+              <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(240,166,35,0.1)', border: '1px solid rgba(240,166,35,0.2)', color: 'warning.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>-&gt;</Box>
               {t('pages.practice.drawer.legend.skipped')}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: '#22223a', color: 'text.disabled', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>·</Box>
+              <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: '#22223a', color: 'text.disabled', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>-</Box>
               {t('pages.practice.drawer.legend.incomplete')}
             </Box>
           </Box>

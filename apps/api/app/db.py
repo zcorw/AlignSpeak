@@ -23,7 +23,7 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def apply_runtime_schema_fixes() -> None:
-    # Backfill default for historical Postgres schemas created before created_at default was added.
+    # Backfill defaults for historical Postgres schemas.
     with engine.begin() as conn:
         if conn.dialect.name != "postgresql":
             return
@@ -32,6 +32,39 @@ def apply_runtime_schema_fixes() -> None:
                 """
                 ALTER TABLE IF EXISTS tts_assets
                 ALTER COLUMN created_at SET DEFAULT now()
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE IF EXISTS practice_attempts
+                ADD COLUMN IF NOT EXISTS alignment_mode VARCHAR(16)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                UPDATE practice_attempts
+                SET alignment_mode = 'token'
+                WHERE alignment_mode IS NULL
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE IF EXISTS practice_attempts
+                ALTER COLUMN alignment_mode SET DEFAULT 'token'
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE IF EXISTS practice_attempts
+                ALTER COLUMN alignment_mode SET NOT NULL
                 """
             )
         )

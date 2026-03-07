@@ -63,6 +63,7 @@ async def parse_uploaded_file(
 @router.get("/{article_id}", response_model=ArticleDetailResponse)
 def get_article(
     article_id: str,
+    include_reading: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ArticleDetailResponse:
@@ -71,6 +72,7 @@ def get_article(
         repository=repository,
         current_user=current_user,
         article_id=article_id,
+        include_reading=include_reading,
     )
 
 

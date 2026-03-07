@@ -1,29 +1,68 @@
-from typing import Literal
-
-from pydantic import BaseModel
-
-DiffKind = Literal["correct", "missing", "insert", "substitute"]
+from pydantic import BaseModel, Field
 
 
-class HomeSummary(BaseModel):
-    target_segments: int
-    completed_segments: int
-    language: Literal["ja", "en", "zh"]
-    draft_text: str
+class StartRecordingPayload(BaseModel):
+    client_ts: str | None = None
 
 
-class PracticeQuery(BaseModel):
-    docId: str | None = None
-    segmentId: str | None = None
+class StartRecordingResponse(BaseModel):
+    recording_id: str
+    status: str
 
 
-class ProgressSummary(BaseModel):
-    accuracy_rate: int
-    current_level: int
-    hot_words: list[dict]
+class UploadChunkResponse(BaseModel):
+    recording_id: str
+    seq: int
+    accepted: bool
 
 
-class MeSummary(BaseModel):
-    email: str
-    streak_days: int
-    history_docs: list[dict]
+class FinishRecordingPayload(BaseModel):
+    total_chunks: int = Field(ge=1, le=10000)
+    duration_ms: int = Field(ge=0, le=600000)
+
+
+class FinishRecordingResponse(BaseModel):
+    recording_id: str
+    job_id: str
+    status: str
+
+
+class SttJobStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    attempt_id: str | None = None
+    recognized_text: str | None = None
+    confidence: float | None = None
+    provider: str | None = None
+    model: str | None = None
+    error_code: str | None = None
+
+
+class AlignAttemptPayload(BaseModel):
+    segment_id: str | None = None
+    recognized_text: str | None = None
+
+
+class AlignToken(BaseModel):
+    text: str
+    status: str
+
+
+class CompareBlock(BaseModel):
+    block_order: int
+    reference: list[AlignToken]
+    recognized: list[AlignToken]
+
+
+class NoiseSpan(BaseModel):
+    start_token: int
+    end_token: int
+    reason: str
+
+
+class AlignResultResponse(BaseModel):
+    accuracy_rate: float
+    ref_tokens: list[AlignToken]
+    hyp_tokens: list[AlignToken]
+    compare_blocks: list[CompareBlock]
+    noise_spans: list[NoiseSpan]
