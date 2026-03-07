@@ -42,6 +42,7 @@ services:
       OPENAI_OCR_TIMEOUT_SECONDS: ${OPENAI_OCR_TIMEOUT_SECONDS:-45}
     volumes:
       - ./data/media/tts:/app/media/tts
+      - ./data/media/stt:/app/media/stt
     expose:
       - "8000"
     depends_on:
@@ -79,6 +80,7 @@ services:
       OPENAI_OCR_TIMEOUT_SECONDS: ${OPENAI_OCR_TIMEOUT_SECONDS:-45}
     volumes:
       - ./data/media/tts:/app/media/tts
+      - ./data/media/stt:/app/media/stt
     depends_on:
       db:
         condition: service_healthy
