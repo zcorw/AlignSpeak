@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import re
+import unicodedata
 
 from app.services.article_service import normalize_text
 from app.services.reading_service import build_segment_reading_tokens
@@ -88,7 +89,7 @@ def _tokenize_text(text: str, language: str) -> list[_Token]:
         return []
     if language == "ja":
         reading_tokens = build_segment_reading_tokens(text=normalized, language=language)
-        return [
+        tokens = [
             _Token(
                 text=token.surface,
                 key=(token.yomi or token.surface),
@@ -96,13 +97,14 @@ def _tokenize_text(text: str, language: str) -> list[_Token]:
             for token in reading_tokens
             if token.surface
         ]
+        return [token for token in tokens if not _is_punctuation_token(token.text)]
 
     if language == "en":
-        raw = re.findall(r"[A-Za-z0-9]+|[^\sA-Za-z0-9]", normalized)
-        return [_Token(text=part, key=part.lower()) for part in raw]
+        raw = re.findall(r"[A-Za-z0-9]+", normalized)
+        return [_Token(text=part, key=part.lower()) for part in raw if not _is_punctuation_token(part)]
 
-    raw = re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9]+|[^\s]", normalized)
-    return [_Token(text=part, key=part) for part in raw]
+    raw = re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9]+", normalized)
+    return [_Token(text=part, key=part) for part in raw if not _is_punctuation_token(part)]
 
 
 def _global_align(ref: list[_Token], hyp: list[_Token]) -> list[tuple[str, int | None, int | None]]:
@@ -164,3 +166,14 @@ def _detect_noise_spans(tokens: list[AlignedToken]) -> list[NoiseSpanResult]:
     if start != -1 and len(tokens) - start >= 2:
         spans.append(NoiseSpanResult(start_token=start, end_token=len(tokens), reason="repeat"))
     return spans
+
+
+def _is_punctuation_token(text: str) -> bool:
+    compact = "".join(char for char in text if not char.isspace())
+    if not compact:
+        return True
+    for char in compact:
+        category = unicodedata.category(char)
+        if category[0] not in {"P", "S"}:
+            return False
+    return True
