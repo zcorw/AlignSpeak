@@ -43,3 +43,9 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+print(
+    "Loaded BOOTSTRAP_ADMIN_KEY",
+    f"configured={'yes' if settings.bootstrap_admin_key else 'no'}",
+    f"len={len(settings.bootstrap_admin_key)}",
+    flush=True,
+)
