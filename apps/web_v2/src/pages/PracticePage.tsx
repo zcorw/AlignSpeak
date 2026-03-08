@@ -30,8 +30,6 @@ import {
 type CellState = PracticeProgressCellState
 type Level = PracticeLevel
 
-const TRENDS = [62, 70, 75, 78]
-
 const createFallbackProgressMatrix = (
   totalSegments: number,
   currentLevel: Level,
@@ -82,6 +80,7 @@ export const PracticePage = () => {
   const [progressMatrix, setProgressMatrix] = useState<PracticeMatrix>(
     createFallbackProgressMatrix(0, level, 1)
   )
+  const [trendScores, setTrendScores] = useState<number[]>([])
 
   const alertFn = (globalThis as { alert?: (message?: string) => void }).alert
   const { isSpeaking, ttsLoading, speakSegment, stopSpeaking } = usePracticeAudio({
@@ -257,9 +256,11 @@ export const PracticePage = () => {
           {} as PracticeMatrix
         )
         setProgressMatrix(matrix)
+        setTrendScores(progress.recentScores)
       } catch {
         if (!active) return
         setProgressMatrix(createFallbackProgressMatrix(totalSegments, level, currentSegmentOrder))
+        setTrendScores([])
       } finally {
         if (active) setProgressLoading(false)
       }
@@ -446,7 +447,7 @@ export const PracticePage = () => {
 
         {showFullMode && (
           <PracticeFullModePanel
-            trends={TRENDS}
+            trends={trendScores.length > 0 ? trendScores : [score]}
             matrix={progressMatrix}
             level={level}
             onSwitchLevel={switchLevel}

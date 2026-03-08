@@ -230,6 +230,26 @@ class PracticeRepository:
         )
         return list(self.db.scalars(statement).all())
 
+    def list_recent_article_accuracy_rates(
+        self,
+        *,
+        user_id: str,
+        article_id: str,
+        limit: int = 4,
+    ) -> list[float]:
+        statement = (
+            select(PracticeAttempt.accuracy_rate)
+            .where(
+                PracticeAttempt.user_id == user_id,
+                PracticeAttempt.article_id == article_id,
+                PracticeAttempt.status == "done",
+                PracticeAttempt.accuracy_rate.is_not(None),
+            )
+            .order_by(PracticeAttempt.submitted_at.desc(), PracticeAttempt.id.desc())
+            .limit(limit)
+        )
+        return [float(value) for value in self.db.scalars(statement).all() if value is not None]
+
     def upsert_attempt_recognition(
         self,
         *,

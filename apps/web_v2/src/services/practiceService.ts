@@ -48,6 +48,7 @@ export interface PracticeArticleProgress {
   passThreshold: number
   currentLevel: PracticeLevel
   matrix: Record<PracticeLevel, PracticeProgressCellState[]>
+  recentScores: number[]
 }
 
 interface BffMeResponse {
@@ -69,6 +70,7 @@ interface RawPracticeArticleProgress {
   passThreshold?: number
   currentLevel?: string
   levels?: RawPracticeProgressLevel[]
+  recentScores?: number[]
 }
 
 const LEVELS: PracticeLevel[] = ['L1', 'L2', 'L3', 'L4']
@@ -142,6 +144,11 @@ export const practiceService = {
       passThreshold: typeof payload.passThreshold === 'number' ? payload.passThreshold : 85,
       currentLevel: toValidLevel(payload.currentLevel),
       matrix,
+      recentScores: Array.isArray(payload.recentScores)
+        ? payload.recentScores
+          .filter((score): score is number => typeof score === 'number' && Number.isFinite(score))
+          .map((score) => Math.max(0, Math.min(100, Math.round(score))))
+        : [],
     }
   },
 }

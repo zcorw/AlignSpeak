@@ -13,16 +13,6 @@ import { EditorTextOverlay, type OverlayLanguageCode } from '../components/Edito
 import { getApiErrorMessage } from '../services/authService'
 import { articleService } from '../services/articleService'
 
-const SAMPLE_TEXT = `Once when I was six years old I saw a magnificent picture in a book about the primeval forest.
-
-It was a picture of a boa constrictor in the act of swallowing an animal.
-
-In the book it said: Boa constrictors swallow their prey whole, without chewing it. After that I used to think a lot about jungle adventures.
-
-I showed my masterpiece to the grown-ups, and asked them whether the drawing frightened them.
-
-They answered: "Why should anyone be frightened by a hat?"`
-
 const buildArticleTitle = (text: string) => {
   const firstLine = text
     .split('\n')
@@ -65,10 +55,10 @@ export const EditorPage = () => {
     navigator.clipboard
       .readText()
       .then((value) => {
-        applyImportedText(value || SAMPLE_TEXT)
+        applyImportedText(value || '')
       })
       .catch(() => {
-        applyImportedText(SAMPLE_TEXT)
+        applyImportedText('')
       })
   }
 
@@ -90,7 +80,7 @@ export const EditorPage = () => {
     void articleService
       .parseUploadFile(file, languageHint)
       .then((result) => {
-        applyImportedText(result.text || SAMPLE_TEXT)
+        applyImportedText(result.text || '')
       })
       .catch((error: unknown) => {
         const message = getApiErrorMessage(error, t('common.error'))

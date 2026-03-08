@@ -120,6 +120,12 @@ def get_article_progress(
         )
 
     snapshots = repository.get_segment_attempt_snapshots(article_id=article_id, user_id=current_user.id)
+    recent_scores_desc = repository.list_recent_article_accuracy_rates(
+        user_id=current_user.id,
+        article_id=article_id,
+        limit=4,
+    )
+    recent_scores = [int(round(score)) for score in reversed(recent_scores_desc)]
 
     resolved_current_segment_order = current_segment_order
     if resolved_current_segment_order is None:
@@ -186,6 +192,7 @@ def get_article_progress(
         pass_threshold=pass_threshold,
         current_level=current_level,
         levels=levels,
+        recent_scores=recent_scores,
     )
 
 

@@ -21,6 +21,8 @@ from app.db import get_db
 from app.deps import get_current_user
 from app.models import EmailVerificationCode, User
 from app.schemas.auth import (
+    ChangePasswordRequest,
+    ChangePasswordResponse,
     LoginRequest,
     LoginResponse,
     MeResponse,
@@ -267,3 +269,31 @@ def me(current_user: User = Depends(get_current_user)) -> MeResponse:
         display_name=current_user.display_name,
         status=current_user.status,
     )
+
+
+@router.post("/change-password", response_model=ChangePasswordResponse)
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ChangePasswordResponse:
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise AppError(
+            code="AUTH_INVALID_CREDENTIALS",
+            message="Current password is incorrect.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+    validate_password_strength(payload.new_password)
+    if verify_password(payload.new_password, current_user.password_hash):
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="New password must be different from current password.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    current_user.password_hash = hash_password(payload.new_password)
+    current_user.updated_at = datetime.now(tz=timezone.utc)
+    db.add(current_user)
+    db.commit()
+
+    return ChangePasswordResponse(message="Password changed successfully.")

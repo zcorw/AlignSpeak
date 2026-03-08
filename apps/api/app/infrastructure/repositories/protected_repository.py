@@ -35,6 +35,7 @@ class ProtectedReadRepository:
             article_id: {
                 "total_segments": 0,
                 "passed_segments": 0,
+                "practice_count": 0,
                 "last_practiced_at": None,
             }
             for article_id in article_ids
@@ -61,6 +62,17 @@ class ProtectedReadRepository:
         )
         for article_id, passed_segments in self.db.execute(passed_statement).all():
             snapshots[str(article_id)]["passed_segments"] = int(passed_segments)
+
+        attempt_count_statement = (
+            select(PracticeAttempt.article_id, func.count(PracticeAttempt.id))
+            .where(
+                PracticeAttempt.user_id == user_id,
+                PracticeAttempt.article_id.in_(article_ids),
+            )
+            .group_by(PracticeAttempt.article_id)
+        )
+        for article_id, practice_count in self.db.execute(attempt_count_statement).all():
+            snapshots[str(article_id)]["practice_count"] = int(practice_count)
 
         latest_statement = (
             select(PracticeAttempt.article_id, func.max(PracticeAttempt.submitted_at))

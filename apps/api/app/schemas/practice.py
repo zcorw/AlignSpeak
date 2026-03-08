@@ -86,6 +86,7 @@ class PracticeArticleProgressResponse(BaseModel):
     pass_threshold: float
     current_level: str
     levels: list[PracticeProgressLevel]
+    recent_scores: list[int] = Field(default_factory=list)
 
 
 class PracticeAttemptResultResponse(BaseModel):

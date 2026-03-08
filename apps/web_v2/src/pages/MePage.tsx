@@ -1,77 +1,30 @@
 import { ArrowBackRounded, CloseRounded, NorthRounded } from '@mui/icons-material'
-import { Box, Button, TextField, Typography } from '@mui/material'
-import { useMemo, useState } from 'react'
+import { Box, Button, CircularProgress, TextField, Typography } from '@mui/material'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { Alert, FieldError } from '../components/Alert'
+import { authService, getApiErrorMessage } from '../services/authService'
+import { startService, type StartHistoryDoc } from '../services/startService'
+import { useAuthStore } from '../stores/authStore'
 import { changePasswordSchema } from '../utils/validation'
-import { FieldError } from '../components/Alert'
 import { ZodError } from 'zod'
 
 type FilterType = 'all' | 'en' | 'zh' | 'done'
 
-type Article = {
+type MeArticle = {
   id: string
   title: string
-  lang: 'en' | 'zh'
-  langFlag: string
-  icon: string
+  language: StartHistoryDoc['language']
   level: number
-  segment: number
+  currentSegmentOrder: number
   totalSegments: number
-  lastPracticedKey: 'today' | 'twoDaysAgo' | 'thirteenDaysAgo'
-  progress: number
-  isActive: boolean
+  lastPracticedAt: string | null
+  progressRate: number
   isDone: boolean
   practiceCount: number
+  isActive: boolean
 }
-
-const ARTICLES: Article[] = [
-  {
-    id: 'a1',
-    title: 'The Little Prince — Chapter I',
-    lang: 'en',
-    langFlag: '🇺🇸',
-    icon: '📖',
-    level: 2,
-    segment: 3,
-    totalSegments: 5,
-    lastPracticedKey: 'today',
-    progress: 0.4,
-    isActive: true,
-    isDone: false,
-    practiceCount: 18,
-  },
-  {
-    id: 'a2',
-    title: 'Pride and Prejudice — Opening',
-    lang: 'en',
-    langFlag: '🇺🇸',
-    icon: '📗',
-    level: 1,
-    segment: 2,
-    totalSegments: 4,
-    lastPracticedKey: 'twoDaysAgo',
-    progress: 0.5,
-    isActive: false,
-    isDone: false,
-    practiceCount: 14,
-  },
-  {
-    id: 'a3',
-    title: '《围城》第一章节选',
-    lang: 'zh',
-    langFlag: '🇨🇳',
-    icon: '📕',
-    level: 4,
-    segment: 8,
-    totalSegments: 8,
-    lastPracticedKey: 'thirteenDaysAgo',
-    progress: 1,
-    isActive: false,
-    isDone: true,
-    practiceCount: 32,
-  },
-]
 
 const iconButtonSx = {
   width: 36,
@@ -88,61 +41,157 @@ const iconButtonSx = {
   '&:hover': { bgcolor: '#22223a', color: 'text.primary' },
 } as const
 
+const formatLastPracticedAt = (value: string | null): string => {
+  if (!value) return '-'
+  const timestamp = Date.parse(value)
+  if (Number.isNaN(timestamp)) return '-'
+  return new Intl.DateTimeFormat(undefined, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(timestamp))
+}
+
+const toArticleBadge = (title: string): string => {
+  const letter = title.trim().charAt(0).toUpperCase()
+  return letter || 'A'
+}
+
+const toLanguageLabel = (
+  language: StartHistoryDoc['language'],
+  english: string,
+  chinese: string
+): string => {
+  if (language === 'en') return english
+  if (language === 'zh') return chinese
+  if (language === 'ja') return 'Japanese'
+  return '-'
+}
+
 export const MePage = () => {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
 
   const [filter, setFilter] = useState<FilterType>('all')
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [articles, setArticles] = useState<MeArticle[]>([])
+
   const [currentPwd, setCurrentPwd] = useState('')
   const [newPwd, setNewPwd] = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false)
+  const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  useEffect(() => {
+    let active = true
+
+    const loadOverview = async () => {
+      setLoading(true)
+      setLoadError(null)
+      try {
+        const overview = await startService.getOverview()
+        if (!active) return
+        const mapped: MeArticle[] = overview.historyDocs.map((item, index) => {
+          const totalSegments = item.totalSegments > 0 ? item.totalSegments : 1
+          const currentSegmentOrder = Math.min(Math.max(item.currentSegmentOrder, 1), totalSegments)
+          return {
+            id: item.id,
+            title: item.title,
+            language: item.language,
+            level: Math.max(1, item.level),
+            currentSegmentOrder,
+            totalSegments,
+            lastPracticedAt: item.lastPracticedAt,
+            progressRate: item.progressRate,
+            isDone: item.isDone || (totalSegments > 0 && item.passedSegments >= totalSegments) || item.progressRate >= 1,
+            practiceCount: item.practiceCount,
+            isActive: index === 0,
+          }
+        })
+        setArticles(mapped)
+      } catch (error: unknown) {
+        if (!active) return
+        setLoadError(getApiErrorMessage(error, t('common.error')))
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadOverview()
+    return () => {
+      active = false
+    }
+  }, [t])
 
   const filteredArticles = useMemo(() => {
-    if (filter === 'en') return ARTICLES.filter((item) => item.lang === 'en')
-    if (filter === 'zh') return ARTICLES.filter((item) => item.lang === 'zh')
-    if (filter === 'done') return ARTICLES.filter((item) => item.isDone)
-    return ARTICLES
-  }, [filter])
+    if (filter === 'en') return articles.filter((item) => item.language === 'en')
+    if (filter === 'zh') return articles.filter((item) => item.language === 'zh')
+    if (filter === 'done') return articles.filter((item) => item.isDone)
+    return articles
+  }, [articles, filter])
 
-  const totalPractices = ARTICLES.reduce((sum, item) => sum + item.practiceCount, 0)
+  const totalPractices = useMemo(
+    () => articles.reduce((sum, item) => sum + item.practiceCount, 0),
+    [articles]
+  )
+
+  const displayName = user?.displayName?.trim() || user?.email?.split('@')[0] || t('pages.start.userName')
+  const avatarText = displayName.trim().charAt(0).toUpperCase() || 'U'
   const currentLang = i18n.resolvedLanguage?.startsWith('zh') ? 'zh' : 'en'
   const nextLang = currentLang === 'zh' ? 'en' : 'zh'
 
   const closePasswordModal = () => {
+    if (passwordSubmitting) return
     setPasswordModalOpen(false)
     setCurrentPwd('')
     setNewPwd('')
     setConfirmPwd('')
     setFieldErrors({})
+    setPasswordFeedback(null)
   }
 
-  const submitPasswordChange = () => {
+  const submitPasswordChange = async () => {
+    if (passwordSubmitting) return
     setFieldErrors({})
+    setPasswordFeedback(null)
 
     try {
-      // Validate form data
-      changePasswordSchema.parse({
+      const validated = changePasswordSchema.parse({
         currentPassword: currentPwd,
         newPassword: newPwd,
         confirmPassword: confirmPwd,
       })
-
-      // TODO: Call change password API
-      console.log('Password change validated')
-      closePasswordModal()
-    } catch (err) {
-      if (err instanceof ZodError) {
-        // Handle validation errors
+      setPasswordSubmitting(true)
+      const result = await authService.changePassword({
+        currentPassword: validated.currentPassword,
+        newPassword: validated.newPassword,
+      })
+      setPasswordFeedback({ type: 'success', message: result.message })
+      window.setTimeout(() => {
+        closePasswordModal()
+      }, 800)
+    } catch (error) {
+      if (error instanceof ZodError) {
         const errors: Record<string, string> = {}
-        err.issues.forEach((issue) => {
+        error.issues.forEach((issue) => {
           if (issue.path[0]) {
             errors[issue.path[0] as string] = issue.message
           }
         })
         setFieldErrors(errors)
+      } else {
+        setPasswordFeedback({
+          type: 'error',
+          message: getApiErrorMessage(error, t('common.error')),
+        })
       }
+    } finally {
+      setPasswordSubmitting(false)
     }
   }
 
@@ -190,14 +239,14 @@ export const MePage = () => {
               flexShrink: 0,
             }}
           >
-            {t('pages.me.account.avatar')}
+            {avatarText}
           </Box>
           <Box sx={{ flex: 1 }}>
             <Typography sx={{ fontSize: '16px', fontWeight: 600 }}>
-              {t('pages.me.account.name')}
+              {displayName}
             </Typography>
             <Typography sx={{ mt: '2px', fontSize: '12px', color: 'text.secondary' }}>
-              {t('pages.me.account.stats', { articles: ARTICLES.length, practices: totalPractices })}
+              {t('pages.me.account.stats', { articles: articles.length, practices: totalPractices })}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
@@ -248,7 +297,7 @@ export const MePage = () => {
                   lineHeight: 1.2,
                 }}
               >
-                中
+                ZH
               </Box>
               <Box
                 component="span"
@@ -304,9 +353,21 @@ export const MePage = () => {
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', px: '20px', pt: '4px', pb: '32px', gap: '10px' }}>
-          {filteredArticles.length === 0 ? (
+          {loading && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', p: '12px 14px', bgcolor: '#1a1a2c', border: '1px solid rgba(255,255,255,0.13)', borderRadius: '12px' }}>
+              <CircularProgress size={16} thickness={5} />
+              <Typography sx={{ fontSize: '13px', color: 'text.secondary' }}>{t('common.loading')}</Typography>
+            </Box>
+          )}
+
+          {loadError && (
+            <Box sx={{ p: '10px 12px', bgcolor: 'rgba(240,82,82,0.08)', border: '1px solid rgba(240,82,82,0.25)', borderRadius: '12px' }}>
+              <Typography sx={{ fontSize: '12px', color: 'error.main' }}>{loadError}</Typography>
+            </Box>
+          )}
+
+          {!loading && !loadError && filteredArticles.length === 0 ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', py: '60px', px: '32px', textAlign: 'center' }}>
-              <Typography sx={{ fontSize: '40px' }}>📭</Typography>
               <Typography sx={{ fontSize: '15px', color: 'text.secondary' }}>
                 {t('pages.me.emptyState')}
               </Typography>
@@ -317,7 +378,7 @@ export const MePage = () => {
                 key={article.id}
                 component="button"
                 type="button"
-                onClick={() => navigate(`/practice?a=${article.id}`)}
+                onClick={() => navigate(`/practice?a=${article.id}&seg=${article.currentSegmentOrder}&lv=L${article.level}`)}
                 sx={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -338,15 +399,14 @@ export const MePage = () => {
               >
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   <Box sx={{ width: 38, height: 38, borderRadius: '9px', bgcolor: '#22223a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', flexShrink: 0 }}>
-                    {article.icon}
+                    {toArticleBadge(article.title)}
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography sx={{ fontSize: '15px', fontWeight: 600, lineHeight: 1.3, color: 'text.primary' }}>
                       {article.title}
                     </Typography>
                     <Typography sx={{ mt: '3px', fontSize: '12px', color: 'text.secondary' }}>
-                      {article.langFlag}{' '}
-                      {article.lang === 'en' ? t('common.languageEnglish') : t('common.languageChinese')}
+                      {toLanguageLabel(article.language, t('common.languageEnglish'), t('common.languageChinese'))}
                     </Typography>
                   </Box>
                   <Box sx={{ px: '9px', py: '3px', borderRadius: '999px', border: '1px solid rgba(110,96,238,0.25)', bgcolor: 'rgba(110,96,238,0.25)', color: 'primary.light', fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', flexShrink: 0 }}>
@@ -356,20 +416,20 @@ export const MePage = () => {
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Box sx={{ flex: 1, height: 3, borderRadius: '3px', bgcolor: '#22223a', overflow: 'hidden' }}>
-                    <Box sx={{ height: '100%', width: `${article.progress * 100}%`, borderRadius: '3px', background: 'linear-gradient(90deg, #6e60ee, #8b7fff)' }} />
+                    <Box sx={{ height: '100%', width: `${article.progressRate * 100}%`, borderRadius: '3px', background: 'linear-gradient(90deg, #6e60ee, #8b7fff)' }} />
                   </Box>
                   <Typography sx={{ fontSize: '11px', color: 'text.disabled', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                    {article.isDone ? t('pages.me.article.allPassed') : `§${article.segment}/${article.totalSegments}`}
+                    {article.isDone ? t('pages.me.article.allPassed') : `搂${article.currentSegmentOrder}/${article.totalSegments}`}
                   </Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>
                     {t('pages.me.article.lastPractice', {
-                      time: t(`pages.me.article.lastPracticeValues.${article.lastPracticedKey}`),
+                      time: formatLastPracticedAt(article.lastPracticedAt),
                     })}
                   </Typography>
-                  <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>·</Typography>
+                  <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>路</Typography>
                   <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>
                     {t('pages.me.article.practiceCount', { count: article.practiceCount })}
                   </Typography>
@@ -442,6 +502,10 @@ export const MePage = () => {
             </Box>
           </Box>
 
+          {passwordFeedback && (
+            <Alert type={passwordFeedback.type} message={passwordFeedback.message} />
+          )}
+
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <Box>
               <TextField
@@ -508,8 +572,8 @@ export const MePage = () => {
             </Box>
           </Box>
 
-          <Button variant="contained" fullWidth onClick={submitPasswordChange}>
-            {t('pages.me.passwordModal.submit')}
+          <Button variant="contained" fullWidth disabled={passwordSubmitting} onClick={() => { void submitPasswordChange() }}>
+            {passwordSubmitting ? t('common.loading') : t('pages.me.passwordModal.submit')}
           </Button>
         </Box>
       </Box>

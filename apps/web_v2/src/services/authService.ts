@@ -27,6 +27,10 @@ interface MeApiResponse {
   status: string
 }
 
+interface ChangePasswordApiResponse {
+  message: string
+}
+
 interface ApiErrorPayload {
   error?: {
     code?: string
@@ -74,6 +78,15 @@ export interface MeResult {
   role: string
   displayName: string
   status: string
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string
+  newPassword: string
+}
+
+export interface ChangePasswordResult {
+  message: string
 }
 
 export const getApiErrorMessage = (error: unknown, fallback: string): string => {
@@ -138,6 +151,16 @@ export const authService = {
       role: response.data.role,
       displayName: response.data.display_name,
       status: response.data.status,
+    }
+  },
+
+  async changePassword(payload: ChangePasswordPayload): Promise<ChangePasswordResult> {
+    const response = await api.post<ChangePasswordApiResponse>('/auth/change-password', {
+      current_password: payload.currentPassword,
+      new_password: payload.newPassword,
+    })
+    return {
+      message: response.data.message,
     }
   },
 }
