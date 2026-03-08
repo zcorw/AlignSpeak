@@ -1,6 +1,8 @@
+import hashlib
 import secrets
 import string
 from datetime import datetime, timezone
+import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request, status
@@ -34,6 +36,7 @@ from app.schemas.auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 INVITATION_CODE_ALPHABET = string.ascii_uppercase + string.digits
 
@@ -154,7 +157,17 @@ def bootstrap_admin(payload: BootstrapAdminRequest, request: Request, db: Sessio
             message="Bootstrap admin key is not configured.",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-    if not secrets.compare_digest(payload.bootstrap_key, configured_key):
+    incoming_key = payload.bootstrap_key
+    incoming_hash = hashlib.sha256(incoming_key.encode("utf-8")).hexdigest()
+    configured_hash = hashlib.sha256(configured_key.encode("utf-8")).hexdigest()
+    logger.warning(
+        "bootstrap-admin key compare incoming_len=%s incoming_sha256=%s configured_len=%s configured_sha256=%s",
+        len(incoming_key),
+        incoming_hash,
+        len(configured_key),
+        configured_hash,
+    )
+    if not secrets.compare_digest(incoming_key, configured_key):
         raise AppError(
             code="FORBIDDEN",
             message="Invalid bootstrap key.",
