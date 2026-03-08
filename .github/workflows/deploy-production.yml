@@ -189,16 +189,16 @@ jobs:
         run: |
           mkdir -p deploy_bundle
           cp deploy/production/compose.yml deploy_bundle/compose.yml
-          cat > deploy_bundle/deploy-flags.env <<EOF
-          DEPLOY_WEB=${{ needs.detect-changes.outputs.deploy_web }}
-          DEPLOY_API=${{ needs.detect-changes.outputs.deploy_api }}
-          EOF
+          {
+            echo "DEPLOY_WEB=${{ needs.detect-changes.outputs.deploy_web }}"
+            echo "DEPLOY_API=${{ needs.detect-changes.outputs.deploy_api }}"
+          } > deploy_bundle/deploy-flags.env
 
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            cat > deploy_bundle/image-updates.env <<EOF
-            WEB_IMAGE=${{ steps.meta.outputs.web_image }}:${{ steps.meta.outputs.image_tag }}
-            API_IMAGE=${{ steps.meta.outputs.api_image }}:${{ steps.meta.outputs.image_tag }}
-            EOF
+            {
+              echo "WEB_IMAGE=${{ steps.meta.outputs.web_image }}:${{ steps.meta.outputs.image_tag }}"
+              echo "API_IMAGE=${{ steps.meta.outputs.api_image }}:${{ steps.meta.outputs.image_tag }}"
+            } > deploy_bundle/image-updates.env
           else
             : > deploy_bundle/image-updates.env
             if [ "${{ needs.detect-changes.outputs.deploy_web }}" = "true" ]; then
@@ -273,10 +273,10 @@ jobs:
             test -n "${WEB_IMAGE:-}" || { echo "WEB_IMAGE is not set"; exit 1; }
             test -n "${API_IMAGE:-}" || { echo "API_IMAGE is not set"; exit 1; }
 
-            cat > .images.env <<EOF
-            WEB_IMAGE=${WEB_IMAGE}
-            API_IMAGE=${API_IMAGE}
-            EOF
+            {
+              echo "WEB_IMAGE=${WEB_IMAGE}"
+              echo "API_IMAGE=${API_IMAGE}"
+            } > .images.env
 
             set -a
             . ./.images.env
