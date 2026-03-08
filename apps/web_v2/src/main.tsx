@@ -7,6 +7,19 @@ import { theme } from './theme'
 import './locales'
 import App from './App.tsx'
 
+const isIOSDevice = () =>
+  /iP(ad|hone|od)/.test(window.navigator.userAgent) ||
+  (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
+
+if (isIOSDevice()) {
+  const preventGestureZoom = (event: Event) => {
+    event.preventDefault()
+  }
+  document.addEventListener('gesturestart', preventGestureZoom as EventListener, { passive: false })
+  document.addEventListener('gesturechange', preventGestureZoom as EventListener, { passive: false })
+  document.addEventListener('gestureend', preventGestureZoom as EventListener, { passive: false })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

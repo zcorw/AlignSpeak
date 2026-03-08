@@ -59,13 +59,18 @@ export const PracticeRecordingOverlay = ({
       <Box sx={{ width: '100%', maxWidth: '360px', flex: 1, minHeight: 0, overflowY: 'auto', px: '2px' }}>
         <Typography
           sx={{
+            display: 'block',
+            width: '100%',
             fontSize: '20px',
             lineHeight: 1.9,
-            textAlign: 'justify',
-            textAlignLast: 'left',
-            whiteSpace: 'normal',
-            wordBreak: 'keep-all',
-            lineBreak: 'strict',
+            textAlign: 'left',
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+            lineBreak: 'auto',
+            '& ruby': {
+              whiteSpace: 'normal',
+            },
           }}
         >
           {segmentText}
@@ -96,4 +101,3 @@ export const PracticeRecordingOverlay = ({
     </Box>
   </Box>
 )
-
