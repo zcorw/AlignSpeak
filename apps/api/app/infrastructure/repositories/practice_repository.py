@@ -177,6 +177,10 @@ class PracticeRepository:
         statement = select(SttJob).where(SttJob.id == job_id)
         return self.db.scalar(statement)
 
+    def get_stt_job_by_attempt(self, *, attempt_id: str) -> SttJob | None:
+        statement = select(SttJob).where(SttJob.attempt_id == attempt_id)
+        return self.db.scalar(statement)
+
     def update_stt_job(self, job: SttJob) -> SttJob:
         self.db.add(job)
         self.db.commit()

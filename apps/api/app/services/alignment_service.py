@@ -44,7 +44,7 @@ class _Token:
 def align_segment_text(*, reference_text: str, recognized_text: str, language: str) -> AlignmentResult:
     ref = _tokenize_text(reference_text, language)
     hyp = _tokenize_text(recognized_text, language)
-    operations = _global_align(ref, hyp)
+    operations = _align_with_resync(ref=ref, hyp=hyp, language=language)
 
     ref_statuses = ["correct"] * len(ref)
     hyp_statuses = ["correct"] * len(hyp)
@@ -62,8 +62,22 @@ def align_segment_text(*, reference_text: str, recognized_text: str, language: s
             if hyp_idx is not None:
                 hyp_statuses[hyp_idx] = "substitute"
 
-    ref_tokens = [AlignedToken(text=token.text, status=ref_statuses[idx]) for idx, token in enumerate(ref)]
-    hyp_tokens = [AlignedToken(text=token.text, status=hyp_statuses[idx]) for idx, token in enumerate(hyp)]
+    if language == "ja":
+        ref_tokens = _collapse_japanese_display_tokens(
+            source_text=reference_text,
+            char_tokens=ref,
+            char_statuses=ref_statuses,
+            side="ref",
+        )
+        hyp_tokens = _collapse_japanese_display_tokens(
+            source_text=recognized_text,
+            char_tokens=hyp,
+            char_statuses=hyp_statuses,
+            side="hyp",
+        )
+    else:
+        ref_tokens = [AlignedToken(text=token.text, status=ref_statuses[idx]) for idx, token in enumerate(ref)]
+        hyp_tokens = [AlignedToken(text=token.text, status=hyp_statuses[idx]) for idx, token in enumerate(hyp)]
 
     correct_count = sum(1 for token in ref_tokens if token.status == "correct")
     accuracy_rate = (correct_count / len(ref_tokens)) if ref_tokens else 0.0
@@ -89,15 +103,19 @@ def _tokenize_text(text: str, language: str) -> list[_Token]:
         return []
     if language == "ja":
         reading_tokens = build_segment_reading_tokens(text=normalized, language=language)
-        tokens = [
-            _Token(
-                text=token.surface,
-                key=(token.yomi or token.surface),
+        if reading_tokens:
+            phonetic = "".join(
+                _normalize_japanese_phonetic(token.yomi or token.surface)
+                for token in reading_tokens
+                if token.surface
             )
-            for token in reading_tokens
-            if token.surface
+        else:
+            phonetic = _normalize_japanese_phonetic(normalized)
+        return [
+            _Token(text=char, key=char)
+            for char in phonetic
+            if not _is_punctuation_token(char)
         ]
-        return [token for token in tokens if not _is_punctuation_token(token.text)]
 
     if language == "en":
         raw = re.findall(r"[A-Za-z0-9]+", normalized)
@@ -107,7 +125,199 @@ def _tokenize_text(text: str, language: str) -> list[_Token]:
     return [_Token(text=part, key=part) for part in raw if not _is_punctuation_token(part)]
 
 
-def _global_align(ref: list[_Token], hyp: list[_Token]) -> list[tuple[str, int | None, int | None]]:
+def _collapse_japanese_display_tokens(
+    *,
+    source_text: str,
+    char_tokens: list[_Token],
+    char_statuses: list[str],
+    side: str,
+) -> list[AlignedToken]:
+    units = _build_japanese_display_units(source_text)
+    if not units:
+        return [AlignedToken(text=token.text, status=char_statuses[idx]) for idx, token in enumerate(char_tokens)]
+
+    collapsed: list[AlignedToken] = []
+    cursor = 0
+    for surface, phonetic_len in units:
+        next_cursor = cursor + phonetic_len
+        if next_cursor > len(char_statuses):
+            return [AlignedToken(text=token.text, status=char_statuses[idx]) for idx, token in enumerate(char_tokens)]
+        span_statuses = char_statuses[cursor:next_cursor]
+        collapsed.append(AlignedToken(text=surface, status=_merge_japanese_statuses(span_statuses, side=side)))
+        cursor = next_cursor
+
+    if cursor != len(char_statuses):
+        return [AlignedToken(text=token.text, status=char_statuses[idx]) for idx, token in enumerate(char_tokens)]
+    return collapsed
+
+
+def _build_japanese_display_units(text: str) -> list[tuple[str, int]]:
+    normalized = normalize_text(text)
+    if not normalized:
+        return []
+
+    reading_tokens = build_segment_reading_tokens(text=normalized, language="ja")
+    if not reading_tokens:
+        return [
+            (char, 1)
+            for char in normalized
+            if not _is_punctuation_token(char)
+        ]
+
+    units: list[tuple[str, int]] = []
+    for token in reading_tokens:
+        surface = token.surface.strip()
+        if not surface or _is_punctuation_token(surface):
+            continue
+        phonetic = _normalize_japanese_phonetic(token.yomi or token.surface)
+        phonetic_chars = [char for char in phonetic if not _is_punctuation_token(char)]
+        if not phonetic_chars:
+            continue
+        units.append((surface, len(phonetic_chars)))
+    return units
+
+
+def _merge_japanese_statuses(statuses: list[str], *, side: str) -> str:
+    if side == "ref":
+        if any(status == "substitute" for status in statuses):
+            return "substitute"
+        if any(status == "missing" for status in statuses):
+            return "missing"
+        return "correct"
+
+    if any(status == "substitute" for status in statuses):
+        return "substitute"
+    if any(status == "insert" for status in statuses):
+        return "insert"
+    return "correct"
+
+
+def _align_with_resync(*, ref: list[_Token], hyp: list[_Token], language: str) -> list[tuple[str, int | None, int | None]]:
+    if language != "ja":
+        return _global_align(ref, hyp, ref_offset=0, hyp_offset=0)
+
+    anchors = _select_anchor_chain(ref=ref, hyp=hyp)
+    if not anchors:
+        return _global_align(ref, hyp, ref_offset=0, hyp_offset=0)
+
+    operations: list[tuple[str, int | None, int | None]] = []
+    ref_cursor = 0
+    hyp_cursor = 0
+    for ref_start, hyp_start, anchor_len in anchors:
+        if ref_start > ref_cursor or hyp_start > hyp_cursor:
+            operations.extend(
+                _global_align(
+                    ref[ref_cursor:ref_start],
+                    hyp[hyp_cursor:hyp_start],
+                    ref_offset=ref_cursor,
+                    hyp_offset=hyp_cursor,
+                )
+            )
+        for index in range(anchor_len):
+            operations.append(("correct", ref_start + index, hyp_start + index))
+        ref_cursor = ref_start + anchor_len
+        hyp_cursor = hyp_start + anchor_len
+
+    if ref_cursor < len(ref) or hyp_cursor < len(hyp):
+        operations.extend(
+            _global_align(
+                ref[ref_cursor:],
+                hyp[hyp_cursor:],
+                ref_offset=ref_cursor,
+                hyp_offset=hyp_cursor,
+            )
+        )
+    return operations
+
+
+def _select_anchor_chain(*, ref: list[_Token], hyp: list[_Token]) -> list[tuple[int, int, int]]:
+    if len(ref) < 8 or len(hyp) < 8:
+        return []
+
+    candidates = _collect_anchor_candidates(ref=ref, hyp=hyp, min_len=4, max_len=8)
+    if not candidates:
+        return []
+
+    candidates.sort(key=lambda item: (item[0], item[1], -item[2]))
+    n = len(candidates)
+    dp = [0] * n
+    prev = [-1] * n
+    best_index = -1
+    best_score = 0
+
+    for i, (ref_start, hyp_start, anchor_len) in enumerate(candidates):
+        dp[i] = anchor_len
+        for j in range(i):
+            prev_ref_start, prev_hyp_start, prev_len = candidates[j]
+            prev_ref_end = prev_ref_start + prev_len
+            prev_hyp_end = prev_hyp_start + prev_len
+            if prev_ref_end <= ref_start and prev_hyp_end <= hyp_start:
+                score = dp[j] + anchor_len
+                if score > dp[i]:
+                    dp[i] = score
+                    prev[i] = j
+        if dp[i] > best_score:
+            best_score = dp[i]
+            best_index = i
+
+    if best_index < 0 or best_score < 8:
+        return []
+
+    chain: list[tuple[int, int, int]] = []
+    current = best_index
+    while current >= 0:
+        chain.append(candidates[current])
+        current = prev[current]
+    chain.reverse()
+    return chain
+
+
+def _collect_anchor_candidates(
+    *,
+    ref: list[_Token],
+    hyp: list[_Token],
+    min_len: int,
+    max_len: int,
+) -> list[tuple[int, int, int]]:
+    ref_keys = [token.key for token in ref]
+    hyp_keys = [token.key for token in hyp]
+    seen: set[tuple[int, int, int]] = set()
+    candidates: list[tuple[int, int, int]] = []
+
+    for window in range(max_len, min_len - 1, -1):
+        ref_positions = _collect_ngram_positions(ref_keys, window)
+        hyp_positions = _collect_ngram_positions(hyp_keys, window)
+        for ngram, ref_pos_list in ref_positions.items():
+            if len(ref_pos_list) != 1:
+                continue
+            hyp_pos_list = hyp_positions.get(ngram)
+            if not hyp_pos_list or len(hyp_pos_list) != 1:
+                continue
+            candidate = (ref_pos_list[0], hyp_pos_list[0], window)
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            candidates.append(candidate)
+    return candidates
+
+
+def _collect_ngram_positions(tokens: list[str], window: int) -> dict[tuple[str, ...], list[int]]:
+    positions: dict[tuple[str, ...], list[int]] = {}
+    if window <= 0 or len(tokens) < window:
+        return positions
+    for start in range(0, len(tokens) - window + 1):
+        ngram = tuple(tokens[start:start + window])
+        positions.setdefault(ngram, []).append(start)
+    return positions
+
+
+def _global_align(
+    ref: list[_Token],
+    hyp: list[_Token],
+    *,
+    ref_offset: int,
+    hyp_offset: int,
+) -> list[tuple[str, int | None, int | None]]:
     n = len(ref)
     m = len(hyp)
     dp = [[0] * (m + 1) for _ in range(n + 1)]
@@ -143,8 +353,8 @@ def _global_align(ref: list[_Token], hyp: list[_Token]) -> list[tuple[str, int |
         if step is None:
             break
         prev_i, prev_j, kind = step
-        ref_idx = i - 1 if kind in {"correct", "substitute", "missing"} and i > 0 else None
-        hyp_idx = j - 1 if kind in {"correct", "substitute", "insert"} and j > 0 else None
+        ref_idx = (ref_offset + i - 1) if kind in {"correct", "substitute", "missing"} and i > 0 else None
+        hyp_idx = (hyp_offset + j - 1) if kind in {"correct", "substitute", "insert"} and j > 0 else None
         ops.append((kind, ref_idx, hyp_idx))
         i, j = prev_i, prev_j
 
@@ -177,3 +387,16 @@ def _is_punctuation_token(text: str) -> bool:
         if category[0] not in {"P", "S"}:
             return False
     return True
+
+
+def _normalize_japanese_phonetic(text: str) -> str:
+    # Normalize full-width variants and convert Katakana to Hiragana
+    normalized = unicodedata.normalize("NFKC", text)
+    chars: list[str] = []
+    for char in normalized:
+        code_point = ord(char)
+        if 0x30A1 <= code_point <= 0x30F6:
+            chars.append(chr(code_point - 0x60))
+        else:
+            chars.append(char)
+    return "".join(chars)

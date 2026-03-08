@@ -65,6 +65,24 @@ def get_attempt_result(
         article_id=article.id,
         segment_id=segment.id,
     )
+    if _needs_japanese_realign(
+        attempt=attempt,
+        language=article.language,
+    ):
+        stt_job = repository.get_stt_job_by_attempt(attempt_id=attempt.id)
+        recognized_text = (stt_job.recognized_text if stt_job is not None else None) or ""
+        if recognized_text.strip():
+            alignment = align_segment_text(
+                reference_text=segment.plain_text,
+                recognized_text=recognized_text,
+                language=article.language,
+            )
+            _persist_alignment(
+                repository=repository,
+                attempt=attempt,
+                alignment=alignment,
+            )
+
     ref_compare_tokens = repository.list_compare_tokens_by_attempt_and_side(attempt_id=attempt.id, side="ref")
     hyp_compare_tokens = repository.list_compare_tokens_by_attempt_and_side(attempt_id=attempt.id, side="rec")
 
@@ -471,55 +489,11 @@ def align_attempt(
         recognized_text=recognized_text,
         language=article.language,
     )
-
-    repository.clear_attempt_alignment(attempt_id=attempt.id)
-    block = repository.create_compare_block(
-        AttemptCompareBlock(
-            id=f"blk_{uuid4().hex[:12]}",
-            attempt_id=attempt.id,
-            block_order=1,
-            created_at=datetime.now(tz=timezone.utc),
-        )
+    _persist_alignment(
+        repository=repository,
+        attempt=attempt,
+        alignment=alignment,
     )
-    compare_tokens: list[AttemptCompareToken] = []
-    for idx, token in enumerate(alignment.ref_tokens):
-        compare_tokens.append(
-            AttemptCompareToken(
-                block_id=block.id,
-                side="ref",
-                token_order=idx,
-                text=token.text,
-                diff_kind=token.status,
-                pair_key=idx,
-            )
-        )
-    for idx, token in enumerate(alignment.hyp_tokens):
-        compare_tokens.append(
-            AttemptCompareToken(
-                block_id=block.id,
-                side="rec",
-                token_order=idx,
-                text=token.text,
-                diff_kind=token.status,
-                pair_key=idx,
-            )
-        )
-    repository.create_compare_tokens(compare_tokens)
-
-    repository.create_noise_spans(
-        [
-            AttemptNoiseSpan(
-                attempt_id=attempt.id,
-                start_token=span.start_token,
-                end_token=span.end_token,
-                reason=span.reason,
-            )
-            for span in alignment.noise_spans
-        ]
-    )
-    attempt.accuracy_rate = round(alignment.accuracy_rate * 100, 2)
-    attempt.status = "done"
-    repository.update_attempt(attempt)
 
     return AlignResultResponse(
         accuracy_rate=alignment.accuracy_rate,
@@ -555,6 +529,72 @@ def _mark_job_failed(*, repository: PracticeRepository, job_id: str, error_code:
     if recording is not None:
         recording.status = "failed"
         repository.update_recording(recording)
+
+
+def _needs_japanese_realign(
+    *,
+    attempt: PracticeAttempt,
+    language: str,
+) -> bool:
+    if language != "ja":
+        return False
+    return (attempt.alignment_mode or "") != "token_v2"
+
+
+def _persist_alignment(
+    *,
+    repository: PracticeRepository,
+    attempt: PracticeAttempt,
+    alignment,
+) -> None:
+    repository.clear_attempt_alignment(attempt_id=attempt.id)
+    block = repository.create_compare_block(
+        AttemptCompareBlock(
+            id=f"blk_{uuid4().hex[:12]}",
+            attempt_id=attempt.id,
+            block_order=1,
+            created_at=datetime.now(tz=timezone.utc),
+        )
+    )
+    compare_tokens: list[AttemptCompareToken] = []
+    for idx, token in enumerate(alignment.ref_tokens):
+        compare_tokens.append(
+            AttemptCompareToken(
+                block_id=block.id,
+                side="ref",
+                token_order=idx,
+                text=token.text,
+                diff_kind=token.status,
+                pair_key=idx,
+            )
+        )
+    for idx, token in enumerate(alignment.hyp_tokens):
+        compare_tokens.append(
+            AttemptCompareToken(
+                block_id=block.id,
+                side="rec",
+                token_order=idx,
+                text=token.text,
+                diff_kind=token.status,
+                pair_key=idx,
+            )
+        )
+    repository.create_compare_tokens(compare_tokens)
+    repository.create_noise_spans(
+        [
+            AttemptNoiseSpan(
+                attempt_id=attempt.id,
+                start_token=span.start_token,
+                end_token=span.end_token,
+                reason=span.reason,
+            )
+            for span in alignment.noise_spans
+        ]
+    )
+    attempt.accuracy_rate = round(alignment.accuracy_rate * 100, 2)
+    attempt.status = "done"
+    attempt.alignment_mode = "token_v2"
+    repository.update_attempt(attempt)
 
 
 def _resolve_recording_root(recording_id: str) -> Path:
