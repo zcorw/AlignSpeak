@@ -1,86 +1,60 @@
 import { ArrowBackRounded } from '@mui/icons-material'
-import { Box, Button, CircularProgress, Typography } from '@mui/material'
+import { Box, CircularProgress, Typography } from '@mui/material'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { PracticeFullModePanel } from '../components/practice/PracticeFullModePanel'
+import { PracticeMetaBar } from '../components/practice/PracticeMetaBar'
 import { PracticeProgressDrawer } from '../components/practice/PracticeProgressDrawer'
 import { PracticeRecordEntry } from '../components/practice/PracticeRecordEntry'
 import { PracticeRecordingOverlay } from '../components/practice/PracticeRecordingOverlay'
 import { PracticeScorePanel } from '../components/practice/PracticeScorePanel'
 import { PracticeSegmentCard } from '../components/practice/PracticeSegmentCard'
+import { PracticeStatusBanners } from '../components/practice/PracticeStatusBanners'
 import { PracticeSyncBar } from '../components/practice/PracticeSyncBar'
 import { PracticeTopBar } from '../components/practice/PracticeTopBar'
 import { ReadSegmentButton } from '../components/practice/ReadSegmentButton'
-import { PRACTICE_LEVELS, type PracticeMatrix } from '../components/practice/shared'
+import { type PracticeLevel } from '../services/practiceService'
+import { type AlignmentResult } from '../services/practiceAttemptService'
 import { usePracticeAudio } from '../hooks/practice/usePracticeAudio'
+import { usePracticeData } from '../hooks/practice/usePracticeData'
 import { usePracticeRecording } from '../hooks/practice/usePracticeRecording'
-import { getApiErrorMessage } from '../services/authService'
-import {
-  type AlignmentResult,
-} from '../services/practiceAttemptService'
-import {
-  practiceService,
-  type PracticeLanguage,
-  type PracticeLevel,
-  type PracticeProgressCellState,
-  type PracticeSegment,
-} from '../services/practiceService'
+import { usePracticeRouteState } from '../hooks/practice/usePracticeRouteState'
 
-type CellState = PracticeProgressCellState
 type Level = PracticeLevel
 
-const createFallbackProgressMatrix = (
-  totalSegments: number,
-  currentLevel: Level,
-  currentSegmentOrder: number
-): PracticeMatrix => {
-  const safeTotalSegments = Math.max(totalSegments, 0)
-  const matrix = PRACTICE_LEVELS.reduce(
-    (acc, level) => {
-      acc[level] = Array.from({ length: safeTotalSegments }, () => 'fail')
-      return acc
-    },
-    {} as PracticeMatrix
-  )
-  if (safeTotalSegments <= 0) return matrix
-  const currentIndex = Math.min(Math.max(currentSegmentOrder - 1, 0), safeTotalSegments - 1)
-  matrix[currentLevel][currentIndex] = 'current'
-  return matrix
-}
-
 const formatTimer = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`
-
-const parseLevelFromQuery = (value: string | null): Level | null => {
-  if (value === 'L1' || value === '1') return 'L1'
-  if (value === 'L2' || value === '2') return 'L2'
-  if (value === 'L3' || value === '3') return 'L3'
-  if (value === 'L4' || value === '4') return 'L4'
-  return null
-}
 
 export const PracticePage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const [showScore, setShowScore] = useState(false)
   const [showFullMode, setShowFullMode] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [level, setLevel] = useState<Level>(parseLevelFromQuery(searchParams.get('lv')) ?? 'L1')
-  const [articleId, setArticleId] = useState<string | null>(null)
-  const [articleTitle, setArticleTitle] = useState('')
-  const [articleLanguage, setArticleLanguage] = useState<PracticeLanguage>('en')
-  const [segments, setSegments] = useState<PracticeSegment[]>([])
-  const [segmentIndex, setSegmentIndex] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
   const [alignmentResult, setAlignmentResult] = useState<AlignmentResult | null>(null)
   const [progressRefreshVersion, setProgressRefreshVersion] = useState(0)
-  const [progressLoading, setProgressLoading] = useState(false)
-  const [progressMatrix, setProgressMatrix] = useState<PracticeMatrix>(
-    createFallbackProgressMatrix(0, level, 1)
-  )
-  const [trendScores, setTrendScores] = useState<number[]>([])
+  const { level, setLevel, queryArticleId, querySegment, searchKey } = usePracticeRouteState()
+  const {
+    articleId,
+    articleTitle,
+    articleLanguage,
+    segmentIndex,
+    loading,
+    loadError,
+    currentSegment,
+    totalSegments,
+    currentSegmentOrder,
+    progressLoading,
+    progressMatrix,
+    trendScores,
+  } = usePracticeData({
+    level,
+    queryArticleId,
+    querySegment,
+    searchKey,
+    progressRefreshVersion,
+    errorMessage: t('common.error'),
+  })
 
   const alertFn = (globalThis as { alert?: (message?: string) => void }).alert
   const { isSpeaking, ttsLoading, speakSegment, stopSpeaking } = usePracticeAudio({
@@ -99,10 +73,7 @@ export const PracticePage = () => {
     setProgressRefreshVersion((prev) => prev + 1)
   }, [])
 
-  const currentSegment = segments[segmentIndex] ?? null
   const segmentText = currentSegment?.plainText ?? ''
-  const totalSegments = segments.length
-  const currentSegmentOrder = currentSegment?.order ?? segmentIndex + 1
   const defaultTokenTotal = Math.max(currentSegment?.tokenCount ?? 1, 1)
   const languageLabel =
     articleLanguage === 'zh'
@@ -173,105 +144,6 @@ export const PracticePage = () => {
     })
   }, [articleId, canPractice, currentSegment, speakSegment])
 
-  const searchKey = searchParams.toString()
-  const queryArticleId = searchParams.get('a') ?? searchParams.get('articleId')
-  const querySegment = Number.parseInt(searchParams.get('seg') ?? '', 10)
-  const queryLevel = parseLevelFromQuery(searchParams.get('lv'))
-
-  useEffect(() => {
-    let active = true
-
-    const loadPracticeArticle = async () => {
-      setLoading(true)
-      setLoadError(null)
-      try {
-        const resolvedArticleId = await practiceService.resolveArticleId(queryArticleId)
-        if (!resolvedArticleId) {
-          throw new Error('No article available for practice.')
-        }
-
-        const practiceArticle = await practiceService.getPracticeArticle(resolvedArticleId)
-        if (!active) return
-
-        setArticleId(practiceArticle.articleId)
-        setArticleTitle(practiceArticle.title)
-        setArticleLanguage(practiceArticle.language)
-        setSegments(practiceArticle.segments)
-        sessionStorage.setItem('article_id', practiceArticle.articleId)
-        sessionStorage.setItem('article_lang', practiceArticle.language)
-
-        const total = practiceArticle.segments.length
-        const maxIndex = Math.max(total - 1, 0)
-        const matchedByOrder = Number.isFinite(querySegment)
-          ? practiceArticle.segments.findIndex((segment) => segment.order === querySegment)
-          : -1
-        const fallbackIndex = Number.isFinite(querySegment) ? querySegment - 1 : 0
-        const resolvedIndex = matchedByOrder >= 0 ? matchedByOrder : Math.min(Math.max(fallbackIndex, 0), maxIndex)
-        setSegmentIndex(resolvedIndex)
-      } catch (error: unknown) {
-        if (!active) return
-        setLoadError(getApiErrorMessage(error, t('common.error')))
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
-
-    if (queryLevel) {
-      setLevel(queryLevel)
-    }
-
-    void loadPracticeArticle()
-    return () => {
-      active = false
-    }
-  }, [queryArticleId, queryLevel, querySegment, searchKey, t])
-
-  useEffect(() => {
-    let active = true
-
-    if (!articleId || totalSegments <= 0) {
-      setProgressLoading(false)
-      setProgressMatrix(createFallbackProgressMatrix(totalSegments, level, currentSegmentOrder))
-      return () => {
-        active = false
-      }
-    }
-
-    const loadProgress = async () => {
-      setProgressLoading(true)
-      try {
-        const progress = await practiceService.getArticleProgress(articleId, {
-          level,
-          currentSegmentOrder,
-        })
-        if (!active) return
-        const resolvedTotalSegments = progress.totalSegments > 0 ? progress.totalSegments : totalSegments
-        const fallback = createFallbackProgressMatrix(resolvedTotalSegments, level, currentSegmentOrder)
-        const matrix = PRACTICE_LEVELS.reduce(
-          (acc, item) => {
-            const source = progress.matrix[item]
-            acc[item] = Array.isArray(source) && source.length > 0 ? source as CellState[] : fallback[item]
-            return acc
-          },
-          {} as PracticeMatrix
-        )
-        setProgressMatrix(matrix)
-        setTrendScores(progress.recentScores)
-      } catch {
-        if (!active) return
-        setProgressMatrix(createFallbackProgressMatrix(totalSegments, level, currentSegmentOrder))
-        setTrendScores([])
-      } finally {
-        if (active) setProgressLoading(false)
-      }
-    }
-
-    void loadProgress()
-    return () => {
-      active = false
-    }
-  }, [articleId, currentSegmentOrder, level, progressRefreshVersion, totalSegments])
-
   useEffect(() => {
     stopSpeaking()
     setShowScore(false)
@@ -324,39 +196,20 @@ export const PracticePage = () => {
           },
         }}
       >
-        {loading && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', p: '12px 14px', bgcolor: '#1a1a2c', border: '1px solid rgba(255,255,255,0.13)', borderRadius: '12px' }}>
-            <CircularProgress size={16} thickness={5} />
-            <Typography sx={{ fontSize: '13px', color: 'text.secondary' }}>{t('common.loading')}</Typography>
-          </Box>
-        )}
+        <PracticeStatusBanners
+          loading={loading}
+          loadError={loadError}
+          resultError={resultError}
+          loadingLabel={t('common.loading')}
+          importLabel={t('pages.start.importNewArticle')}
+          onImport={() => navigate('/editor')}
+        />
 
-        {loadError && (
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', p: '12px 14px', bgcolor: 'rgba(240,82,82,0.08)', border: '1px solid rgba(240,82,82,0.25)', borderRadius: '12px' }}>
-            <Typography sx={{ fontSize: '13px', color: 'error.main' }}>{loadError}</Typography>
-            <Button size="small" variant="outlined" onClick={() => navigate('/editor')}>
-              {t('pages.start.importNewArticle')}
-            </Button>
-          </Box>
-        )}
-
-        {resultError && (
-          <Box sx={{ p: '10px 12px', bgcolor: 'rgba(240,82,82,0.08)', border: '1px solid rgba(240,82,82,0.25)', borderRadius: '12px' }}>
-            <Typography sx={{ fontSize: '12px', color: 'error.main' }}>{resultError}</Typography>
-          </Box>
-        )}
-
-        <Box sx={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <Box sx={{ px: '10px', py: '3px', borderRadius: '999px', bgcolor: 'rgba(110,96,238,0.25)', border: '1px solid rgba(110,96,238,0.3)', color: 'primary.light', fontSize: '12px', fontWeight: 600 }}>
-            {level}
-          </Box>
-          <Typography sx={{ fontSize: '13px', color: 'text.secondary' }}>
-            {t('pages.practice.meta.segmentProgress', { current: currentSegmentOrder, total: totalSegments })}
-          </Typography>
-          <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>
-            {t('pages.practice.meta.targetAccuracy')}
-          </Typography>
-        </Box>
+        <PracticeMetaBar
+          level={level}
+          segmentProgressLabel={t('pages.practice.meta.segmentProgress', { current: currentSegmentOrder, total: totalSegments })}
+          targetAccuracyLabel={t('pages.practice.meta.targetAccuracy')}
+        />
 
         <PracticeSegmentCard
           segmentLabel={t('pages.practice.segmentLabel', { segment: currentSegmentOrder })}

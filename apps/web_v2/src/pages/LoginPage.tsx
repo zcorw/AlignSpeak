@@ -1,9 +1,13 @@
 import { useState, type FormEvent } from 'react'
-import { Box, TextField, Button, Typography } from '@mui/material'
+import { Box } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { loginSchema } from '../utils/validation'
-import { Alert, FieldError } from '../components/Alert'
+import { Alert } from '../components/Alert'
+import { AuthCardLayout } from '../components/auth/AuthCardLayout'
+import { AuthField } from '../components/auth/AuthField'
+import { AuthPrimaryButton } from '../components/auth/AuthPrimaryButton'
+import { AuthSecondaryButton } from '../components/auth/AuthSecondaryButton'
 import { ZodError } from 'zod'
 import { authService, getApiErrorMessage } from '../services/authService'
 import { useAuthStore } from '../stores/authStore'
@@ -60,198 +64,64 @@ export const LoginPage = () => {
   }
 
   return (
-    <Box
-      sx={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        p: 2.5,
-      }}
+    <AuthCardLayout
+      title={t('pages.login.title')}
+      description={t('pages.login.description')}
     >
       <Box
+        component="form"
+        onSubmit={handleSubmit}
         sx={{
-          width: '100%',
-          maxWidth: 400,
-          bgcolor: '#1a1a2c',
-          border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: '14px',
-          p: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
         }}
       >
-        <Typography
-          variant="h5"
-          sx={{
-            fontSize: 24,
-            fontWeight: 700,
-            mb: 1,
-          }}
-        >
-          {t('pages.login.title')}
-        </Typography>
-        <Typography
-          sx={{
-            fontSize: 13,
-            color: '#8888aa',
-            mb: 3,
-          }}
-        >
-          {t('pages.login.description')}
-        </Typography>
-
-        <Box
-          component="form"
-          onSubmit={handleSubmit}
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2,
-          }}
-        >
-          <Box>
-            <Typography
-              component="label"
-              sx={{
-                display: 'block',
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: '0.8px',
-                textTransform: 'uppercase',
-                color: '#55556a',
-                mb: 0.75,
-              }}
-            >
-              {t('pages.login.email')}
-            </Typography>
-            <TextField
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value)
-                setFieldErrors((prev) => ({ ...prev, email: '' }))
-              }}
-              placeholder={t('pages.login.emailPlaceholder')}
-              autoComplete="email"
-              fullWidth
-              error={!!fieldErrors.email}
-              sx={{
-                '& .MuiInputBase-root': {
-                  bgcolor: '#22223a',
-                  border: `1px solid ${fieldErrors.email ? '#f05252' : 'rgba(255,255,255,0.13)'}`,
-                  borderRadius: '8px',
-                  fontSize: 15,
-                  color: '#eeeef6',
-                },
-                '& .MuiOutlinedInput-notchedOutline': {
-                  border: 'none',
-                },
-                '& .MuiInputBase-input::placeholder': {
-                  color: '#55556a',
-                  opacity: 1,
-                },
-              }}
-            />
-            {fieldErrors.email && <FieldError message={fieldErrors.email} />}
-          </Box>
-
-          <Box>
-            <Typography
-              component="label"
-              sx={{
-                display: 'block',
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: '0.8px',
-                textTransform: 'uppercase',
-                color: '#55556a',
-                mb: 0.75,
-              }}
-            >
-              {t('pages.login.password')}
-            </Typography>
-            <TextField
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value)
-                setFieldErrors((prev) => ({ ...prev, password: '' }))
-              }}
-              placeholder={t('pages.login.passwordPlaceholder')}
-              autoComplete="current-password"
-              fullWidth
-              error={!!fieldErrors.password}
-              sx={{
-                '& .MuiInputBase-root': {
-                  bgcolor: '#22223a',
-                  border: `1px solid ${fieldErrors.password ? '#f05252' : 'rgba(255,255,255,0.13)'}`,
-                  borderRadius: '8px',
-                  fontSize: 15,
-                  color: '#eeeef6',
-                },
-                '& .MuiOutlinedInput-notchedOutline': {
-                  border: 'none',
-                },
-                '& .MuiInputBase-input::placeholder': {
-                  color: '#55556a',
-                  opacity: 1,
-                },
-              }}
-            />
-            {fieldErrors.password && <FieldError message={fieldErrors.password} />}
-          </Box>
-
-          {error && (
-            <Alert type="error" message={error} />
-          )}
-
-          <Button
-            type="submit"
-            disabled={loading}
-            fullWidth
-            sx={{
-              bgcolor: '#6e60ee',
-              color: '#fff',
-              borderRadius: '999px',
-              padding: '13px 24px',
-              fontSize: 15,
-              fontWeight: 600,
-              textTransform: 'none',
-              boxShadow: '0 2px 12px rgba(110,96,238,0.25)',
-              '&:hover': {
-                bgcolor: '#8b7fff',
-              },
-              '&:disabled': {
-                opacity: 0.4,
-              },
+        <Box>
+          <AuthField
+            type="email"
+            label={t('pages.login.email')}
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setFieldErrors((prev) => ({ ...prev, email: '' }))
             }}
-          >
-            {loading ? t('pages.login.submitting') : t('pages.login.submit')}
-          </Button>
-
-          <Button
-            type="button"
-            onClick={() => navigate('/register')}
-            disabled={loading}
-            fullWidth
-            sx={{
-              bgcolor: 'transparent',
-              color: '#8888aa',
-              border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: '999px',
-              padding: '13px 24px',
-              fontSize: 15,
-              fontWeight: 600,
-              textTransform: 'none',
-              '&:hover': {
-                color: '#eeeef6',
-                borderColor: 'rgba(255,255,255,0.13)',
-              },
-            }}
-          >
-            {t('pages.login.switchToRegister')}
-          </Button>
+            placeholder={t('pages.login.emailPlaceholder')}
+            autoComplete="email"
+            error={fieldErrors.email}
+          />
         </Box>
+
+        <Box>
+          <AuthField
+            type="password"
+            label={t('pages.login.password')}
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value)
+              setFieldErrors((prev) => ({ ...prev, password: '' }))
+            }}
+            placeholder={t('pages.login.passwordPlaceholder')}
+            autoComplete="current-password"
+            error={fieldErrors.password}
+          />
+        </Box>
+
+        {error && <Alert type="error" message={error} />}
+
+        <AuthPrimaryButton
+          type="submit"
+          loading={loading}
+          label={t('pages.login.submit')}
+          loadingLabel={t('pages.login.submitting')}
+        />
+
+        <AuthSecondaryButton
+          disabled={loading}
+          label={t('pages.login.switchToRegister')}
+          onClick={() => navigate('/register')}
+        />
       </Box>
-    </Box>
+    </AuthCardLayout>
   )
 }

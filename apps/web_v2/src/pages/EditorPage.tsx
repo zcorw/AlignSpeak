@@ -1,190 +1,39 @@
-import {
-  ArrowBackRounded,
-  ContentPasteRounded,
-  EditOutlined,
-  PersonOutlineRounded,
-  UploadFileRounded,
-} from '@mui/icons-material'
 import { Box, Typography } from '@mui/material'
-import { type ChangeEvent, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { EditorTextOverlay, type OverlayLanguageCode } from '../components/EditorTextOverlay'
-import { getApiErrorMessage } from '../services/authService'
-import { articleService } from '../services/articleService'
-
-const buildArticleTitle = (text: string) => {
-  const firstLine = text
-    .split('\n')
-    .map((line) => line.trim())
-    .find((line) => line.length > 0)
-  if (!firstLine) return 'Untitled Article'
-  return firstLine.length <= 50 ? firstLine : `${firstLine.slice(0, 50)}...`
-}
+import { EditorTextOverlay } from '../components/EditorTextOverlay'
+import { EditorImportMethods } from '../components/editor/EditorImportMethods'
+import { EditorManualEntryTrigger } from '../components/editor/EditorManualEntryTrigger'
+import { EditorTopBar } from '../components/editor/EditorTopBar'
+import { useEditorImport } from '../hooks/editor/useEditorImport'
 
 export const EditorPage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const inputRef = useRef<HTMLInputElement | null>(null)
-
-  const [overlayOpen, setOverlayOpen] = useState(false)
-  const [ocrLoading, setOcrLoading] = useState(false)
-  const [importedText, setImportedText] = useState('')
-  const [importVersion, setImportVersion] = useState(0)
-  const [focusVersion, setFocusVersion] = useState(0)
-  const [creatingArticle, setCreatingArticle] = useState(false)
-
-  const applyImportedText = (value: string) => {
-    setImportedText(value)
-    setImportVersion((prev) => prev + 1)
-    setFocusVersion((prev) => prev + 1)
-  }
-
-  const closeOverlay = () => {
-    setOcrLoading(false)
-    setOverlayOpen(false)
-  }
-
-  const handleOpenOverlay = (source: 'clipboard' | 'manual') => {
-    setOverlayOpen(true)
-    if (source === 'manual') {
-      setFocusVersion((prev) => prev + 1)
-      return
-    }
-
-    navigator.clipboard
-      .readText()
-      .then((value) => {
-        applyImportedText(value || '')
-      })
-      .catch(() => {
-        applyImportedText('')
-      })
-  }
-
-  const handlePickFile = () => {
-    inputRef.current?.click()
-  }
-
-  const handleFileImport = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-
-    setOverlayOpen(true)
-    setOcrLoading(true)
-
-    const locale = navigator.language.toLowerCase()
-    const languageHint = locale.startsWith('zh') ? 'zh' : locale.startsWith('ja') ? 'ja' : 'en'
-
-    void articleService
-      .parseUploadFile(file, languageHint)
-      .then((result) => {
-        applyImportedText(result.text || '')
-      })
-      .catch((error: unknown) => {
-        const message = getApiErrorMessage(error, t('common.error'))
-        window.alert(message)
-      })
-      .finally(() => {
-        setOcrLoading(false)
-      })
-  }
-
-  const handleConfirm = (payload: { text: string; language: OverlayLanguageCode }) => {
-    if (creatingArticle) return
-    setCreatingArticle(true)
-
-    const title = buildArticleTitle(payload.text)
-    void articleService
-      .createArticle({
-        title,
-        language: payload.language,
-        text: payload.text,
-      })
-      .then((article) => {
-        sessionStorage.setItem('article_id', article.articleId)
-        sessionStorage.setItem('article_text', payload.text)
-        sessionStorage.setItem('article_lang', payload.language)
-        navigate('/practice?new=1')
-      })
-      .catch((error: unknown) => {
-        const message = getApiErrorMessage(error, t('common.error'))
-        window.alert(message)
-      })
-      .finally(() => {
-        setCreatingArticle(false)
-      })
-  }
+  const {
+    inputRef,
+    overlayOpen,
+    ocrLoading,
+    importedText,
+    importVersion,
+    focusVersion,
+    creatingArticle,
+    closeOverlay,
+    openOverlay,
+    pickFile,
+    importFile,
+    confirmArticle,
+  } = useEditorImport()
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          px: '20px',
-          pt: '16px',
-          pb: '12px',
-          position: 'relative',
-          zIndex: 10,
-        }}
-      >
-        <Box
-          component="button"
-          type="button"
-          aria-label={t('pages.editor.topbar.backAriaLabel')}
-          onClick={() => navigate('/start')}
-          sx={{
-            width: 36,
-            height: 36,
-            borderRadius: '999px',
-            border: '1px solid rgba(255,255,255,0.13)',
-            bgcolor: '#1a1a2c',
-            color: 'text.secondary',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            transition: 'background-color 0.15s, color 0.15s',
-            '&:hover': {
-              bgcolor: '#22223a',
-              color: 'text.primary',
-            },
-          }}
-        >
-          <ArrowBackRounded sx={{ fontSize: 16 }} />
-        </Box>
-        <Typography sx={{ flex: 1, fontSize: '16px', fontWeight: 600 }}>
-          {t('pages.editor.topbar.title')}
-        </Typography>
-        <Box
-          component="button"
-          type="button"
-          aria-label={t('pages.editor.topbar.meAriaLabel')}
-          onClick={() => navigate('/me')}
-          sx={{
-            width: 36,
-            height: 36,
-            borderRadius: '999px',
-            border: '1px solid rgba(255,255,255,0.13)',
-            bgcolor: '#1a1a2c',
-            color: 'text.secondary',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            transition: 'background-color 0.15s, color 0.15s',
-            '&:hover': {
-              bgcolor: '#22223a',
-              color: 'text.primary',
-            },
-          }}
-        >
-          <PersonOutlineRounded sx={{ fontSize: 16 }} />
-        </Box>
-      </Box>
+      <EditorTopBar
+        title={t('pages.editor.topbar.title')}
+        backAriaLabel={t('pages.editor.topbar.backAriaLabel')}
+        meAriaLabel={t('pages.editor.topbar.meAriaLabel')}
+        onBack={() => navigate('/start')}
+        onOpenMe={() => navigate('/me')}
+      />
 
       <Box
         sx={{
@@ -218,120 +67,17 @@ export const EditorPage = () => {
           </Typography>
         </Box>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <Box
-            component="button"
-            type="button"
-            onClick={() => handleOpenOverlay('clipboard')}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px',
-              p: '16px 18px',
-              textAlign: 'left',
-              bgcolor: '#1a1a2c',
-              color: 'text.primary',
-              border: '1px solid rgba(255,255,255,0.13)',
-              borderRadius: '14px',
-              cursor: 'pointer',
-              transition: 'border-color 0.15s, background-color 0.15s',
-              '&:hover': {
-                borderColor: 'primary.main',
-                bgcolor: '#22223a',
-              },
-            }}
-          >
-            <Box
-              sx={{
-                width: 42,
-                height: 42,
-                borderRadius: '10px',
-                bgcolor: '#22223a',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <ContentPasteRounded sx={{ fontSize: 20, color: 'text.secondary' }} />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'text.primary' }}>
-                {t('pages.editor.methods.clipboard.name')}
-              </Typography>
-              <Typography sx={{ mt: '2px', fontSize: '12px', color: 'text.secondary' }}>
-                {t('pages.editor.methods.clipboard.desc')}
-              </Typography>
-            </Box>
-            <Box
-              sx={{
-                px: '8px',
-                py: '2px',
-                borderRadius: '20px',
-                bgcolor: 'rgba(110,96,238,0.25)',
-                color: 'primary.light',
-                fontSize: '11px',
-                fontWeight: 600,
-                flexShrink: 0,
-              }}
-            >
-              {t('pages.editor.methods.clipboard.recommended')}
-            </Box>
-          </Box>
-
-          <Box
-            component="button"
-            type="button"
-            onClick={handlePickFile}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px',
-              p: '16px 18px',
-              textAlign: 'left',
-              bgcolor: '#1a1a2c',
-              color: 'text.primary',
-              border: '1px solid rgba(255,255,255,0.13)',
-              borderRadius: '14px',
-              cursor: 'pointer',
-              transition: 'border-color 0.15s, background-color 0.15s',
-              '&:hover': {
-                borderColor: 'primary.main',
-                bgcolor: '#22223a',
-              },
-            }}
-          >
-            <Box
-              sx={{
-                width: 42,
-                height: 42,
-                borderRadius: '10px',
-                bgcolor: '#22223a',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <UploadFileRounded sx={{ fontSize: 20, color: 'text.secondary' }} />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'text.primary' }}>
-                {t('pages.editor.methods.upload.name')}
-              </Typography>
-              <Typography sx={{ mt: '2px', fontSize: '12px', color: 'text.secondary' }}>
-                {t('pages.editor.methods.upload.desc')}
-              </Typography>
-            </Box>
-          </Box>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".txt,.md,image/*"
-            style={{ display: 'none' }}
-            onChange={handleFileImport}
-          />
-        </Box>
+        <EditorImportMethods
+          clipboardTitle={t('pages.editor.methods.clipboard.name')}
+          clipboardDesc={t('pages.editor.methods.clipboard.desc')}
+          clipboardRecommended={t('pages.editor.methods.clipboard.recommended')}
+          uploadTitle={t('pages.editor.methods.upload.name')}
+          uploadDesc={t('pages.editor.methods.upload.desc')}
+          inputRef={inputRef}
+          onClipboard={() => openOverlay('clipboard')}
+          onUploadClick={pickFile}
+          onFileChange={importFile}
+        />
 
         <Box
           sx={{
@@ -351,32 +97,10 @@ export const EditorPage = () => {
           {t('pages.editor.manualDivider')}
         </Box>
 
-        <Box
-          component="button"
-          type="button"
-          onClick={() => handleOpenOverlay('manual')}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            p: '12px 18px',
-            borderRadius: '14px',
-            border: '1px dashed rgba(255,255,255,0.13)',
-            bgcolor: 'transparent',
-            color: 'text.secondary',
-            textAlign: 'left',
-            fontSize: '14px',
-            cursor: 'pointer',
-            transition: 'color 0.15s, border-color 0.15s',
-            '&:hover': {
-              color: 'text.primary',
-              borderColor: 'rgba(255,255,255,0.13)',
-            },
-          }}
-        >
-          <EditOutlined sx={{ fontSize: 16 }} />
-          {t('pages.editor.manualInput')}
-        </Box>
+        <EditorManualEntryTrigger
+          label={t('pages.editor.manualInput')}
+          onClick={() => openOverlay('manual')}
+        />
       </Box>
 
       <EditorTextOverlay
@@ -387,8 +111,9 @@ export const EditorPage = () => {
         focusVersion={focusVersion}
         submitting={creatingArticle}
         onClose={closeOverlay}
-        onConfirm={handleConfirm}
+        onConfirm={confirmArticle}
       />
     </Box>
   )
 }
+

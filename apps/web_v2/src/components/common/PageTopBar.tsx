@@ -10,10 +10,12 @@ interface PageTopBarAction {
 
 interface PageTopBarProps {
   title: string
-  subtitle: string
-  onBack: () => void
+  subtitle?: string
+  onBack?: () => void
   backAriaLabel?: string
+  leading?: ReactNode
   actions?: PageTopBarAction[]
+  rightSlot?: ReactNode
 }
 
 const iconButtonSx = {
@@ -33,22 +35,32 @@ const iconButtonSx = {
 
 export const PageTopBar = ({
   title,
-  subtitle,
+  subtitle = '',
   onBack,
   backAriaLabel,
+  leading,
   actions = [],
+  rightSlot,
 }: PageTopBarProps) => (
   <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', px: '20px', pt: '16px', pb: '12px' }}>
-    <Box component="button" type="button" sx={iconButtonSx} onClick={onBack} aria-label={backAriaLabel}>
-      <ArrowBackRounded sx={{ fontSize: 16 }} />
-    </Box>
+    {leading ?? (
+      onBack ? (
+        <Box component="button" type="button" sx={iconButtonSx} onClick={onBack} aria-label={backAriaLabel}>
+          <ArrowBackRounded sx={{ fontSize: 16 }} />
+        </Box>
+      ) : (
+        <Box sx={{ width: 36, height: 36, flexShrink: 0 }} />
+      )
+    )}
     <Box sx={{ flex: 1, minWidth: 0 }}>
       <Typography sx={{ fontSize: '14px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {title}
       </Typography>
-      <Typography sx={{ fontSize: '11px', color: 'text.secondary' }}>
-        {subtitle}
-      </Typography>
+      {subtitle && (
+        <Typography sx={{ fontSize: '11px', color: 'text.secondary' }}>
+          {subtitle}
+        </Typography>
+      )}
     </Box>
     {actions.map((action, index) => (
       <Box
@@ -62,6 +74,6 @@ export const PageTopBar = ({
         {action.icon}
       </Box>
     ))}
+    {rightSlot}
   </Box>
 )
-
