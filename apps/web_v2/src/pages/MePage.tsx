@@ -23,7 +23,6 @@ type MeArticle = {
   progressRate: number
   isDone: boolean
   practiceCount: number
-  isActive: boolean
 }
 
 const iconButtonSx = {
@@ -79,6 +78,10 @@ export const MePage = () => {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [articles, setArticles] = useState<MeArticle[]>([])
+  const [currentArticleId, setCurrentArticleId] = useState<string | null>(() => {
+    const articleId = sessionStorage.getItem('article_id')?.trim()
+    return articleId || null
+  })
 
   const [currentPwd, setCurrentPwd] = useState('')
   const [newPwd, setNewPwd] = useState('')
@@ -96,7 +99,7 @@ export const MePage = () => {
       try {
         const overview = await startService.getOverview()
         if (!active) return
-        const mapped: MeArticle[] = overview.historyDocs.map((item, index) => {
+        const mapped: MeArticle[] = overview.historyDocs.map((item) => {
           const totalSegments = item.totalSegments > 0 ? item.totalSegments : 1
           const currentSegmentOrder = Math.min(Math.max(item.currentSegmentOrder, 1), totalSegments)
           return {
@@ -110,10 +113,17 @@ export const MePage = () => {
             progressRate: item.progressRate,
             isDone: item.isDone || (totalSegments > 0 && item.passedSegments >= totalSegments) || item.progressRate >= 1,
             practiceCount: item.practiceCount,
-            isActive: index === 0,
           }
         })
         setArticles(mapped)
+        if (mapped.length > 0) {
+          setCurrentArticleId((prev) => {
+            if (prev) return prev
+            const nextCurrentArticleId = mapped[0].id
+            sessionStorage.setItem('article_id', nextCurrentArticleId)
+            return nextCurrentArticleId
+          })
+        }
       } catch (error: unknown) {
         if (!active) return
         setLoadError(getApiErrorMessage(error, t('common.error')))
@@ -139,6 +149,7 @@ export const MePage = () => {
     () => articles.reduce((sum, item) => sum + item.practiceCount, 0),
     [articles]
   )
+  const activeArticleId = currentArticleId || articles[0]?.id || null
 
   const displayName = user?.displayName?.trim() || user?.email?.split('@')[0] || t('pages.start.userName')
   const avatarText = displayName.trim().charAt(0).toUpperCase() || 'U'
@@ -373,21 +384,27 @@ export const MePage = () => {
               </Typography>
             </Box>
           ) : (
-            filteredArticles.map((article) => (
+            filteredArticles.map((article) => {
+              const isActive = activeArticleId === article.id
+              return (
               <Box
                 key={article.id}
                 component="button"
                 type="button"
-                onClick={() => navigate(`/practice?a=${article.id}&seg=${article.currentSegmentOrder}&lv=L${article.level}`)}
+                onClick={() => {
+                  setCurrentArticleId(article.id)
+                  sessionStorage.setItem('article_id', article.id)
+                  navigate(`/practice?a=${article.id}&seg=${article.currentSegmentOrder}&lv=L${article.level}`)
+                }}
                 sx={{
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '10px',
                   p: '16px',
                   textAlign: 'left',
-                  bgcolor: article.isActive ? 'rgba(110,96,238,0.04)' : '#1a1a2c',
+                  bgcolor: isActive ? 'rgba(110,96,238,0.04)' : '#1a1a2c',
                   border: '1px solid',
-                  borderColor: article.isActive ? 'rgba(110,96,238,0.4)' : 'rgba(255,255,255,0.07)',
+                  borderColor: isActive ? 'rgba(110,96,238,0.4)' : 'rgba(255,255,255,0.07)',
                   borderRadius: '14px',
                   cursor: 'pointer',
                   transition: 'border-color 0.15s, background-color 0.15s',
@@ -419,7 +436,7 @@ export const MePage = () => {
                     <Box sx={{ height: '100%', width: `${article.progressRate * 100}%`, borderRadius: '3px', background: 'linear-gradient(90deg, #6e60ee, #8b7fff)' }} />
                   </Box>
                   <Typography sx={{ fontSize: '11px', color: 'text.disabled', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                    {article.isDone ? t('pages.me.article.allPassed') : `搂${article.currentSegmentOrder}/${article.totalSegments}`}
+                    {article.isDone ? t('pages.me.article.allPassed') : `S${article.currentSegmentOrder}/${article.totalSegments}`}
                   </Typography>
                 </Box>
 
@@ -429,7 +446,7 @@ export const MePage = () => {
                       time: formatLastPracticedAt(article.lastPracticedAt),
                     })}
                   </Typography>
-                  <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>路</Typography>
+                  <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>|</Typography>
                   <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>
                     {t('pages.me.article.practiceCount', { count: article.practiceCount })}
                   </Typography>
@@ -438,14 +455,15 @@ export const MePage = () => {
                       {t('pages.me.article.doneBadge')}
                     </Box>
                   )}
-                  {article.isActive && (
+                  {isActive && (
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'primary.light' }}>
                       {t('pages.me.article.currentBadge')}
                     </Box>
                   )}
                 </Box>
               </Box>
-            ))
+              )
+            })
           )}
         </Box>
       </Box>
