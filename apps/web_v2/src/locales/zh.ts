@@ -206,6 +206,7 @@ export default {
           name: '张明',
           stats: '共 {{articles}} 篇文章 · 已练 {{practices}} 次',
           changePassword: '修改密码',
+          logout: '退出账号',
         },
         filters: {
           all: '全部',
@@ -270,7 +271,7 @@ export default {
         invitationCodePlaceholder: 'INV-XXXXXXXXXX',
         passwordPlaceholder: '••••••••',
         displayNamePlaceholder: 'Alice',
-        success: 'Verification code sent. Please verify before login.',
+        success: 'Registration successful. You can now sign in.',
         submit: 'Register',
         submitting: 'Registering...',
         switchToLogin: 'Already have an account? Sign in',

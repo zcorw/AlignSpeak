@@ -15,16 +15,6 @@ class RegisterResponse(BaseModel):
     verification_code: str | None = None
 
 
-class VerifyEmailRequest(BaseModel):
-    email: EmailStr
-    code: str = Field(min_length=4, max_length=12)
-
-
-class VerifyEmailResponse(BaseModel):
-    user_id: str
-    message: str
-
-
 class BootstrapAdminRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)

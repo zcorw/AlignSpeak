@@ -9,7 +9,6 @@ import {
   MePage,
   LoginPage,
   RegisterPage,
-  VerifyEmailPage,
 } from './pages'
 import { authService } from './services/authService'
 import { entryService } from './services/entryService'
@@ -106,10 +105,7 @@ function App() {
           path="/register"
           element={isAuthenticated ? <Navigate to={defaultAuthedRoute} replace /> : <RegisterPage />}
         />
-        <Route
-          path="/register/verify"
-          element={isAuthenticated ? <Navigate to={defaultAuthedRoute} replace /> : <VerifyEmailPage />}
-        />
+        <Route path="/register/verify" element={<Navigate to="/register" replace />} />
 
         {/* Protected routes */}
         <Route

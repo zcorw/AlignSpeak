@@ -87,6 +87,13 @@ def apply_runtime_schema_fixes() -> None:
         conn.execute(
             text(
                 """
+                DROP TABLE IF EXISTS email_verification_codes
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
                 CREATE TABLE IF NOT EXISTS invitation_codes (
                     id VARCHAR(32) PRIMARY KEY,
                     code VARCHAR(32) UNIQUE NOT NULL,

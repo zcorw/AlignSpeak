@@ -38,17 +38,7 @@ export const RegisterPage = () => {
         displayName: validatedData.displayName?.trim() || undefined,
       })
       setSuccessMessage(result.message || t('pages.register.success'))
-      if (result.verificationRequired) {
-        navigate('/register/verify', {
-          state: {
-            email: validatedData.email,
-            verificationCode: result.verificationCode,
-          },
-          replace: true,
-        })
-      } else {
-        navigate('/login', { replace: true })
-      }
+      navigate('/login', { replace: true })
     } catch (err) {
       if (err instanceof ZodError) {
         // Handle validation errors

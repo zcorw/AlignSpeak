@@ -206,6 +206,7 @@ export default {
           name: 'Ming',
           stats: '{{articles}} articles · {{practices}} practices',
           changePassword: 'Change password',
+          logout: 'Sign out',
         },
         filters: {
           all: 'All',
@@ -270,7 +271,7 @@ export default {
         invitationCodePlaceholder: 'INV-XXXXXXXXXX',
         passwordPlaceholder: '••••••••',
         displayNamePlaceholder: 'Alice',
-        success: 'Verification code sent. Please verify before login.',
+        success: 'Registration successful. You can now sign in.',
         submit: 'Register',
         submitting: 'Registering...',
         switchToLogin: 'Already have an account? Sign in',

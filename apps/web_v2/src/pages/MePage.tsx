@@ -35,6 +35,7 @@ export const MePage = () => {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
+  const clearAuth = useAuthStore((state) => state.clearAuth)
   const [filter, setFilter] = useState<MeFilterType>('all')
   const {
     loading,
@@ -101,6 +102,11 @@ export const MePage = () => {
     }
   }
 
+  const handleLogout = () => {
+    clearAuth()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <MeTopBar
@@ -118,7 +124,9 @@ export const MePage = () => {
           currentLang={currentLang}
           onOpenPassword={() => password.setOpen(true)}
           onSwitchLanguage={() => i18n.changeLanguage(nextLang)}
+          onLogout={handleLogout}
           changePasswordLabel={t('pages.me.account.changePassword')}
+          logoutLabel={t('pages.me.account.logout')}
         />
 
         {isAdmin && (

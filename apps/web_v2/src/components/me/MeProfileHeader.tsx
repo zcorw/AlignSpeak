@@ -7,7 +7,9 @@ interface MeProfileHeaderProps {
   currentLang: 'zh' | 'en'
   onOpenPassword: () => void
   onSwitchLanguage: () => void
+  onLogout: () => void
   changePasswordLabel: string
+  logoutLabel: string
 }
 
 export const MeProfileHeader = ({
@@ -17,7 +19,9 @@ export const MeProfileHeader = ({
   currentLang,
   onOpenPassword,
   onSwitchLanguage,
+  onLogout,
   changePasswordLabel,
+  logoutLabel,
 }: MeProfileHeaderProps) => (
   <Box sx={{ display: 'flex', alignItems: 'center', gap: '14px', px: '20px', pt: '20px', pb: '16px', borderBottom: '1px solid', borderColor: 'divider' }}>
     <Box
@@ -110,7 +114,22 @@ export const MeProfileHeader = ({
           EN
         </Box>
       </Box>
+      <Box
+        component="button"
+        type="button"
+        onClick={onLogout}
+        sx={{
+          fontSize: '12px',
+          color: 'text.disabled',
+          border: 'none',
+          bgcolor: 'transparent',
+          cursor: 'pointer',
+          transition: 'color 0.15s',
+          '&:hover': { color: '#f87171' },
+        }}
+      >
+        {logoutLabel}
+      </Box>
     </Box>
   </Box>
 )
-
