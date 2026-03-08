@@ -20,9 +20,152 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_web: ${{ steps.flags.outputs.deploy_web }}
+      deploy_api: ${{ steps.flags.outputs.deploy_api }}
+      deploy_any: ${{ steps.flags.outputs.deploy_any }}
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        if: github.event_name == 'push'
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'apps/web_v2/**'
+            api:
+              - 'apps/api/**'
+            infra:
+              - 'deploy/production/compose.yml'
+              - '.github/workflows/deploy-production.yml'
+
+      - name: Compute deployment flags
+        id: flags
+        shell: bash
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            deploy_web=true
+            deploy_api=true
+          else
+            web_changed="${{ steps.changes.outputs.web || 'false' }}"
+            api_changed="${{ steps.changes.outputs.api || 'false' }}"
+            infra_changed="${{ steps.changes.outputs.infra || 'false' }}"
+
+            if [ "$web_changed" = "true" ] || [ "$infra_changed" = "true" ]; then
+              deploy_web=true
+            else
+              deploy_web=false
+            fi
+
+            if [ "$api_changed" = "true" ] || [ "$infra_changed" = "true" ]; then
+              deploy_api=true
+            else
+              deploy_api=false
+            fi
+          fi
+
+          if [ "$deploy_web" = "true" ] || [ "$deploy_api" = "true" ]; then
+            deploy_any=true
+          else
+            deploy_any=false
+          fi
+
+          echo "deploy_web=$deploy_web" >> "$GITHUB_OUTPUT"
+          echo "deploy_api=$deploy_api" >> "$GITHUB_OUTPUT"
+          echo "deploy_any=$deploy_any" >> "$GITHUB_OUTPUT"
+
+  build-web:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.deploy_web == 'true' && github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute deployment metadata
+        id: meta
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image_tag="${GITHUB_SHA}"
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+          echo "web_image=ghcr.io/$owner/alignspeak-web" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/web_v2
+          file: ./apps/web_v2/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.web_image }}:${{ steps.meta.outputs.image_tag }}
+            ${{ steps.meta.outputs.web_image }}:main
+
+  build-api:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.deploy_api == 'true' && github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute deployment metadata
+        id: meta
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image_tag="${GITHUB_SHA}"
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+          echo "api_image=ghcr.io/$owner/alignspeak-api" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push api image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.api_image }}:${{ steps.meta.outputs.image_tag }}
+            ${{ steps.meta.outputs.api_image }}:main
+
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    needs:
+      - detect-changes
+      - build-web
+      - build-api
+    if: |
+      always() &&
+      needs.detect-changes.outputs.deploy_any == 'true' &&
+      (needs.build-web.result == 'success' || needs.build-web.result == 'skipped') &&
+      (needs.build-api.result == 'success' || needs.build-api.result == 'skipped')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,49 +184,30 @@ jobs:
           echo "web_image=ghcr.io/$owner/alignspeak-web" >> "$GITHUB_OUTPUT"
           echo "api_image=ghcr.io/$owner/alignspeak-api" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Docker Buildx
-        if: github.event_name == 'push'
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push web image
-        if: github.event_name == 'push'
-        uses: docker/build-push-action@v6
-        with:
-          context: ./apps/web_v2
-          file: ./apps/web_v2/Dockerfile
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.web_image }}:${{ steps.meta.outputs.image_tag }}
-            ${{ steps.meta.outputs.web_image }}:main
-
-      - name: Build and push api image
-        if: github.event_name == 'push'
-        uses: docker/build-push-action@v6
-        with:
-          context: ./apps/api
-          file: ./apps/api/Dockerfile
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.api_image }}:${{ steps.meta.outputs.image_tag }}
-            ${{ steps.meta.outputs.api_image }}:main
-
       - name: Prepare deployment bundle
         shell: bash
         run: |
           mkdir -p deploy_bundle
           cp deploy/production/compose.yml deploy_bundle/compose.yml
-          cat > deploy_bundle/images.env <<EOF
-          WEB_IMAGE=${{ steps.meta.outputs.web_image }}:${{ steps.meta.outputs.image_tag }}
-          API_IMAGE=${{ steps.meta.outputs.api_image }}:${{ steps.meta.outputs.image_tag }}
+          cat > deploy_bundle/deploy-flags.env <<EOF
+          DEPLOY_WEB=${{ needs.detect-changes.outputs.deploy_web }}
+          DEPLOY_API=${{ needs.detect-changes.outputs.deploy_api }}
           EOF
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            cat > deploy_bundle/image-updates.env <<EOF
+            WEB_IMAGE=${{ steps.meta.outputs.web_image }}:${{ steps.meta.outputs.image_tag }}
+            API_IMAGE=${{ steps.meta.outputs.api_image }}:${{ steps.meta.outputs.image_tag }}
+            EOF
+          else
+            : > deploy_bundle/image-updates.env
+            if [ "${{ needs.detect-changes.outputs.deploy_web }}" = "true" ]; then
+              echo "WEB_IMAGE=${{ steps.meta.outputs.web_image }}:${{ steps.meta.outputs.image_tag }}" >> deploy_bundle/image-updates.env
+            fi
+            if [ "${{ needs.detect-changes.outputs.deploy_api }}" = "true" ]; then
+              echo "API_IMAGE=${{ steps.meta.outputs.api_image }}:${{ steps.meta.outputs.image_tag }}" >> deploy_bundle/image-updates.env
+            fi
+          fi
 
       - name: Upload deployment bundle
         uses: appleboy/scp-action@v0.1.7
@@ -114,12 +238,16 @@ jobs:
             mkdir -p "$DEPLOY_PATH"/data/postgres "$DEPLOY_PATH"/data/media/tts "$DEPLOY_PATH"/data/media/stt
             cd "$DEPLOY_PATH"
 
-            if [ -f images.env ]; then
-              mv images.env .images.env
+            if [ -f image-updates.env ]; then
+              mv image-updates.env .image-updates.env
+            fi
+            if [ -f deploy-flags.env ]; then
+              mv deploy-flags.env .deploy-flags.env
             fi
 
             test -f .env.production || { echo "Missing .env.production"; exit 1; }
-            test -f .images.env || { echo "Missing .images.env"; exit 1; }
+            test -f .deploy-flags.env || { echo "Missing .deploy-flags.env"; exit 1; }
+            test -f .image-updates.env || { echo "Missing .image-updates.env"; exit 1; }
 
             if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_PAT:-}" ]; then
               echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
@@ -127,25 +255,73 @@ jobs:
 
             set -a
             . ./.env.production
+            . ./.deploy-flags.env
+            set +a
+
+            if [ -f .images.env ]; then
+              set -a
+              . ./.images.env
+              set +a
+            fi
+
+            if [ -s .image-updates.env ]; then
+              set -a
+              . ./.image-updates.env
+              set +a
+            fi
+
+            test -n "${WEB_IMAGE:-}" || { echo "WEB_IMAGE is not set"; exit 1; }
+            test -n "${API_IMAGE:-}" || { echo "API_IMAGE is not set"; exit 1; }
+
+            cat > .images.env <<EOF
+            WEB_IMAGE=${WEB_IMAGE}
+            API_IMAGE=${API_IMAGE}
+            EOF
+
+            set -a
             . ./.images.env
             set +a
 
-            docker compose -f compose.yml pull
-            docker compose -f compose.yml up -d --remove-orphans
-
-            api_container="$(docker compose -f compose.yml ps -q api)"
-            if [ -z "$api_container" ]; then
-              echo "API container was not created"
-              exit 1
+            if [ "$DEPLOY_WEB" = "true" ] && [ "$DEPLOY_API" = "true" ]; then
+              docker compose -f compose.yml pull
+              docker compose -f compose.yml up -d --remove-orphans
+            elif [ "$DEPLOY_WEB" = "true" ]; then
+              docker compose -f compose.yml pull web
+              docker compose -f compose.yml up -d --no-deps web
+            elif [ "$DEPLOY_API" = "true" ]; then
+              docker compose -f compose.yml pull api
+              docker compose -f compose.yml up -d --no-deps api
+            else
+              echo "No deployable service changes detected"
+              exit 0
             fi
 
-            for attempt in $(seq 1 20); do
-              status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$api_container")"
-              if [ "$status" = "healthy" ]; then
-                exit 0
-              fi
-              sleep 3
-            done
+            services_to_check=""
+            if [ "$DEPLOY_WEB" = "true" ]; then
+              services_to_check="$services_to_check web"
+            fi
+            if [ "$DEPLOY_API" = "true" ]; then
+              services_to_check="$services_to_check api"
+            fi
 
-            docker compose -f compose.yml ps
-            exit 1
+            for service in $services_to_check; do
+              container_id="$(docker compose -f compose.yml ps -q "$service")"
+              if [ -z "$container_id" ]; then
+                echo "$service container was not created"
+                docker compose -f compose.yml ps
+                exit 1
+              fi
+
+              for attempt in $(seq 1 20); do
+                status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+                if [ "$status" = "healthy" ] || [ "$status" = "running" ]; then
+                  break
+                fi
+                if [ "$attempt" = "20" ]; then
+                  echo "$service did not become healthy"
+                  docker compose -f compose.yml ps
+                  exit 1
+                fi
+                sleep 3
+              done
+            done

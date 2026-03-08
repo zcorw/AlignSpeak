@@ -5,6 +5,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     display_name: str | None = Field(default=None, min_length=1, max_length=80)
+    invitation_code: str = Field(min_length=4, max_length=32)
 
 
 class RegisterResponse(BaseModel):
@@ -22,6 +23,28 @@ class VerifyEmailRequest(BaseModel):
 class VerifyEmailResponse(BaseModel):
     user_id: str
     message: str
+
+
+class BootstrapAdminRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    display_name: str | None = Field(default=None, min_length=1, max_length=80)
+    bootstrap_key: str = Field(min_length=8, max_length=256)
+
+
+class BootstrapAdminResponse(BaseModel):
+    user_id: str
+    role: str
+    message: str
+
+
+class CreateInvitationCodeResponse(BaseModel):
+    invitation_code_id: str
+    code: str
+    max_uses: int
+    used_count: int
+    remaining_uses: int
+    status: str
 
 
 class LoginRequest(BaseModel):

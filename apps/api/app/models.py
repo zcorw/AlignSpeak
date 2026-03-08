@@ -41,6 +41,31 @@ class EmailVerificationCode(Base):
     )
 
 
+class InvitationCode(Base):
+    __tablename__ = "invitation_codes"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    code: Mapped[str] = mapped_column(String(32), unique=True, nullable=False, index=True)
+    created_by_user_id: Mapped[str | None] = mapped_column(String(32), ForeignKey("users.id"), nullable=True, index=True)
+    max_uses: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    used_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class InvitationCodeUsage(Base):
+    __tablename__ = "invitation_code_usages"
+    __table_args__ = (UniqueConstraint("invitation_code_id", "user_id", name="uq_invitation_code_usages_code_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    invitation_code_id: Mapped[str] = mapped_column(String(32), ForeignKey("invitation_codes.id"), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class Article(Base):
     __tablename__ = "articles"
 

@@ -16,6 +16,7 @@ export const RegisterPage = () => {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [invitationCode, setInvitationCode] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +32,7 @@ export const RegisterPage = () => {
 
     try {
       // Validate form data
-      const validatedData = registerSchema.parse({ email, password, displayName })
+      const validatedData = registerSchema.parse({ email, password, invitationCode, displayName })
       const result = await authService.register({
         ...validatedData,
         displayName: validatedData.displayName?.trim() || undefined,
@@ -103,6 +104,20 @@ export const RegisterPage = () => {
             placeholder={t('pages.register.passwordPlaceholder')}
             autoComplete="new-password"
             error={fieldErrors.password}
+          />
+        </Box>
+
+        <Box>
+          <AuthField
+            label={t('pages.register.invitationCode')}
+            value={invitationCode}
+            onChange={(e) => {
+              setInvitationCode(e.target.value.toUpperCase())
+              setFieldErrors((prev) => ({ ...prev, invitationCode: '' }))
+            }}
+            placeholder={t('pages.register.invitationCodePlaceholder')}
+            autoComplete="off"
+            error={fieldErrors.invitationCode}
           />
         </Box>
 

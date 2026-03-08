@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     jwt_secret: str = "alignspeak-dev-secret-change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_seconds: int = 60 * 60 * 12  # 12h
+    bootstrap_admin_key: str = "change-me-bootstrap-key"
+    invitation_code_length: int = 10
+    invitation_code_max_uses: int = 3
 
     # OCR provider configuration
     ocr_provider: str = "openai"

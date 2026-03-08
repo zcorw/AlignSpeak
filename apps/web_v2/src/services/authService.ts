@@ -31,6 +31,15 @@ interface ChangePasswordApiResponse {
   message: string
 }
 
+interface CreateInvitationCodeApiResponse {
+  invitation_code_id: string
+  code: string
+  max_uses: number
+  used_count: number
+  remaining_uses: number
+  status: string
+}
+
 interface ApiErrorPayload {
   error?: {
     code?: string
@@ -42,6 +51,7 @@ export interface RegisterPayload {
   email: string
   password: string
   displayName?: string
+  invitationCode: string
 }
 
 export interface RegisterResult {
@@ -89,6 +99,15 @@ export interface ChangePasswordResult {
   message: string
 }
 
+export interface CreateInvitationCodeResult {
+  invitationCodeId: string
+  code: string
+  maxUses: number
+  usedCount: number
+  remainingUses: number
+  status: string
+}
+
 export const getApiErrorMessage = (error: unknown, fallback: string): string => {
   if (!axios.isAxiosError(error)) {
     if (error instanceof Error && error.message.trim()) return error.message
@@ -108,6 +127,7 @@ export const authService = {
       email: payload.email,
       password: payload.password,
       display_name: payload.displayName,
+      invitation_code: payload.invitationCode,
     })
 
     return {
@@ -161,6 +181,18 @@ export const authService = {
     })
     return {
       message: response.data.message,
+    }
+  },
+
+  async createInvitationCode(): Promise<CreateInvitationCodeResult> {
+    const response = await api.post<CreateInvitationCodeApiResponse>('/auth/invitation-codes')
+    return {
+      invitationCodeId: response.data.invitation_code_id,
+      code: response.data.code,
+      maxUses: response.data.max_uses,
+      usedCount: response.data.used_count,
+      remainingUses: response.data.remaining_uses,
+      status: response.data.status,
     }
   },
 }

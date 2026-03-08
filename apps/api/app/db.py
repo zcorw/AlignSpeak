@@ -84,3 +84,48 @@ def apply_runtime_schema_fixes() -> None:
                 """
             )
         )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS invitation_codes (
+                    id VARCHAR(32) PRIMARY KEY,
+                    code VARCHAR(32) UNIQUE NOT NULL,
+                    created_by_user_id VARCHAR(32) NULL REFERENCES users(id),
+                    max_uses INTEGER NOT NULL DEFAULT 3,
+                    used_count INTEGER NOT NULL DEFAULT 0,
+                    status VARCHAR(16) NOT NULL DEFAULT 'active',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_invitation_codes_code
+                ON invitation_codes (code)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS invitation_code_usages (
+                    id SERIAL PRIMARY KEY,
+                    invitation_code_id VARCHAR(32) NOT NULL REFERENCES invitation_codes(id),
+                    user_id VARCHAR(32) NOT NULL UNIQUE REFERENCES users(id),
+                    used_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    CONSTRAINT uq_invitation_code_usages_code_user UNIQUE (invitation_code_id, user_id)
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_invitation_code_usages_invitation_code_id
+                ON invitation_code_usages (invitation_code_id)
+                """
+            )
+        )

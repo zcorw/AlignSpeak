@@ -16,10 +16,11 @@
 - `.github/workflows/deploy-production.yml`
   - Trigger: push to `main`
   - Optional trigger: `workflow_dispatch` with an existing image tag for rollback
-  - Build and push `web` and `api` images to GHCR
+  - Detect which application area changed on `main`
+  - Only build and push the changed image to GHCR
+  - Only restart the changed service on the server when the change is limited to `web` or `api`
   - Upload the compose bundle to the server
-  - Run `docker compose pull && docker compose up -d --remove-orphans`
-  - Poll the API container health status before marking the deployment successful
+  - Poll the updated container health status before marking the deployment successful
 
 ## Server layout
 

@@ -5,10 +5,12 @@ import { useNavigate } from 'react-router-dom'
 import { ChangePasswordSheet } from '../components/me/ChangePasswordSheet'
 import { MeArticleList } from '../components/me/MeArticleList'
 import { MeFilterTabs } from '../components/me/MeFilterTabs'
+import { MeInviteEntry } from '../components/me/MeInviteEntry'
 import { MeProfileHeader } from '../components/me/MeProfileHeader'
 import { MeTopBar } from '../components/me/MeTopBar'
 import type { MeFilterType } from '../components/me/types'
 import { useChangePassword } from '../hooks/me/useChangePassword'
+import { authService, getApiErrorMessage } from '../services/authService'
 import { useMeOverview } from '../hooks/me/useMeOverview'
 import { useAuthStore } from '../stores/authStore'
 
@@ -44,6 +46,9 @@ export const MePage = () => {
     setActiveArticleId,
   } = useMeOverview(filter)
   const password = useChangePassword()
+  const [inviteGenerating, setInviteGenerating] = useState(false)
+  const [latestInvitationCode, setLatestInvitationCode] = useState<string | null>(null)
+  const [inviteFeedback, setInviteFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
 
   const filters = [
     { id: 'all' as const, label: t('pages.me.filters.all') },
@@ -55,6 +60,46 @@ export const MePage = () => {
   const avatarText = displayName.trim().charAt(0).toUpperCase() || 'U'
   const currentLang = i18n.resolvedLanguage?.startsWith('zh') ? 'zh' : 'en'
   const nextLang = currentLang === 'zh' ? 'en' : 'zh'
+  const isAdmin = user?.role === 'admin'
+
+  const handleGenerateInvitationCode = async () => {
+    if (inviteGenerating) return
+    setInviteFeedback(null)
+
+    try {
+      setInviteGenerating(true)
+      const result = await authService.createInvitationCode()
+      setLatestInvitationCode(result.code)
+      setInviteFeedback({
+        type: 'success',
+        message: t('pages.me.invitation.generatedSuccess', { code: result.code }),
+      })
+    } catch (error) {
+      setInviteFeedback({
+        type: 'error',
+        message: getApiErrorMessage(error, t('common.error')),
+      })
+    } finally {
+      setInviteGenerating(false)
+    }
+  }
+
+  const handleCopyInvitationCode = async () => {
+    if (!latestInvitationCode) return
+
+    try {
+      await navigator.clipboard.writeText(latestInvitationCode)
+      setInviteFeedback({
+        type: 'info',
+        message: t('pages.me.invitation.copied'),
+      })
+    } catch {
+      setInviteFeedback({
+        type: 'error',
+        message: t('pages.me.invitation.copyFailed'),
+      })
+    }
+  }
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -75,6 +120,23 @@ export const MePage = () => {
           onSwitchLanguage={() => i18n.changeLanguage(nextLang)}
           changePasswordLabel={t('pages.me.account.changePassword')}
         />
+
+        {isAdmin && (
+          <MeInviteEntry
+            title={t('pages.me.invitation.title')}
+            description={t('pages.me.invitation.description')}
+            generateLabel={t('pages.me.invitation.generate')}
+            generatingLabel={t('pages.me.invitation.generating')}
+            copyLabel={t('pages.me.invitation.copy')}
+            generatedCodeLabel={t('pages.me.invitation.generatedCode')}
+            usageHint={t('pages.me.invitation.usageHint')}
+            isGenerating={inviteGenerating}
+            latestCode={latestInvitationCode}
+            feedback={inviteFeedback}
+            onGenerate={() => { void handleGenerateInvitationCode() }}
+            onCopy={() => { void handleCopyInvitationCode() }}
+          />
+        )}
 
         <MeFilterTabs
           filter={filter}

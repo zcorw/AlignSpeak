@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -19,10 +19,13 @@ from app.core.security import (
 )
 from app.db import get_db
 from app.deps import get_current_user
-from app.models import EmailVerificationCode, User
+from app.models import EmailVerificationCode, InvitationCode, InvitationCodeUsage, User
 from app.schemas.auth import (
+    BootstrapAdminRequest,
+    BootstrapAdminResponse,
     ChangePasswordRequest,
     ChangePasswordResponse,
+    CreateInvitationCodeResponse,
     LoginRequest,
     LoginResponse,
     MeResponse,
@@ -36,6 +39,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 VERIFICATION_CODE_TTL_SECONDS = 15 * 60
 VERIFICATION_CODE_LENGTH = 6
+INVITATION_CODE_ALPHABET = string.ascii_uppercase + string.digits
 
 
 def _get_client_ip(request: Request) -> str:
@@ -117,8 +121,159 @@ def _dev_verification_code(code: str) -> str | None:
     return code
 
 
+def _count_users(db: Session) -> int:
+    return int(db.scalar(select(func.count(User.id))) or 0)
+
+
+def _new_invitation_code(db: Session) -> str:
+    for _ in range(8):
+        body = "".join(secrets.choice(INVITATION_CODE_ALPHABET) for _ in range(settings.invitation_code_length))
+        code = f"INV-{body}"
+        exists = db.scalar(select(InvitationCode.id).where(InvitationCode.code == code))
+        if exists is None:
+            return code
+    raise AppError(
+        code="INVITATION_CODE_GENERATION_FAILED",
+        message="Failed to generate invitation code. Please try again.",
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
+def _assert_admin(user: User) -> None:
+    if user.role != "admin":
+        raise AppError(
+            code="FORBIDDEN",
+            message="Admin permission is required.",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
+def _get_invitation_code_for_update(db: Session, raw_code: str) -> InvitationCode:
+    normalized = raw_code.strip().upper()
+    if not normalized:
+        raise AppError(
+            code="AUTH_INVITATION_REQUIRED",
+            message="Invitation code is required.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    invitation = db.scalar(
+        select(InvitationCode)
+        .where(InvitationCode.code == normalized)
+        .with_for_update()
+    )
+    if invitation is None or invitation.status != "active":
+        raise AppError(
+            code="AUTH_INVITATION_INVALID",
+            message="Invitation code is invalid.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    if invitation.used_count >= invitation.max_uses:
+        raise AppError(
+            code="AUTH_INVITATION_EXHAUSTED",
+            message="Invitation code has reached its usage limit.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    return invitation
+
+
+def _get_usage_by_user_id(db: Session, user_id: str) -> InvitationCodeUsage | None:
+    return db.scalar(select(InvitationCodeUsage).where(InvitationCodeUsage.user_id == user_id))
+
+
+@router.post("/bootstrap-admin", response_model=BootstrapAdminResponse, status_code=status.HTTP_201_CREATED)
+def bootstrap_admin(payload: BootstrapAdminRequest, request: Request, db: Session = Depends(get_db)) -> BootstrapAdminResponse:
+    if _count_users(db) > 0:
+        raise AppError(
+            code="AUTH_BOOTSTRAP_CLOSED",
+            message="Bootstrap is already completed.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    configured_key = settings.bootstrap_admin_key.strip()
+    if not configured_key:
+        raise AppError(
+            code="AUTH_BOOTSTRAP_DISABLED",
+            message="Bootstrap admin key is not configured.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+    if not secrets.compare_digest(payload.bootstrap_key, configured_key):
+        raise AppError(
+            code="FORBIDDEN",
+            message="Invalid bootstrap key.",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    normalized_email = normalize_email(payload.email)
+    _check_dual_rate_limit(request=request, email=normalized_email, scope="register")
+    validate_password_strength(payload.password)
+    existing = db.scalar(select(User).where(User.email == normalized_email))
+    if existing is not None:
+        raise AppError(
+            code="AUTH_EMAIL_ALREADY_EXISTS",
+            message="Email already registered.",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+
+    now = datetime.now(tz=timezone.utc)
+    user = User(
+        id=f"usr_{uuid4().hex[:12]}",
+        email=normalized_email,
+        password_hash=hash_password(payload.password),
+        display_name=(payload.display_name or normalized_email.split("@")[0][:20]).strip(),
+        role="admin",
+        status="active",
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(user)
+    db.commit()
+
+    return BootstrapAdminResponse(
+        user_id=user.id,
+        role=user.role,
+        message="Bootstrap admin created successfully.",
+    )
+
+
+@router.post("/invitation-codes", response_model=CreateInvitationCodeResponse, status_code=status.HTTP_201_CREATED)
+def create_invitation_code(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CreateInvitationCodeResponse:
+    _assert_admin(current_user)
+    now = datetime.now(tz=timezone.utc)
+    invitation = InvitationCode(
+        id=f"inv_{uuid4().hex[:12]}",
+        code=_new_invitation_code(db),
+        created_by_user_id=current_user.id,
+        max_uses=settings.invitation_code_max_uses,
+        used_count=0,
+        status="active",
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(invitation)
+    db.commit()
+    db.refresh(invitation)
+    remaining = max(invitation.max_uses - invitation.used_count, 0)
+    return CreateInvitationCodeResponse(
+        invitation_code_id=invitation.id,
+        code=invitation.code,
+        max_uses=invitation.max_uses,
+        used_count=invitation.used_count,
+        remaining_uses=remaining,
+        status=invitation.status,
+    )
+
+
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)) -> RegisterResponse:
+    if _count_users(db) == 0:
+        raise AppError(
+            code="AUTH_BOOTSTRAP_REQUIRED",
+            message="No users found. Please bootstrap admin first.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
     normalized_email = normalize_email(payload.email)
     _check_dual_rate_limit(request=request, email=normalized_email, scope="register")
     validate_password_strength(payload.password)
@@ -132,6 +287,12 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
             message="Email already registered. Please sign in.",
             verification_required=False,
             verification_code=None,
+        )
+    if existing is not None and existing.status == "disabled":
+        raise AppError(
+            code="FORBIDDEN",
+            message="Account is disabled.",
+            status_code=status.HTTP_403_FORBIDDEN,
         )
 
     if existing is None:
@@ -152,6 +313,20 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
         user.display_name = (payload.display_name or normalized_email.split("@")[0][:20]).strip()
         user.status = "pending"
         user.updated_at = now
+
+    usage = _get_usage_by_user_id(db=db, user_id=user.id)
+    if usage is None:
+        invitation = _get_invitation_code_for_update(db=db, raw_code=payload.invitation_code)
+        invitation.used_count += 1
+        invitation.updated_at = now
+        db.add(invitation)
+        db.add(
+            InvitationCodeUsage(
+                invitation_code_id=invitation.id,
+                user_id=user.id,
+                used_at=now,
+            )
+        )
 
     code = _new_verification_code()
     _upsert_verification_code(db=db, email=normalized_email, user_id=user.id, code=code)
