@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { PracticeLevel } from '../../services/practiceService'
 
@@ -11,19 +11,21 @@ export const parseLevelFromQuery = (value: string | null): PracticeLevel | null 
 }
 
 export const usePracticeRouteState = () => {
-  const [searchParams] = useSearchParams()
-  const [level, setLevel] = useState<PracticeLevel>(parseLevelFromQuery(searchParams.get('lv')) ?? 'L1')
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const searchKey = searchParams.toString()
   const queryArticleId = searchParams.get('a') ?? searchParams.get('articleId')
   const querySegment = Number.parseInt(searchParams.get('seg') ?? '', 10)
   const queryLevel = parseLevelFromQuery(searchParams.get('lv'))
-
-  useEffect(() => {
-    if (queryLevel) {
-      setLevel(queryLevel)
-    }
-  }, [queryLevel])
+  const level = queryLevel ?? 'L1'
+  const setLevel = useCallback(
+    (nextLevel: PracticeLevel) => {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.set('lv', nextLevel)
+      setSearchParams(nextParams, { replace: true })
+    },
+    [searchParams, setSearchParams]
+  )
 
   return {
     level,
@@ -34,4 +36,3 @@ export const usePracticeRouteState = () => {
     queryLevel,
   }
 }
-

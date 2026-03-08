@@ -22,16 +22,24 @@ import { usePracticeRecording } from '../hooks/practice/usePracticeRecording'
 import { usePracticeRouteState } from '../hooks/practice/usePracticeRouteState'
 
 type Level = PracticeLevel
+type SegmentResultState = {
+  segmentKey: string | null
+  alignmentResult: AlignmentResult | null
+  showScore: boolean
+}
 
 const formatTimer = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`
 
 export const PracticePage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [showScore, setShowScore] = useState(false)
   const [showFullMode, setShowFullMode] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [alignmentResult, setAlignmentResult] = useState<AlignmentResult | null>(null)
+  const [segmentResultState, setSegmentResultState] = useState<SegmentResultState>({
+    segmentKey: null,
+    alignmentResult: null,
+    showScore: false,
+  })
   const [progressRefreshVersion, setProgressRefreshVersion] = useState(0)
   const { level, setLevel, queryArticleId, querySegment, searchKey } = usePracticeRouteState()
   const {
@@ -55,6 +63,10 @@ export const PracticePage = () => {
     progressRefreshVersion,
     errorMessage: t('common.error'),
   })
+  const activeSegmentKey = `${articleId ?? queryArticleId ?? 'unknown'}:${segmentIndex}`
+  const alignmentResult =
+    segmentResultState.segmentKey === activeSegmentKey ? segmentResultState.alignmentResult : null
+  const showScore = segmentResultState.segmentKey === activeSegmentKey && segmentResultState.showScore
 
   const alertFn = (globalThis as { alert?: (message?: string) => void }).alert
   const { isSpeaking, ttsLoading, speakSegment, stopSpeaking } = usePracticeAudio({
@@ -63,15 +75,21 @@ export const PracticePage = () => {
   })
 
   const handleBeforeStart = useCallback(() => {
-    setShowScore(false)
-    setAlignmentResult(null)
-  }, [])
+    setSegmentResultState({
+      segmentKey: activeSegmentKey,
+      alignmentResult: null,
+      showScore: false,
+    })
+  }, [activeSegmentKey])
 
   const handleAligned = useCallback((result: AlignmentResult) => {
-    setAlignmentResult(result)
-    setShowScore(true)
+    setSegmentResultState({
+      segmentKey: activeSegmentKey,
+      alignmentResult: result,
+      showScore: true,
+    })
     setProgressRefreshVersion((prev) => prev + 1)
-  }, [])
+  }, [activeSegmentKey])
 
   const segmentText = currentSegment?.plainText ?? ''
   const defaultTokenTotal = Math.max(currentSegment?.tokenCount ?? 1, 1)
@@ -146,8 +164,6 @@ export const PracticePage = () => {
 
   useEffect(() => {
     stopSpeaking()
-    setShowScore(false)
-    setAlignmentResult(null)
     clearFeedback()
   }, [clearFeedback, segmentIndex, stopSpeaking])
 
@@ -257,8 +273,11 @@ export const PracticePage = () => {
             missedCount={missedCount}
             displayTokens={displayTokens}
             onPracticeAgain={() => {
-              setShowScore(false)
-              setAlignmentResult(null)
+              setSegmentResultState({
+                segmentKey: activeSegmentKey,
+                alignmentResult: null,
+                showScore: false,
+              })
             }}
             onSubmitView={() => {
               if (!articleId) {
@@ -277,7 +296,13 @@ export const PracticePage = () => {
               navigate(`/result?${params.toString()}`)
             }}
             onSkipSegment={() => {
-              if (window.confirm(t('pages.practice.confirm.skipSegment'))) setShowScore(false)
+              if (window.confirm(t('pages.practice.confirm.skipSegment'))) {
+                setSegmentResultState({
+                  segmentKey: activeSegmentKey,
+                  alignmentResult: null,
+                  showScore: false,
+                })
+              }
             }}
             labels={{
               passed: t('pages.practice.score.passed'),
