@@ -1,12 +1,14 @@
 import { Box } from '@mui/material'
 import { Fragment } from 'react'
 import type { PracticeReadingToken } from '../../services/practiceService'
+import { buildMaskPlaceholder } from './masking'
 
 interface PracticeFuriganaTextProps {
   tokens: PracticeReadingToken[]
   fallbackText: string
   editable: boolean
   activeTokenIndex: number | null
+  maskedTokenIndices?: ReadonlySet<number>
   onSelectToken?: (tokenIndex: number) => void
 }
 
@@ -18,6 +20,7 @@ export const PracticeFuriganaText = ({
   fallbackText,
   editable,
   activeTokenIndex,
+  maskedTokenIndices,
   onSelectToken,
 }: PracticeFuriganaTextProps) => {
   if (!tokens.length) return <>{fallbackText || '...'}</>
@@ -26,14 +29,32 @@ export const PracticeFuriganaText = ({
     <>
       {tokens.map((token, index) => {
         const tokenIndex = typeof token.tokenIndex === 'number' ? token.tokenIndex : index
-        const content = hasReading(token) ? (
-          <ruby>
-            {token.surface}
-            <rt>{token.yomi}</rt>
-          </ruby>
-        ) : (
-          token.surface
-        )
+        const masked = Boolean(maskedTokenIndices?.has(tokenIndex))
+        const content = masked
+          ? (
+            <Box
+              component="span"
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                px: '4px',
+                borderRadius: '4px',
+                bgcolor: 'rgba(110,96,238,0.18)',
+                color: 'rgba(255,255,255,0.88)',
+                lineHeight: 1.4,
+              }}
+            >
+              {buildMaskPlaceholder(token.surface)}
+            </Box>
+            )
+          : hasReading(token)
+            ? (
+              <ruby>
+                {token.surface}
+                <rt>{token.yomi}</rt>
+              </ruby>
+              )
+            : token.surface
         if (!editable || !token.editable) {
           return <Fragment key={`${token.surface}-${tokenIndex}-${index}`}>{content}</Fragment>
         }
@@ -65,4 +86,3 @@ export const PracticeFuriganaText = ({
     </>
   )
 }
-

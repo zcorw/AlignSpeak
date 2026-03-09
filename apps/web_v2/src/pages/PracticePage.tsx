@@ -7,6 +7,7 @@ import { PracticeFullModePanel } from '../components/practice/PracticeFullModePa
 import { PracticeFuriganaEditEntry } from '../components/practice/PracticeFuriganaEditEntry'
 import { PracticeFuriganaEditorBar } from '../components/practice/PracticeFuriganaEditorBar'
 import { PracticeFuriganaText } from '../components/practice/PracticeFuriganaText'
+import { PracticeMaskedPlainText } from '../components/practice/PracticeMaskedPlainText'
 import { PracticeMetaBar } from '../components/practice/PracticeMetaBar'
 import { PracticeProgressDrawer } from '../components/practice/PracticeProgressDrawer'
 import { PracticeRecordEntry } from '../components/practice/PracticeRecordEntry'
@@ -25,6 +26,7 @@ import { usePracticeFuriganaEditor } from '../hooks/practice/usePracticeFurigana
 import { usePracticeFuriganaSync } from '../hooks/practice/usePracticeFuriganaSync'
 import { usePracticeRecording } from '../hooks/practice/usePracticeRecording'
 import { usePracticeRouteState } from '../hooks/practice/usePracticeRouteState'
+import { computeMaskedReadingTokenIndices } from '../components/practice/masking'
 
 type Level = PracticeLevel
 type SegmentResultState = {
@@ -189,18 +191,6 @@ export const PracticePage = () => {
     onAligned: handleAligned,
   })
 
-  const recordingSegmentText = useMemo<ReactNode>(() => {
-    if (articleLanguage !== 'ja') return segmentText
-    return (
-      <PracticeFuriganaText
-        tokens={readingTokens}
-        fallbackText={segmentText}
-        editable={false}
-        activeTokenIndex={null}
-      />
-    )
-  }, [articleLanguage, readingTokens, segmentText])
-
   const handleSpeakSegment = useCallback(() => {
     void speakSegment({
       canPractice,
@@ -211,6 +201,42 @@ export const PracticePage = () => {
 
   const furiganaEditableUIVisible =
     canEditFurigana && !recordOverlayOpen && !recognizing && !showScore && !loading && !loadError
+  const isMaskingPhase = recordOverlayOpen || recognizing
+  const maskingDisabled = !isMaskingPhase || (isEditMode && furiganaEditableUIVisible)
+
+  const maskedReadingTokenIndices = useMemo(() => {
+    if (articleLanguage !== 'ja') return new Set<number>()
+    if (!currentSegment || maskingDisabled) return new Set<number>()
+    return computeMaskedReadingTokenIndices(currentSegment.id, level, readingTokens)
+  }, [articleLanguage, currentSegment, level, maskingDisabled, readingTokens])
+
+  const recordingMaskedReadingTokenIndices = useMemo(() => {
+    if (articleLanguage !== 'ja') return new Set<number>()
+    if (!currentSegment) return new Set<number>()
+    return computeMaskedReadingTokenIndices(currentSegment.id, level, readingTokens)
+  }, [articleLanguage, currentSegment, level, readingTokens])
+
+  const recordingSegmentText = useMemo<ReactNode>(() => {
+    if (articleLanguage === 'ja') {
+      return (
+        <PracticeFuriganaText
+          tokens={readingTokens}
+          fallbackText={segmentText}
+          editable={false}
+          activeTokenIndex={null}
+          maskedTokenIndices={recordingMaskedReadingTokenIndices}
+        />
+      )
+    }
+    return (
+      <PracticeMaskedPlainText
+        text={segmentText}
+        language={articleLanguage}
+        level={level}
+        segmentId={currentSegment?.id ?? 'seg_unknown'}
+      />
+    )
+  }, [articleLanguage, currentSegment, level, readingTokens, recordingMaskedReadingTokenIndices, segmentText])
 
   const segmentContent = articleLanguage === 'ja' ? (
     <PracticeFuriganaText
@@ -218,10 +244,17 @@ export const PracticePage = () => {
       fallbackText={segmentText}
       editable={isEditMode && furiganaEditableUIVisible}
       activeTokenIndex={activeTokenIndex}
+      maskedTokenIndices={maskedReadingTokenIndices}
       onSelectToken={selectToken}
     />
   ) : (
-    segmentText
+    <PracticeMaskedPlainText
+      text={segmentText}
+      language={articleLanguage}
+      level={level}
+      segmentId={currentSegment?.id ?? 'seg_unknown'}
+      maskingDisabled={maskingDisabled}
+    />
   )
 
   useEffect(() => {

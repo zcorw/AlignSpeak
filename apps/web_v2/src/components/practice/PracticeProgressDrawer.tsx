@@ -1,9 +1,10 @@
 import { CloseRounded, GridViewRounded } from '@mui/icons-material'
-import { Box, Button, Typography } from '@mui/material'
+import { Box, Typography } from '@mui/material'
 import type { PracticeLevel } from '../../services/practiceService'
+import { PracticeLevelSelector } from './PracticeLevelSelector'
 import { PracticeProgressMatrix } from './PracticeProgressMatrix'
 import { PracticeSegmentSelector } from './PracticeSegmentSelector'
-import { PRACTICE_LEVELS, iconButtonSx, type PracticeMatrix } from './shared'
+import { iconButtonSx, type PracticeMatrix } from './shared'
 
 interface PracticeProgressDrawerProps {
   open: boolean
@@ -91,24 +92,7 @@ export const PracticeProgressDrawer = ({
           <Typography sx={{ mb: '8px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'text.disabled' }}>
             {switchLevelLabel}
           </Typography>
-          <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {PRACTICE_LEVELS.map((item) => (
-              <Button
-                key={item}
-                size="small"
-                variant="outlined"
-                onClick={() => onSwitchLevel(item)}
-                sx={{
-                  minWidth: '42px',
-                  borderColor: item === level ? 'rgba(110,96,238,0.3)' : 'rgba(255,255,255,0.07)',
-                  bgcolor: item === level ? 'rgba(110,96,238,0.25)' : 'transparent',
-                  color: item === level ? 'primary.light' : 'text.secondary',
-                }}
-              >
-                {item}
-              </Button>
-            ))}
-          </Box>
+          <PracticeLevelSelector level={level} disabled={loading} onSwitchLevel={onSwitchLevel} />
           <Typography sx={{ mt: '8px', fontSize: '12px', color: 'text.disabled' }}>
             {switchLevelHint}
           </Typography>
