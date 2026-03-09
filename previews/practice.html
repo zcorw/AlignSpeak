@@ -33,6 +33,17 @@
       gap: 8px;
       flex-wrap: wrap;
     }
+    .demo-jp-btn {
+      border: 1px dashed var(--border-2);
+      background: transparent;
+      color: var(--text-3);
+      border-radius: var(--r-full);
+      padding: 4px 10px;
+      font-size: 11px;
+      width: fit-content;
+      cursor: pointer;
+    }
+    .demo-jp-btn:hover { color: var(--text-2); border-color: var(--border); }
     /* Segment text card */
     .segment-card {
       background: var(--card);
@@ -55,6 +66,125 @@
       color: var(--text);
     }
     .segment-text.zh { font-size: 18px; }
+    .segment-text ruby,
+    .rec-segment-text ruby {
+      ruby-position: over;
+    }
+    .segment-text rt,
+    .rec-segment-text rt {
+      font-size: 0.55em;
+      color: var(--text-3);
+      letter-spacing: 0;
+    }
+    .segment-text.editing .furigana-token.editable {
+      display: inline-block;
+      padding: 1px 3px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .segment-text.editing .furigana-token.editable:hover {
+      border-color: rgba(110,96,238,0.45);
+      background: rgba(110,96,238,0.12);
+    }
+    .segment-text.editing .furigana-token.editable.active {
+      border-color: rgba(110,96,238,0.75);
+      background: rgba(110,96,238,0.2);
+    }
+    .furigana-inline-tools {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .furigana-inline-btn {
+      border: 1px solid var(--border-2);
+      background: transparent;
+      color: var(--text-2);
+      border-radius: var(--r-full);
+      padding: 5px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .furigana-inline-btn.active {
+      border-color: rgba(110,96,238,0.45);
+      background: rgba(110,96,238,0.16);
+      color: var(--accent-2);
+    }
+    .furigana-inline-tip {
+      font-size: 11px;
+      color: var(--text-3);
+    }
+    .furigana-edit-panel {
+      display: none;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border);
+      background: var(--card-2);
+      gap: 8px;
+      flex-direction: column;
+    }
+    .furigana-edit-empty {
+      font-size: 12px;
+      color: var(--text-3);
+    }
+    .furigana-edit-content {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .furigana-edit-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .furigana-edit-token {
+      font-size: 13px;
+      color: var(--text);
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+    }
+    .furigana-edit-reset {
+      border: none;
+      background: transparent;
+      color: var(--text-3);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+    }
+    .furigana-edit-reset:hover { color: var(--text-2); }
+    .furigana-edit-input {
+      width: 100%;
+      min-height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border-2);
+      background: var(--card);
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+    }
+    .furigana-edit-input:focus { border-color: var(--accent); }
+    .furigana-edit-nav {
+      display: flex;
+      gap: 8px;
+    }
+    .furigana-nav-btn {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-2);
+      border-radius: var(--r-full);
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .furigana-nav-btn:hover { color: var(--text); border-color: var(--border-2); }
     /* Threshold */
     .threshold-bar {
       display: flex;
@@ -212,7 +342,6 @@
       gap: 6px;
     }
     .skip-btn:hover { color: var(--text-2); }
-
     /* Recording overlay */
     .rec-overlay {
       position: fixed;
@@ -321,8 +450,8 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
       </a>
       <div style="flex:1;display:flex;flex-direction:column;gap:1px;">
-        <span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">The Little Prince — Ch.I</span>
-        <span style="font-size:11px;color:var(--text-2);">英语</span>
+        <span id="top-article-title" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">The Little Prince — Ch.I</span>
+        <span id="top-article-lang" style="font-size:11px;color:var(--text-2);">英语</span>
       </div>
       <button class="icon-btn" onclick="openProgress()" title="进度">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -345,16 +474,35 @@
       <div class="article-info">
         <div class="practice-meta">
           <span class="badge badge-accent">L2</span>
-          <span style="font-size:13px;color:var(--text-2);">段落 3 / 5</span>
+          <span id="meta-segment" style="font-size:13px;color:var(--text-2);">段落 3 / 5</span>
           <span style="font-size:12px;color:var(--text-3);">目标 ≥85%</span>
         </div>
+        <button class="demo-jp-btn" type="button" onclick="loadJapaneseDemo()">载入日文示例</button>
       </div>
 
       <!-- Segment text -->
       <div class="segment-card">
-        <div class="segment-num">§3 跟读段落</div>
+        <div class="segment-num" id="segment-label">§3 跟读段落</div>
         <div class="segment-text" id="seg-text">
           After that I used to think a lot about jungle adventures, and eventually managed to make my first drawing with colored pencils.
+        </div>
+        <div class="furigana-inline-tools" id="furigana-inline-tools">
+          <button class="furigana-inline-btn" id="furigana-edit-toggle" type="button" onclick="toggleFuriganaEditMode()">注音校对</button>
+          <span class="furigana-inline-tip" id="furigana-inline-tip">录音前可点击词语修改注音</span>
+        </div>
+        <div class="furigana-edit-panel" id="furigana-edit-panel">
+          <div class="furigana-edit-empty" id="furigana-edit-empty">已进入校对模式，点击上方词语即可修改注音。</div>
+          <div class="furigana-edit-content" id="furigana-edit-content">
+            <div class="furigana-edit-head">
+              <span class="furigana-edit-token" id="furigana-edit-token">词语</span>
+              <button class="furigana-edit-reset" type="button" onclick="resetActiveFurigana()">恢复默认</button>
+            </div>
+            <input class="furigana-edit-input" id="furigana-edit-input" type="text" placeholder="输入读音（平假名）" oninput="onFuriganaInputChange(this.value)">
+            <div class="furigana-edit-nav">
+              <button class="furigana-nav-btn" type="button" onclick="focusPrevFuriganaToken()">上一个</button>
+              <button class="furigana-nav-btn" type="button" onclick="focusNextFuriganaToken()">下一个</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -448,8 +596,8 @@
       <span id="rec-timer" style="font-size:14px;font-weight:600;font-family:monospace;color:var(--text-2);">0:00</span>
     </div>
     <div class="rec-body">
-      <div class="rec-segment-label">§3 · 跟读段落</div>
-      <div class="rec-segment-text">
+      <div class="rec-segment-label" id="rec-segment-label">§3 · 跟读段落</div>
+      <div class="rec-segment-text" id="rec-segment-text">
         After that I used to think a lot about jungle adventures, and eventually managed to make my first drawing with colored pencils.
       </div>
       <div class="rec-waveform">
@@ -499,10 +647,277 @@
       L4: ['fail','fail','fail','fail','fail'],
     };
     const TRENDS = [62, 70, 75, 78]; // recent scores for seg3
+    const JP_YOMI_DICT = {
+      時代: 'じだい',
+      圧倒的: 'あっとうてき',
+      増え: 'ふえ',
+      各社: 'かくしゃ',
+      養成所: 'ようせいじょ',
+      基本的: 'きほんてき',
+      知識: 'ちしき',
+      身: 'み',
+      競争: 'きょうそう',
+      厳しい: 'きびしい',
+      必死: 'ひっし'
+    };
+    const JP_DEMO_TEXT = `今は、僕らの頃の時代とちがいます。なり手が圧倒的に増えています。
+
+また、各社の養成所の数もしっかりしてきたので、仕事をするうえでの基本的な知識はほとんどの人が身につけています。
+
+だから競争が厳しい。少しでもふるい落とそうと必死です。`;
 
     let recTimer = null;
     let recSeconds = 0;
     let isFullMode = false;
+    let currentSegmentIndex = 0;
+    let currentArticleLang = 'en';
+    let currentSegments = [];
+    let currentSegmentTokens = [];
+    let currentEditableTokenIndices = [];
+    let furiganaEditMap = {};
+    let isFuriganaEditMode = false;
+    let activeFuriganaTokenIndex = null;
+
+    function escapeHtml(text) {
+      return text.replace(/[&<>"']/g, (m) => (
+        m === '&' ? '&amp;' :
+        m === '<' ? '&lt;' :
+        m === '>' ? '&gt;' :
+        m === '"' ? '&quot;' : '&#39;'
+      ));
+    }
+
+    function isKana(token) {
+      return /^[\u3040-\u30ffー]+$/.test(token);
+    }
+
+    function isPunctuation(token) {
+      return /^[\s、。！？,.!?「」『』（）()・…]+$/.test(token);
+    }
+
+    function tokenizeJapaneseSegment(segment) {
+      return segment.match(/[\u4e00-\u9fff々]+|[\u3040-\u30ffー]+|[A-Za-z0-9]+|[^\s]/g) || [];
+    }
+
+    function loadFuriganaEditMap() {
+      try {
+        furiganaEditMap = JSON.parse(sessionStorage.getItem('furigana_edits_preview') || '{}');
+      } catch (_) {
+        furiganaEditMap = {};
+      }
+    }
+
+    function saveFuriganaEditMap() {
+      sessionStorage.setItem('furigana_edits_preview', JSON.stringify(furiganaEditMap));
+    }
+
+    function isJapaneseArticle() {
+      return currentArticleLang === 'jp';
+    }
+
+    function getFuriganaValue(token, segmentIndex, tokenIndex) {
+      const key = `${segmentIndex}:${tokenIndex}`;
+      if (Object.prototype.hasOwnProperty.call(furiganaEditMap, key)) {
+        return (furiganaEditMap[key] || '').trim();
+      }
+      if (isPunctuation(token)) return '';
+      if (isKana(token)) return token;
+      return JP_YOMI_DICT[token] || '';
+    }
+
+    function renderTokenWithFurigana(token, tokenIndex, editable) {
+      const safeToken = escapeHtml(token);
+      if (isPunctuation(token)) return safeToken;
+      const yomi = getFuriganaValue(token, currentSegmentIndex, tokenIndex);
+      const ruby = (!yomi || yomi === token)
+        ? safeToken
+        : `<ruby>${safeToken}<rt>${escapeHtml(yomi)}</rt></ruby>`;
+      if (!editable) return ruby;
+      const active = tokenIndex === activeFuriganaTokenIndex ? ' active' : '';
+      return `<span class="furigana-token editable${active}" data-token-index="${tokenIndex}">${ruby}</span>`;
+    }
+
+    function renderCurrentSegment() {
+      const segTextEl = document.getElementById('seg-text');
+      const recTextEl = document.getElementById('rec-segment-text');
+      const currentSeg = currentSegments[currentSegmentIndex] || '';
+
+      if (!isJapaneseArticle()) {
+        segTextEl.classList.remove('editing');
+        segTextEl.textContent = currentSeg;
+        recTextEl.textContent = currentSeg;
+        return;
+      }
+
+      currentSegmentTokens = tokenizeJapaneseSegment(currentSeg);
+      currentEditableTokenIndices = currentSegmentTokens
+        .map((token, idx) => ({ token, idx }))
+        .filter(({ token }) => !isPunctuation(token))
+        .map(({ idx }) => idx);
+
+      const segHtml = currentSegmentTokens
+        .map((token, tokenIndex) => renderTokenWithFurigana(token, tokenIndex, isFuriganaEditMode))
+        .join('');
+      const recHtml = currentSegmentTokens
+        .map((token, tokenIndex) => renderTokenWithFurigana(token, tokenIndex, false))
+        .join('');
+
+      segTextEl.classList.toggle('editing', isFuriganaEditMode);
+      segTextEl.innerHTML = segHtml;
+      recTextEl.innerHTML = recHtml;
+    }
+
+    function updateFuriganaControls() {
+      const toolsEl = document.getElementById('furigana-inline-tools');
+      const panelEl = document.getElementById('furigana-edit-panel');
+      const toggleEl = document.getElementById('furigana-edit-toggle');
+      const tipEl = document.getElementById('furigana-inline-tip');
+      const canShow = isJapaneseArticle()
+        && document.getElementById('record-area').style.display !== 'none'
+        && !document.getElementById('rec-overlay').classList.contains('open');
+
+      toolsEl.style.display = canShow ? 'flex' : 'none';
+      if (!canShow) {
+        panelEl.style.display = 'none';
+        return;
+      }
+
+      toggleEl.classList.toggle('active', isFuriganaEditMode);
+      toggleEl.textContent = isFuriganaEditMode ? '完成校对' : '注音校对';
+      tipEl.textContent = isFuriganaEditMode ? '点击词语修改注音，完成后再录音' : '录音前可点击词语修改注音';
+      panelEl.style.display = isFuriganaEditMode ? 'flex' : 'none';
+    }
+
+    function updateFuriganaEditPanel() {
+      const emptyEl = document.getElementById('furigana-edit-empty');
+      const contentEl = document.getElementById('furigana-edit-content');
+      const tokenEl = document.getElementById('furigana-edit-token');
+      const inputEl = document.getElementById('furigana-edit-input');
+
+      if (!isFuriganaEditMode || activeFuriganaTokenIndex == null) {
+        emptyEl.style.display = isFuriganaEditMode ? 'block' : 'none';
+        contentEl.style.display = 'none';
+        return;
+      }
+
+      const token = currentSegmentTokens[activeFuriganaTokenIndex] || '';
+      tokenEl.textContent = token;
+      inputEl.value = getFuriganaValue(token, currentSegmentIndex, activeFuriganaTokenIndex);
+      emptyEl.style.display = 'none';
+      contentEl.style.display = 'flex';
+    }
+
+    function setFuriganaEditMode(enabled) {
+      if (!isJapaneseArticle()) return;
+      isFuriganaEditMode = enabled;
+      if (!enabled) activeFuriganaTokenIndex = null;
+      renderCurrentSegment();
+      updateFuriganaControls();
+      updateFuriganaEditPanel();
+    }
+
+    function toggleFuriganaEditMode() {
+      setFuriganaEditMode(!isFuriganaEditMode);
+    }
+
+    function openFuriganaTokenEditor(tokenIndex) {
+      if (!isFuriganaEditMode) return;
+      if (!currentEditableTokenIndices.includes(tokenIndex)) return;
+      activeFuriganaTokenIndex = tokenIndex;
+      renderCurrentSegment();
+      updateFuriganaEditPanel();
+      setTimeout(() => {
+        const inputEl = document.getElementById('furigana-edit-input');
+        inputEl.focus();
+        inputEl.select();
+      }, 0);
+    }
+
+    function moveActiveFuriganaToken(step) {
+      if (!currentEditableTokenIndices.length) return;
+      if (activeFuriganaTokenIndex == null) {
+        activeFuriganaTokenIndex = step >= 0
+          ? currentEditableTokenIndices[0]
+          : currentEditableTokenIndices[currentEditableTokenIndices.length - 1];
+      } else {
+        const currentIdx = currentEditableTokenIndices.indexOf(activeFuriganaTokenIndex);
+        const nextIdx = Math.max(0, Math.min(currentEditableTokenIndices.length - 1, currentIdx + step));
+        activeFuriganaTokenIndex = currentEditableTokenIndices[nextIdx];
+      }
+      openFuriganaTokenEditor(activeFuriganaTokenIndex);
+    }
+
+    function focusPrevFuriganaToken() {
+      moveActiveFuriganaToken(-1);
+    }
+
+    function focusNextFuriganaToken() {
+      moveActiveFuriganaToken(1);
+    }
+
+    function onFuriganaInputChange(value) {
+      if (activeFuriganaTokenIndex == null) return;
+      const key = `${currentSegmentIndex}:${activeFuriganaTokenIndex}`;
+      furiganaEditMap[key] = value.trim();
+      saveFuriganaEditMap();
+      renderCurrentSegment();
+      updateFuriganaEditPanel();
+      document.getElementById('furigana-edit-input').focus();
+    }
+
+    function resetActiveFurigana() {
+      if (activeFuriganaTokenIndex == null) return;
+      const key = `${currentSegmentIndex}:${activeFuriganaTokenIndex}`;
+      delete furiganaEditMap[key];
+      saveFuriganaEditMap();
+      renderCurrentSegment();
+      updateFuriganaEditPanel();
+    }
+
+    function onSegmentTextClick(event) {
+      const base = event.target instanceof Element ? event.target : event.target.parentElement;
+      const tokenEl = base ? base.closest('.furigana-token.editable') : null;
+      if (!tokenEl) return;
+      const tokenIndex = Number.parseInt(tokenEl.dataset.tokenIndex || '', 10);
+      if (!Number.isFinite(tokenIndex)) return;
+      openFuriganaTokenEditor(tokenIndex);
+    }
+
+    function initPracticeFromSession() {
+      const qp = new URLSearchParams(window.location.search);
+      const isJpDemo = qp.get('demo') === 'jp';
+      const text = sessionStorage.getItem('article_text') || (isJpDemo ? JP_DEMO_TEXT : '');
+      const lang = sessionStorage.getItem('article_lang') || (isJpDemo ? 'jp' : 'en');
+      const segments = text.split(/\n+/).map(s => s.trim()).filter(Boolean);
+      currentArticleLang = lang;
+      currentSegments = segments.length
+        ? segments
+        : [document.getElementById('seg-text').textContent.trim()];
+      loadFuriganaEditMap();
+
+      const segFromQuery = Number.parseInt(qp.get('seg') || '1', 10);
+      currentSegmentIndex = Number.isFinite(segFromQuery) && segFromQuery > 0
+        ? Math.min(segFromQuery - 1, currentSegments.length - 1)
+        : 0;
+
+      document.getElementById('meta-segment').textContent = `段落 ${currentSegmentIndex + 1} / ${currentSegments.length}`;
+      document.getElementById('segment-label').textContent = `§${currentSegmentIndex + 1} 跟读段落`;
+      document.getElementById('rec-segment-label').textContent = `§${currentSegmentIndex + 1} · 跟读段落`;
+      document.getElementById('top-article-lang').textContent = lang === 'jp' ? '日语' : '英语';
+
+      renderCurrentSegment();
+      updateFuriganaControls();
+      updateFuriganaEditPanel();
+    }
+
+    function loadJapaneseDemo() {
+      sessionStorage.setItem('article_text', JP_DEMO_TEXT);
+      sessionStorage.setItem('article_lang', 'jp');
+      if (!sessionStorage.getItem('furigana_edits_preview')) {
+        sessionStorage.setItem('furigana_edits_preview', '{}');
+      }
+      window.location.href = 'practice.html?demo=jp&seg=1';
+    }
 
     // Build full-mode matrix
     function buildMatrix(containerId) {
@@ -560,7 +975,9 @@
     }
 
     function startRecording() {
+      if (isFuriganaEditMode) setFuriganaEditMode(false);
       document.getElementById('rec-overlay').classList.add('open');
+      updateFuriganaControls();
       recSeconds = 0;
       updateTimer();
       recTimer = setInterval(() => {
@@ -578,6 +995,7 @@
     function cancelRecording() {
       clearInterval(recTimer);
       document.getElementById('rec-overlay').classList.remove('open');
+      updateFuriganaControls();
     }
 
     function stopRecording() {
@@ -590,6 +1008,7 @@
         document.getElementById('recognizing-state').classList.remove('show');
         showScore();
       }, 1800);
+      updateFuriganaControls();
     }
 
     function showScore() {
@@ -605,6 +1024,8 @@
     function practiceAgain() {
       document.getElementById('score-area').style.display = 'none';
       document.getElementById('record-area').style.display = 'flex';
+      renderCurrentSegment();
+      updateFuriganaControls();
     }
 
     function submitResult() {
@@ -649,6 +1070,9 @@
       document.getElementById('sync-bar').innerHTML = `<div class="sync-warn"><div class="recognizing-spinner spin" style="width:12px;height:12px;border-width:2px;"></div> 同步中…</div>`;
       setTimeout(() => { document.getElementById('sync-bar').style.display = 'none'; }, 1500);
     }
+
+    document.getElementById('seg-text').addEventListener('click', onSegmentTextClick);
+    initPracticeFromSession();
   </script>
 </body>
 </html>
