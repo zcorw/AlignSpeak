@@ -167,6 +167,7 @@ def finish_segment_recording(
         recording_id=recording_id,
         total_chunks=payload.total_chunks,
         duration_ms=payload.duration_ms,
+        practice_level=payload.level,
     )
     background_tasks.add_task(process_stt_job, response.job_id)
     return response

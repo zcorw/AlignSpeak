@@ -4,11 +4,12 @@ import {
   practiceAttemptService,
   type AlignmentResult,
 } from '../../services/practiceAttemptService'
-import { type PracticeSegment } from '../../services/practiceService'
+import { type PracticeLevel, type PracticeSegment } from '../../services/practiceService'
 
 const CHUNK_DURATION_MS = 1200
 
 interface UsePracticeRecordingOptions {
+  level: PracticeLevel
   currentSegment: PracticeSegment | null
   canPractice: boolean
   ttsLoading: boolean
@@ -20,6 +21,7 @@ interface UsePracticeRecordingOptions {
 }
 
 export const usePracticeRecording = ({
+  level,
   currentSegment,
   canPractice,
   ttsLoading,
@@ -106,7 +108,12 @@ export const usePracticeRecording = ({
       const elapsedMs = recordingStartAtRef.current
         ? Date.now() - recordingStartAtRef.current
         : recordSecondsRef.current * 1000
-      const finishRes = await practiceAttemptService.finishRecording(recordingId, totalChunks, Math.max(elapsedMs, 1))
+      const finishRes = await practiceAttemptService.finishRecording(
+        recordingId,
+        totalChunks,
+        Math.max(elapsedMs, 1),
+        level
+      )
       const sttStatus = await practiceAttemptService.waitSttDone(finishRes.jobId)
       if (sttStatus.status !== 'done' || !sttStatus.attempt_id) {
         const reason = sttStatus.error_code ?? 'STT_PROVIDER_ERROR'
@@ -126,7 +133,7 @@ export const usePracticeRecording = ({
       resetRecordingState()
       finalizingRef.current = false
     }
-  }, [cleanupRecordingMedia, errorMessage, onAligned, resetRecordingState])
+  }, [cleanupRecordingMedia, errorMessage, level, onAligned, resetRecordingState])
 
   const startRecording = useCallback(async () => {
     if (ttsLoading || !canPractice || !currentSegment || recognizing || isRecording) return

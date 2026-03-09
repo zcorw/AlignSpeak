@@ -178,6 +178,7 @@ export const PracticePage = () => {
     retrySync,
     clearFeedback,
   } = usePracticeRecording({
+    level,
     currentSegment,
     canPractice,
     ttsLoading,

@@ -1,4 +1,5 @@
 import api from './api'
+import type { PracticeLevel } from './practiceService'
 
 export type AlignmentStatus = 'correct' | 'missing' | 'insert' | 'substitute'
 
@@ -101,11 +102,13 @@ export const practiceAttemptService = {
   async finishRecording(
     recordingId: string,
     totalChunks: number,
-    durationMs: number
+    durationMs: number,
+    level: PracticeLevel
   ): Promise<{ recordingId: string; jobId: string; status: string }> {
     const response = await api.post<FinishRecordingResponse>(`/practice/recordings/${recordingId}/finish`, {
       total_chunks: totalChunks,
       duration_ms: durationMs,
+      level,
     })
     return {
       recordingId: response.data.recording_id,

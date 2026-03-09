@@ -48,15 +48,16 @@ class PracticeRepository:
         )
         return list(self.db.scalars(statement).all())
 
-    def get_segment_attempt_snapshots(
+    def get_segment_attempt_snapshots_by_level(
         self,
         *,
         article_id: str,
         user_id: str,
-    ) -> dict[str, dict[str, int | float | None]]:
+    ) -> dict[str, dict[str, dict[str, int | float | None]]]:
         statement = (
             select(
                 PracticeAttempt.segment_id,
+                PracticeAttempt.practice_level,
                 func.count(PracticeAttempt.id).label("attempt_count"),
                 func.max(PracticeAttempt.accuracy_rate).label("best_accuracy"),
             )
@@ -65,11 +66,13 @@ class PracticeRepository:
                 PracticeAttempt.user_id == user_id,
                 PracticeAttempt.status == "done",
             )
-            .group_by(PracticeAttempt.segment_id)
+            .group_by(PracticeAttempt.segment_id, PracticeAttempt.practice_level)
         )
-        snapshots: dict[str, dict[str, int | float | None]] = {}
-        for segment_id, attempt_count, best_accuracy in self.db.execute(statement).all():
-            snapshots[str(segment_id)] = {
+        snapshots: dict[str, dict[str, dict[str, int | float | None]]] = {}
+        for segment_id, practice_level, attempt_count, best_accuracy in self.db.execute(statement).all():
+            level_key = str(practice_level or "L1")
+            level_map = snapshots.setdefault(level_key, {})
+            level_map[str(segment_id)] = {
                 "attempt_count": int(attempt_count or 0),
                 "best_accuracy": float(best_accuracy) if best_accuracy is not None else None,
             }

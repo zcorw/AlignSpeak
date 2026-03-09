@@ -87,6 +87,39 @@ def apply_runtime_schema_fixes() -> None:
         conn.execute(
             text(
                 """
+                ALTER TABLE IF EXISTS practice_attempts
+                ADD COLUMN IF NOT EXISTS practice_level VARCHAR(8)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                UPDATE practice_attempts
+                SET practice_level = 'L1'
+                WHERE practice_level IS NULL
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE IF EXISTS practice_attempts
+                ALTER COLUMN practice_level SET DEFAULT 'L1'
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE IF EXISTS practice_attempts
+                ALTER COLUMN practice_level SET NOT NULL
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
                 DROP TABLE IF EXISTS email_verification_codes
                 """
             )
