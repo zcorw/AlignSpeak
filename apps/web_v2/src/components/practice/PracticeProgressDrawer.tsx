@@ -1,7 +1,9 @@
 import { CloseRounded, GridViewRounded } from '@mui/icons-material'
-import { Box, Typography } from '@mui/material'
+import { Box, Button, Typography } from '@mui/material'
+import type { PracticeLevel } from '../../services/practiceService'
 import { PracticeProgressMatrix } from './PracticeProgressMatrix'
-import { iconButtonSx, type PracticeMatrix } from './shared'
+import { PracticeSegmentSelector } from './PracticeSegmentSelector'
+import { PRACTICE_LEVELS, iconButtonSx, type PracticeMatrix } from './shared'
 
 interface PracticeProgressDrawerProps {
   open: boolean
@@ -10,12 +12,19 @@ interface PracticeProgressDrawerProps {
   articleInfo: string
   loadingLabel: string
   matrix: PracticeMatrix
+  level: PracticeLevel
+  totalSegments: number
+  currentSegmentOrder: number
+  switchLevelLabel: string
+  switchLevelHint: string
   legend: {
     pass: string
     current: string
     skipped: string
     incomplete: string
   }
+  onSwitchLevel: (nextLevel: PracticeLevel) => void
+  onSelectSegment: (segmentOrder: number) => void
   onClose: () => void
 }
 
@@ -26,7 +35,14 @@ export const PracticeProgressDrawer = ({
   articleInfo,
   loadingLabel,
   matrix,
+  level,
+  totalSegments,
+  currentSegmentOrder,
+  switchLevelLabel,
+  switchLevelHint,
   legend,
+  onSwitchLevel,
+  onSelectSegment,
   onClose,
 }: PracticeProgressDrawerProps) => (
   <>
@@ -71,6 +87,40 @@ export const PracticeProgressDrawer = ({
           </Typography>
         )}
         <PracticeProgressMatrix matrix={matrix} />
+        <Box sx={{ mt: '14px' }}>
+          <Typography sx={{ mb: '8px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'text.disabled' }}>
+            {switchLevelLabel}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {PRACTICE_LEVELS.map((item) => (
+              <Button
+                key={item}
+                size="small"
+                variant="outlined"
+                onClick={() => onSwitchLevel(item)}
+                sx={{
+                  minWidth: '42px',
+                  borderColor: item === level ? 'rgba(110,96,238,0.3)' : 'rgba(255,255,255,0.07)',
+                  bgcolor: item === level ? 'rgba(110,96,238,0.25)' : 'transparent',
+                  color: item === level ? 'primary.light' : 'text.secondary',
+                }}
+              >
+                {item}
+              </Button>
+            ))}
+          </Box>
+          <Typography sx={{ mt: '8px', fontSize: '12px', color: 'text.disabled' }}>
+            {switchLevelHint}
+          </Typography>
+        </Box>
+        <Box sx={{ mt: '14px' }}>
+          <PracticeSegmentSelector
+            totalSegments={totalSegments}
+            currentSegmentOrder={currentSegmentOrder}
+            disabled={loading}
+            onSelectSegment={onSelectSegment}
+          />
+        </Box>
         <Box sx={{ mt: '20px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'text.disabled' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Box sx={{ width: 20, height: 20, borderRadius: '6px', bgcolor: 'rgba(29,201,138,0.1)', border: '1px solid rgba(29,201,138,0.2)', color: 'success.main', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>OK</Box>
@@ -93,4 +143,3 @@ export const PracticeProgressDrawer = ({
     </Box>
   </>
 )
-

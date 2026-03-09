@@ -6,7 +6,10 @@ interface PracticeProgressMatrixProps {
   compact?: boolean
 }
 
-export const PracticeProgressMatrix = ({ matrix, compact = false }: PracticeProgressMatrixProps) => (
+export const PracticeProgressMatrix = ({
+  matrix,
+  compact = false,
+}: PracticeProgressMatrixProps) => (
   <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
     {PRACTICE_LEVELS.map((level) => (
       <Box key={level} sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -64,4 +67,3 @@ export const PracticeProgressMatrix = ({ matrix, compact = false }: PracticeProg
     ))}
   </Box>
 )
-

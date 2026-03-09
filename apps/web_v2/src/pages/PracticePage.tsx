@@ -242,6 +242,22 @@ export const PracticePage = () => {
     }
   }
 
+  const handleSelectSegment = useCallback((segmentOrder: number) => {
+    if (segmentOrder === currentSegmentOrder) {
+      setDrawerOpen(false)
+      return
+    }
+    const targetArticleId = articleId ?? queryArticleId
+    if (!targetArticleId) return
+    const params = new URLSearchParams({
+      a: targetArticleId,
+      seg: String(segmentOrder),
+      lv: level,
+    })
+    setDrawerOpen(false)
+    navigate(`/practice?${params.toString()}`, { replace: true })
+  }, [articleId, currentSegmentOrder, level, navigate, queryArticleId])
+
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <PracticeTopBar
@@ -423,13 +439,9 @@ export const PracticePage = () => {
           <PracticeFullModePanel
             trends={trendScores.length > 0 ? trendScores : [score]}
             matrix={progressMatrix}
-            level={level}
-            onSwitchLevel={switchLevel}
             labels={{
               trend: t('pages.practice.fullMode.trend'),
               matrix: t('pages.practice.fullMode.matrix'),
-              switchLevel: t('pages.practice.fullMode.switchLevel'),
-              switchLevelHint: t('pages.practice.fullMode.switchLevelHint'),
             }}
           />
         )}
@@ -465,12 +477,19 @@ export const PracticePage = () => {
         articleInfo={t('pages.practice.drawer.articleInfo', { total: totalSegments })}
         loadingLabel={t('common.loading')}
         matrix={progressMatrix}
+        level={level}
+        totalSegments={totalSegments}
+        currentSegmentOrder={currentSegmentOrder}
+        switchLevelLabel={t('pages.practice.fullMode.switchLevel')}
+        switchLevelHint={t('pages.practice.fullMode.switchLevelHint')}
         legend={{
           pass: t('pages.practice.drawer.legend.pass'),
           current: t('pages.practice.drawer.legend.current'),
           skipped: t('pages.practice.drawer.legend.skipped'),
           incomplete: t('pages.practice.drawer.legend.incomplete'),
         }}
+        onSwitchLevel={switchLevel}
+        onSelectSegment={handleSelectSegment}
         onClose={() => setDrawerOpen(false)}
       />
     </Box>
