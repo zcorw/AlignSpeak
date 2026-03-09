@@ -126,6 +126,42 @@ def get_attempt_result(
     )
 
 
+def resolve_attempt_audio_path(
+    *,
+    repository: PracticeRepository,
+    current_user: User,
+    attempt_id: str,
+) -> Path:
+    attempt = repository.get_attempt_for_user(attempt_id=attempt_id, user_id=current_user.id)
+    if attempt is None:
+        raise AppError(
+            code="NOT_FOUND",
+            message="Practice attempt not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    stt_job = repository.get_stt_job_by_attempt(attempt_id=attempt.id)
+    if stt_job is not None:
+        recording = repository.get_recording(recording_id=stt_job.recording_id)
+        if recording is not None and recording.merged_audio_path:
+            merged_path = Path(recording.merged_audio_path)
+            if merged_path.exists():
+                return merged_path
+
+    # Fallback for historical rows where only audio_url was persisted.
+    recording_id = Path(attempt.audio_url or "").stem
+    if recording_id:
+        merged_path = _resolve_merged_audio_path(recording_id=recording_id)
+        if merged_path.exists():
+            return merged_path
+
+    raise AppError(
+        code="AUDIO_NOT_FOUND",
+        message="Practice recording audio not found.",
+        status_code=status.HTTP_404_NOT_FOUND,
+    )
+
+
 def get_article_progress(
     *,
     repository: PracticeRepository,

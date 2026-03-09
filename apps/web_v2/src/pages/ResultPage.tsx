@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ResultActionsCard } from '../components/result/ResultActionsCard'
+import { ResultAttemptAudioButton } from '../components/result/ResultAttemptAudioButton'
 import { ResultAlignmentPanel } from '../components/result/ResultAlignmentPanel'
 import { ResultBreakdownStats } from '../components/result/ResultBreakdownStats'
 import { ResultErrorState } from '../components/result/ResultErrorState'
@@ -65,6 +66,7 @@ export const ResultPage = () => {
         {!loading && !error && detail && (
           <>
             <ResultScoreCard detail={detail} level={level} score={score} passed={passed} />
+            <ResultAttemptAudioButton attemptId={detail.attemptId} />
             <ResultBreakdownStats detail={detail} />
             <ResultAlignmentPanel refTokens={detail.refTokens} hypTokens={detail.hypTokens} />
             <ResultProgressMatrix
@@ -95,4 +97,3 @@ export const ResultPage = () => {
     </Box>
   )
 }
-

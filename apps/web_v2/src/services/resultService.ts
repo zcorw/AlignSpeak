@@ -61,5 +61,11 @@ export const resultService = {
       insertedCount: payload.inserted_count,
     }
   },
-}
 
+  async fetchAttemptAudioObjectUrl(attemptId: string): Promise<string> {
+    const response = await api.get<Blob>(`/practice/attempts/${attemptId}/audio`, {
+      responseType: 'blob',
+    })
+    return URL.createObjectURL(response.data)
+  },
+}

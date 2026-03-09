@@ -1,4 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.application.usecases.practice_usecase import (
@@ -6,6 +7,7 @@ from app.application.usecases.practice_usecase import (
     delete_segment_reading_override,
     finish_recording,
     get_attempt_result,
+    resolve_attempt_audio_path,
     get_article_progress,
     get_segment_reading,
     get_stt_job_status,
@@ -48,6 +50,21 @@ def get_practice_attempt_result(
         current_user=current_user,
         attempt_id=attempt_id,
     )
+
+
+@router.get("/practice/attempts/{attempt_id}/audio")
+def get_practice_attempt_audio(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FileResponse:
+    repository = PracticeRepository(db=db)
+    audio_path = resolve_attempt_audio_path(
+        repository=repository,
+        current_user=current_user,
+        attempt_id=attempt_id,
+    )
+    return FileResponse(path=audio_path, media_type="audio/webm")
 
 
 @router.get("/practice/articles/{article_id}/progress", response_model=PracticeArticleProgressResponse)
