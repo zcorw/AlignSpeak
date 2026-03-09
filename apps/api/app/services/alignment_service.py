@@ -177,7 +177,11 @@ def _collapse_japanese_display_tokens(
         if next_cursor > len(char_statuses):
             return [AlignedToken(text=token.text, status=char_statuses[idx]) for idx, token in enumerate(char_tokens)]
         span_statuses = char_statuses[cursor:next_cursor]
-        collapsed.append(AlignedToken(text=surface, status=_merge_japanese_statuses(span_statuses, side=side)))
+        expanded_tokens = _expand_hyp_unit_tokens(surface=surface, statuses=span_statuses, side=side)
+        if expanded_tokens:
+            collapsed.extend(expanded_tokens)
+        else:
+            collapsed.append(AlignedToken(text=surface, status=_merge_japanese_statuses(span_statuses, side=side)))
         cursor = next_cursor
 
     if cursor != len(char_statuses):
@@ -234,6 +238,37 @@ def _merge_japanese_statuses(statuses: list[str], *, side: str) -> str:
     if any(status == "insert" for status in statuses):
         return "insert"
     return "correct"
+
+
+def _expand_hyp_unit_tokens(
+    *,
+    surface: str,
+    statuses: list[str],
+    side: str,
+) -> list[AlignedToken]:
+    if side != "hyp":
+        return []
+    # Only split when a unit contains mixed statuses and the surface can be mapped 1:1 to the phonetic span.
+    if not statuses or all(status == statuses[0] for status in statuses):
+        return []
+    chars = list(surface)
+    if len(chars) != len(statuses):
+        return []
+
+    expanded: list[AlignedToken] = []
+    start = 0
+    current_status = statuses[0]
+    for index in range(1, len(statuses) + 1):
+        next_status = statuses[index] if index < len(statuses) else None
+        if next_status == current_status:
+            continue
+        text = "".join(chars[start:index])
+        if text:
+            expanded.append(AlignedToken(text=text, status=current_status))
+        if index < len(statuses):
+            start = index
+            current_status = statuses[index]
+    return expanded
 
 
 def _align_with_resync(*, ref: list[_Token], hyp: list[_Token], language: str) -> list[tuple[str, int | None, int | None]]:
