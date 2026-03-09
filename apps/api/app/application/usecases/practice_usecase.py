@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
+import unicodedata
 from uuid import uuid4
 
 from fastapi import status
@@ -14,6 +15,7 @@ from app.models import (
     AttemptNoiseSpan,
     PracticeAttempt,
     PracticeRecording,
+    SegmentReadingOverride,
     SttJob,
     User,
 )
@@ -27,12 +29,17 @@ from app.schemas.practice import (
     PracticeArticleProgressResponse,
     PracticeProgressCell,
     PracticeProgressLevel,
+    SegmentReadingResponse,
+    SegmentReadingToken,
+    SegmentReadingOverrideItem,
+    UpsertSegmentReadingOverridesPayload,
     NoiseSpan,
     StartRecordingResponse,
     SttJobStatusResponse,
     UploadChunkResponse,
 )
 from app.services.alignment_service import align_segment_text
+from app.services.reading_service import build_segment_reading_tokens
 from app.services.stt_service import transcribe_audio_by_provider
 
 PRACTICE_LEVELS = ("L1", "L2", "L3", "L4")
@@ -72,10 +79,16 @@ def get_attempt_result(
         stt_job = repository.get_stt_job_by_attempt(attempt_id=attempt.id)
         recognized_text = (stt_job.recognized_text if stt_job is not None else None) or ""
         if recognized_text.strip():
+            reading_overrides = _load_segment_override_map(
+                repository=repository,
+                user_id=current_user.id,
+                segment_id=segment.id,
+            )
             alignment = align_segment_text(
                 reference_text=segment.plain_text,
                 recognized_text=recognized_text,
                 language=article.language,
+                reading_overrides=reading_overrides if article.language == "ja" else None,
             )
             _persist_alignment(
                 repository=repository,
@@ -211,6 +224,134 @@ def get_article_progress(
         current_level=current_level,
         levels=levels,
         recent_scores=recent_scores,
+    )
+
+
+def get_segment_reading(
+    *,
+    repository: PracticeRepository,
+    current_user: User,
+    segment_id: str,
+) -> SegmentReadingResponse:
+    pair = repository.get_segment_for_user(segment_id=segment_id, user_id=current_user.id)
+    if pair is None:
+        raise AppError(
+            code="SEGMENT_NOT_FOUND",
+            message="Segment not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    article, segment = pair
+    override_map = _load_segment_override_map(
+        repository=repository,
+        user_id=current_user.id,
+        segment_id=segment.id,
+    )
+    return _build_segment_reading_response(
+        segment_id=segment.id,
+        language=article.language,
+        text=segment.plain_text,
+        override_map=override_map,
+    )
+
+
+def upsert_segment_reading_overrides(
+    *,
+    repository: PracticeRepository,
+    current_user: User,
+    segment_id: str,
+    payload: UpsertSegmentReadingOverridesPayload,
+) -> SegmentReadingResponse:
+    pair = repository.get_segment_for_user(segment_id=segment_id, user_id=current_user.id)
+    if pair is None:
+        raise AppError(
+            code="SEGMENT_NOT_FOUND",
+            message="Segment not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    article, segment = pair
+    if article.language != "ja":
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Reading override is only supported for Japanese segments.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    base_tokens = build_segment_reading_tokens(text=segment.plain_text, language=article.language)
+    seen: set[int] = set()
+    override_map: dict[int, str | None] = {}
+    rows: list[SegmentReadingOverride] = []
+    for item in payload.overrides:
+        _validate_override_item(item=item, base_tokens=base_tokens, seen_indices=seen)
+        normalized_yomi = (item.yomi or "").strip() or None
+        override_map[item.token_index] = normalized_yomi
+        rows.append(
+            SegmentReadingOverride(
+                id=f"sro_{uuid4().hex[:12]}",
+                user_id=current_user.id,
+                segment_id=segment.id,
+                token_index=item.token_index,
+                surface=item.surface,
+                yomi=normalized_yomi,
+                created_at=datetime.now(tz=timezone.utc),
+                updated_at=datetime.now(tz=timezone.utc),
+            )
+        )
+
+    repository.replace_segment_reading_overrides(
+        user_id=current_user.id,
+        segment_id=segment.id,
+        overrides=rows,
+    )
+    return _build_segment_reading_response(
+        segment_id=segment.id,
+        language=article.language,
+        text=segment.plain_text,
+        override_map=override_map,
+    )
+
+
+def delete_segment_reading_override(
+    *,
+    repository: PracticeRepository,
+    current_user: User,
+    segment_id: str,
+    token_index: int,
+) -> SegmentReadingResponse:
+    if token_index < 0:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="token_index must be greater than or equal to 0.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    pair = repository.get_segment_for_user(segment_id=segment_id, user_id=current_user.id)
+    if pair is None:
+        raise AppError(
+            code="SEGMENT_NOT_FOUND",
+            message="Segment not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    article, segment = pair
+    if article.language != "ja":
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Reading override is only supported for Japanese segments.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    repository.delete_segment_reading_override(
+        user_id=current_user.id,
+        segment_id=segment.id,
+        token_index=token_index,
+    )
+    override_map = _load_segment_override_map(
+        repository=repository,
+        user_id=current_user.id,
+        segment_id=segment.id,
+    )
+    return _build_segment_reading_response(
+        segment_id=segment.id,
+        language=article.language,
+        text=segment.plain_text,
+        override_map=override_map,
     )
 
 
@@ -488,6 +629,15 @@ def align_attempt(
         reference_text=segment.plain_text,
         recognized_text=recognized_text,
         language=article.language,
+        reading_overrides=(
+            _load_segment_override_map(
+                repository=repository,
+                user_id=current_user.id,
+                segment_id=segment.id,
+            )
+            if article.language == "ja"
+            else None
+        ),
     )
     _persist_alignment(
         repository=repository,
@@ -512,6 +662,101 @@ def align_attempt(
             for span in alignment.noise_spans
         ],
     )
+
+
+def _build_segment_reading_response(
+    *,
+    segment_id: str,
+    language: str,
+    text: str,
+    override_map: dict[int, str | None],
+) -> SegmentReadingResponse:
+    tokens = build_segment_reading_tokens(
+        text=text,
+        language=language,
+        reading_overrides=override_map if language == "ja" else None,
+    )
+    response_tokens: list[SegmentReadingToken] = []
+    for index, token in enumerate(tokens):
+        is_override = index in override_map
+        source = "override" if is_override else ("auto" if token.yomi else "none")
+        response_tokens.append(
+            SegmentReadingToken(
+                token_index=index,
+                surface=token.surface,
+                yomi=token.yomi,
+                editable=language == "ja" and _is_reading_token_editable(token.surface),
+                source=source,
+            )
+        )
+    return SegmentReadingResponse(
+        segment_id=segment_id,
+        language=language,
+        tokens=response_tokens,
+    )
+
+
+def _load_segment_override_map(
+    *,
+    repository: PracticeRepository,
+    user_id: str,
+    segment_id: str,
+) -> dict[int, str | None]:
+    rows = repository.list_segment_reading_overrides(user_id=user_id, segment_id=segment_id)
+    return {
+        int(row.token_index): (row.yomi.strip() if row.yomi is not None else None)
+        for row in rows
+    }
+
+
+def _validate_override_item(
+    *,
+    item: SegmentReadingOverrideItem,
+    base_tokens,
+    seen_indices: set[int],
+) -> None:
+    if item.token_index in seen_indices:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Duplicate token_index in overrides.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    seen_indices.add(item.token_index)
+
+    if item.token_index < 0 or item.token_index >= len(base_tokens):
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="token_index is out of range.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    target = base_tokens[item.token_index]
+    if target.surface != item.surface:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="surface does not match token at token_index.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    if not _is_reading_token_editable(target.surface):
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="token at token_index is not editable.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+def _is_reading_token_editable(surface: str) -> bool:
+    compact = "".join(char for char in surface if not char.isspace())
+    if not compact:
+        return False
+    return not _is_punctuation_token(compact)
+
+
+def _is_punctuation_token(text: str) -> bool:
+    for char in text:
+        category = unicodedata.category(char)
+        if category[0] not in {"P", "S"}:
+            return False
+    return True
 
 
 def _mark_job_failed(*, repository: PracticeRepository, job_id: str, error_code: str) -> None:

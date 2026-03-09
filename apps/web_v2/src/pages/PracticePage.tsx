@@ -4,6 +4,9 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { PracticeFullModePanel } from '../components/practice/PracticeFullModePanel'
+import { PracticeFuriganaEditEntry } from '../components/practice/PracticeFuriganaEditEntry'
+import { PracticeFuriganaEditorBar } from '../components/practice/PracticeFuriganaEditorBar'
+import { PracticeFuriganaText } from '../components/practice/PracticeFuriganaText'
 import { PracticeMetaBar } from '../components/practice/PracticeMetaBar'
 import { PracticeProgressDrawer } from '../components/practice/PracticeProgressDrawer'
 import { PracticeRecordEntry } from '../components/practice/PracticeRecordEntry'
@@ -14,10 +17,12 @@ import { PracticeStatusBanners } from '../components/practice/PracticeStatusBann
 import { PracticeSyncBar } from '../components/practice/PracticeSyncBar'
 import { PracticeTopBar } from '../components/practice/PracticeTopBar'
 import { ReadSegmentButton } from '../components/practice/ReadSegmentButton'
-import { type PracticeLevel } from '../services/practiceService'
+import { type PracticeLevel, type SegmentReadingOverrideInput } from '../services/practiceService'
 import { type AlignmentResult } from '../services/practiceAttemptService'
 import { usePracticeAudio } from '../hooks/practice/usePracticeAudio'
 import { usePracticeData } from '../hooks/practice/usePracticeData'
+import { usePracticeFuriganaEditor } from '../hooks/practice/usePracticeFuriganaEditor'
+import { usePracticeFuriganaSync } from '../hooks/practice/usePracticeFuriganaSync'
 import { usePracticeRecording } from '../hooks/practice/usePracticeRecording'
 import { usePracticeRouteState } from '../hooks/practice/usePracticeRouteState'
 
@@ -74,14 +79,6 @@ export const PracticePage = () => {
     onError: (message) => alertFn?.(message),
   })
 
-  const handleBeforeStart = useCallback(() => {
-    setSegmentResultState({
-      segmentKey: activeSegmentKey,
-      alignmentResult: null,
-      showScore: false,
-    })
-  }, [activeSegmentKey])
-
   const handleAligned = useCallback((result: AlignmentResult) => {
     setSegmentResultState({
       segmentKey: activeSegmentKey,
@@ -113,6 +110,61 @@ export const PracticePage = () => {
   const passed = score >= 85
 
   const {
+    tokens: syncedReadingTokens,
+    saving: furiganaSaving,
+    error: furiganaSyncError,
+    scheduleReplaceOverrides,
+    flushPendingOverrides,
+  } = usePracticeFuriganaSync({
+    segmentId: currentSegment?.id ?? null,
+    language: articleLanguage,
+    fallbackTokens: currentSegment?.tokens,
+    errorMessage: t('common.error'),
+  })
+
+  const handleOverridesChange = useCallback(
+    (overrides: SegmentReadingOverrideInput[]) => {
+      scheduleReplaceOverrides(overrides)
+    },
+    [scheduleReplaceOverrides]
+  )
+
+  const {
+    canEdit: canEditFurigana,
+    isEditMode,
+    activeTokenIndex,
+    activeToken,
+    activeYomi,
+    mergedTokens: readingTokens,
+    setEditMode,
+    toggleEditMode,
+    selectToken,
+    setActiveYomi,
+    resetActiveToken,
+    focusPrevToken,
+    focusNextToken,
+  } = usePracticeFuriganaEditor({
+    language: articleLanguage,
+    tokens: syncedReadingTokens,
+    enabled: canPractice,
+    onOverridesChange: handleOverridesChange,
+  })
+
+  const handleBeforeStart = useCallback(async () => {
+    setEditMode(false)
+    try {
+      await flushPendingOverrides()
+    } catch {
+      // Keep local overrides and continue recording flow.
+    }
+    setSegmentResultState({
+      segmentKey: activeSegmentKey,
+      alignmentResult: null,
+      showScore: false,
+    })
+  }, [activeSegmentKey, flushPendingOverrides, setEditMode])
+
+  const {
     recordOverlayOpen,
     recordSeconds,
     recognizing,
@@ -137,22 +189,16 @@ export const PracticePage = () => {
   })
 
   const recordingSegmentText = useMemo<ReactNode>(() => {
-    if (articleLanguage !== 'ja' || !currentSegment?.tokens?.length) return segmentText
-    return currentSegment.tokens.map((token, index) => {
-      if (!token.surface.trim()) {
-        return null
-      }
-      if (!token.yomi) {
-        return <span key={`${token.surface}-${index}`}>{token.surface}</span>
-      }
-      return (
-        <ruby key={`${token.surface}-${index}`} style={{ marginInline: '1px' }}>
-          {token.surface}
-          <rt style={{ fontSize: '0.56em', color: 'rgba(255,255,255,0.68)', fontWeight: 500 }}>{token.yomi}</rt>
-        </ruby>
-      )
-    })
-  }, [articleLanguage, currentSegment, segmentText])
+    if (articleLanguage !== 'ja') return segmentText
+    return (
+      <PracticeFuriganaText
+        tokens={readingTokens}
+        fallbackText={segmentText}
+        editable={false}
+        activeTokenIndex={null}
+      />
+    )
+  }, [articleLanguage, readingTokens, segmentText])
 
   const handleSpeakSegment = useCallback(() => {
     void speakSegment({
@@ -162,10 +208,31 @@ export const PracticePage = () => {
     })
   }, [articleId, canPractice, currentSegment, speakSegment])
 
+  const furiganaEditableUIVisible =
+    canEditFurigana && !recordOverlayOpen && !recognizing && !showScore && !loading && !loadError
+
+  const segmentContent = articleLanguage === 'ja' ? (
+    <PracticeFuriganaText
+      tokens={readingTokens}
+      fallbackText={segmentText}
+      editable={isEditMode && furiganaEditableUIVisible}
+      activeTokenIndex={activeTokenIndex}
+      onSelectToken={selectToken}
+    />
+  ) : (
+    segmentText
+  )
+
   useEffect(() => {
     stopSpeaking()
     clearFeedback()
-  }, [clearFeedback, segmentIndex, stopSpeaking])
+    setEditMode(false)
+  }, [clearFeedback, segmentIndex, setEditMode, stopSpeaking])
+
+  useEffect(() => {
+    if (furiganaEditableUIVisible) return
+    setEditMode(false)
+  }, [furiganaEditableUIVisible, setEditMode])
 
   const switchLevel = (nextLevel: Level) => {
     if (nextLevel === level) return
@@ -229,7 +296,35 @@ export const PracticePage = () => {
 
         <PracticeSegmentCard
           segmentLabel={t('pages.practice.segmentLabel', { segment: currentSegmentOrder })}
-          segmentText={segmentText}
+          segmentText={segmentContent}
+          middleControls={(
+            <>
+              <PracticeFuriganaEditEntry
+                visible={furiganaEditableUIVisible}
+                active={isEditMode}
+                buttonLabel={isEditMode ? t('pages.practice.furigana.finish') : t('pages.practice.furigana.entry')}
+                hintLabel={isEditMode ? t('pages.practice.furigana.editingHint') : t('pages.practice.furigana.weakHint')}
+                onToggle={toggleEditMode}
+              />
+              <PracticeFuriganaEditorBar
+                visible={furiganaEditableUIVisible && isEditMode}
+                activeSurface={activeToken?.surface ?? null}
+                activeYomi={activeYomi}
+                saving={furiganaSaving}
+                syncError={furiganaSyncError}
+                emptyLabel={t('pages.practice.furigana.empty')}
+                placeholder={t('pages.practice.furigana.inputPlaceholder')}
+                resetLabel={t('pages.practice.furigana.reset')}
+                prevLabel={t('pages.practice.furigana.prev')}
+                nextLabel={t('pages.practice.furigana.next')}
+                savingLabel={t('pages.practice.furigana.saving')}
+                onChangeYomi={setActiveYomi}
+                onReset={resetActiveToken}
+                onPrev={focusPrevToken}
+                onNext={focusNextToken}
+              />
+            </>
+          )}
           readButton={(
             <ReadSegmentButton
               loading={ttsLoading}

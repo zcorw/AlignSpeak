@@ -23,8 +23,11 @@ export type PracticeProgressCellState = 'pass' | 'current' | 'skip' | 'fail'
 export type PracticeLevel = 'L1' | 'L2' | 'L3' | 'L4'
 
 export interface PracticeReadingToken {
+  tokenIndex?: number
   surface: string
   yomi?: string | null
+  editable?: boolean
+  source?: 'auto' | 'override' | 'none'
 }
 
 export interface PracticeSegment {
@@ -49,6 +52,18 @@ export interface PracticeArticleProgress {
   currentLevel: PracticeLevel
   matrix: Record<PracticeLevel, PracticeProgressCellState[]>
   recentScores: number[]
+}
+
+export interface SegmentReading {
+  segmentId: string
+  language: PracticeLanguage | string
+  tokens: PracticeReadingToken[]
+}
+
+export interface SegmentReadingOverrideInput {
+  tokenIndex: number
+  surface: string
+  yomi: string | null
 }
 
 interface BffMeResponse {
@@ -150,5 +165,32 @@ export const practiceService = {
           .map((score) => Math.max(0, Math.min(100, Math.round(score))))
         : [],
     }
+  },
+
+  async getSegmentReading(segmentId: string): Promise<SegmentReading> {
+    const response = await api.get(`/practice/segments/${segmentId}/reading`)
+    return toCamelCase<SegmentReading>(response.data)
+  },
+
+  async replaceSegmentReadingOverrides(
+    segmentId: string,
+    overrides: SegmentReadingOverrideInput[]
+  ): Promise<SegmentReading> {
+    const response = await api.put(`/practice/segments/${segmentId}/reading-overrides`, {
+      overrides: overrides.map((item) => ({
+        token_index: item.tokenIndex,
+        surface: item.surface,
+        yomi: item.yomi,
+      })),
+    })
+    return toCamelCase<SegmentReading>(response.data)
+  },
+
+  async deleteSegmentReadingOverride(
+    segmentId: string,
+    tokenIndex: number
+  ): Promise<SegmentReading> {
+    const response = await api.delete(`/practice/segments/${segmentId}/reading-overrides/${tokenIndex}`)
+    return toCamelCase<SegmentReading>(response.data)
   },
 }

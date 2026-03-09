@@ -112,6 +112,18 @@ export default {
           unsupported: '当前浏览器不支持语音朗读。',
           failed: '朗读失败，请重试。',
         },
+        furigana: {
+          entry: '注音校对',
+          finish: '完成校对',
+          weakHint: '录音前可点击词语修改注音',
+          editingHint: '点击词语修改注音，完成后再录音',
+          empty: '已进入校对模式，点击上方词语即可修改注音。',
+          inputPlaceholder: '输入读音（平假名）',
+          reset: '恢复默认',
+          prev: '上一个',
+          next: '下一个',
+          saving: '注音保存中…',
+        },
         startRecording: '点击开始录音',
         recognizing: '识别中…',
         score: {

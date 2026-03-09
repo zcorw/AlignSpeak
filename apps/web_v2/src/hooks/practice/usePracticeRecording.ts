@@ -15,7 +15,7 @@ interface UsePracticeRecordingOptions {
   isSpeaking: boolean
   stopSpeaking: () => void
   errorMessage: string
-  onBeforeStart: () => void
+  onBeforeStart: () => void | Promise<void>
   onAligned: (result: AlignmentResult, attemptId: string) => void
 }
 
@@ -138,7 +138,7 @@ export const usePracticeRecording = ({
     }
 
     try {
-      onBeforeStart()
+      await onBeforeStart()
       setResultError(null)
       setShowSyncBar(false)
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -255,4 +255,3 @@ export const usePracticeRecording = ({
     clearFeedback,
   }
 }
-

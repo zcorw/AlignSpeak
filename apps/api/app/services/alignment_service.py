@@ -41,9 +41,24 @@ class _Token:
     key: str
 
 
-def align_segment_text(*, reference_text: str, recognized_text: str, language: str) -> AlignmentResult:
-    ref = _tokenize_text(reference_text, language)
-    hyp = _tokenize_text(recognized_text, language)
+def align_segment_text(
+    *,
+    reference_text: str,
+    recognized_text: str,
+    language: str,
+    reading_overrides: dict[int, str | None] | None = None,
+) -> AlignmentResult:
+    surface_overrides = (
+        _build_reference_surface_override_map(reference_text=reference_text, reading_overrides=reading_overrides)
+        if language == "ja" and reading_overrides
+        else None
+    )
+    ref = _tokenize_text(reference_text, language, reading_overrides=reading_overrides)
+    hyp = _tokenize_text(
+        recognized_text,
+        language,
+        reading_surface_overrides=surface_overrides,
+    )
     operations = _align_with_resync(ref=ref, hyp=hyp, language=language)
 
     ref_statuses = ["correct"] * len(ref)
@@ -68,12 +83,14 @@ def align_segment_text(*, reference_text: str, recognized_text: str, language: s
             char_tokens=ref,
             char_statuses=ref_statuses,
             side="ref",
+            reading_overrides=reading_overrides,
         )
         hyp_tokens = _collapse_japanese_display_tokens(
             source_text=recognized_text,
             char_tokens=hyp,
             char_statuses=hyp_statuses,
             side="hyp",
+            reading_surface_overrides=surface_overrides,
         )
     else:
         ref_tokens = [AlignedToken(text=token.text, status=ref_statuses[idx]) for idx, token in enumerate(ref)]
@@ -97,12 +114,23 @@ def align_segment_text(*, reference_text: str, recognized_text: str, language: s
     )
 
 
-def _tokenize_text(text: str, language: str) -> list[_Token]:
+def _tokenize_text(
+    text: str,
+    language: str,
+    *,
+    reading_overrides: dict[int, str | None] | None = None,
+    reading_surface_overrides: dict[str, str | None] | None = None,
+) -> list[_Token]:
     normalized = normalize_text(text)
     if not normalized:
         return []
     if language == "ja":
-        reading_tokens = build_segment_reading_tokens(text=normalized, language=language)
+        reading_tokens = build_segment_reading_tokens(
+            text=normalized,
+            language=language,
+            reading_overrides=reading_overrides,
+            reading_surface_overrides=reading_surface_overrides,
+        )
         if reading_tokens:
             phonetic = "".join(
                 _normalize_japanese_phonetic(token.yomi or token.surface)
@@ -131,8 +159,14 @@ def _collapse_japanese_display_tokens(
     char_tokens: list[_Token],
     char_statuses: list[str],
     side: str,
+    reading_overrides: dict[int, str | None] | None = None,
+    reading_surface_overrides: dict[str, str | None] | None = None,
 ) -> list[AlignedToken]:
-    units = _build_japanese_display_units(source_text)
+    units = _build_japanese_display_units(
+        source_text,
+        reading_overrides=reading_overrides,
+        reading_surface_overrides=reading_surface_overrides,
+    )
     if not units:
         return [AlignedToken(text=token.text, status=char_statuses[idx]) for idx, token in enumerate(char_tokens)]
 
@@ -151,12 +185,22 @@ def _collapse_japanese_display_tokens(
     return collapsed
 
 
-def _build_japanese_display_units(text: str) -> list[tuple[str, int]]:
+def _build_japanese_display_units(
+    text: str,
+    *,
+    reading_overrides: dict[int, str | None] | None = None,
+    reading_surface_overrides: dict[str, str | None] | None = None,
+) -> list[tuple[str, int]]:
     normalized = normalize_text(text)
     if not normalized:
         return []
 
-    reading_tokens = build_segment_reading_tokens(text=normalized, language="ja")
+    reading_tokens = build_segment_reading_tokens(
+        text=normalized,
+        language="ja",
+        reading_overrides=reading_overrides,
+        reading_surface_overrides=reading_surface_overrides,
+    )
     if not reading_tokens:
         return [
             (char, 1)
@@ -400,3 +444,34 @@ def _normalize_japanese_phonetic(text: str) -> str:
         else:
             chars.append(char)
     return "".join(chars)
+
+
+def _build_reference_surface_override_map(
+    *,
+    reference_text: str,
+    reading_overrides: dict[int, str | None] | None,
+) -> dict[str, str | None]:
+    if not reading_overrides:
+        return {}
+
+    base_tokens = build_segment_reading_tokens(text=normalize_text(reference_text), language="ja")
+    if not base_tokens:
+        return {}
+
+    surface_map: dict[str, str | None] = {}
+    ambiguous_surfaces: set[str] = set()
+    for token_index, yomi in reading_overrides.items():
+        if token_index < 0 or token_index >= len(base_tokens):
+            continue
+        surface = base_tokens[token_index].surface
+        if not surface or _is_punctuation_token(surface):
+            continue
+        normalized = yomi.strip() if isinstance(yomi, str) else None
+        if surface in surface_map and surface_map[surface] != normalized:
+            ambiguous_surfaces.add(surface)
+            continue
+        surface_map[surface] = normalized
+
+    for surface in ambiguous_surfaces:
+        surface_map.pop(surface, None)
+    return surface_map

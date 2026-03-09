@@ -13,6 +13,7 @@ from app.models import (
     PracticeAttempt,
     PracticeRecording,
     PracticeRecordingChunk,
+    SegmentReadingOverride,
     SttJob,
 )
 
@@ -318,4 +319,53 @@ class PracticeRepository:
     def create_noise_spans(self, noise_spans: list[AttemptNoiseSpan]) -> None:
         for span in noise_spans:
             self.db.add(span)
+        self.db.commit()
+
+    def list_segment_reading_overrides(
+        self,
+        *,
+        user_id: str,
+        segment_id: str,
+    ) -> list[SegmentReadingOverride]:
+        statement = (
+            select(SegmentReadingOverride)
+            .where(
+                SegmentReadingOverride.user_id == user_id,
+                SegmentReadingOverride.segment_id == segment_id,
+            )
+            .order_by(SegmentReadingOverride.token_index.asc())
+        )
+        return list(self.db.scalars(statement).all())
+
+    def replace_segment_reading_overrides(
+        self,
+        *,
+        user_id: str,
+        segment_id: str,
+        overrides: list[SegmentReadingOverride],
+    ) -> None:
+        self.db.execute(
+            delete(SegmentReadingOverride).where(
+                SegmentReadingOverride.user_id == user_id,
+                SegmentReadingOverride.segment_id == segment_id,
+            )
+        )
+        for item in overrides:
+            self.db.add(item)
+        self.db.commit()
+
+    def delete_segment_reading_override(
+        self,
+        *,
+        user_id: str,
+        segment_id: str,
+        token_index: int,
+    ) -> None:
+        self.db.execute(
+            delete(SegmentReadingOverride).where(
+                SegmentReadingOverride.user_id == user_id,
+                SegmentReadingOverride.segment_id == segment_id,
+                SegmentReadingOverride.token_index == token_index,
+            )
+        )
         self.db.commit()

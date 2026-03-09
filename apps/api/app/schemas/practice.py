@@ -68,6 +68,30 @@ class AlignResultResponse(BaseModel):
     noise_spans: list[NoiseSpan]
 
 
+class SegmentReadingToken(BaseModel):
+    token_index: int = Field(ge=0)
+    surface: str
+    yomi: str | None = None
+    editable: bool
+    source: str
+
+
+class SegmentReadingResponse(BaseModel):
+    segment_id: str
+    language: str
+    tokens: list[SegmentReadingToken]
+
+
+class SegmentReadingOverrideItem(BaseModel):
+    token_index: int = Field(ge=0)
+    surface: str = Field(min_length=1, max_length=128)
+    yomi: str | None = Field(default=None, max_length=128)
+
+
+class UpsertSegmentReadingOverridesPayload(BaseModel):
+    overrides: list[SegmentReadingOverrideItem] = Field(default_factory=list, max_length=512)
+
+
 class PracticeProgressCell(BaseModel):
     segment_order: int = Field(ge=1)
     state: str

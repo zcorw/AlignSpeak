@@ -3,12 +3,15 @@ from sqlalchemy.orm import Session
 
 from app.application.usecases.practice_usecase import (
     align_attempt,
+    delete_segment_reading_override,
     finish_recording,
     get_attempt_result,
     get_article_progress,
+    get_segment_reading,
     get_stt_job_status,
     process_stt_job,
     start_recording,
+    upsert_segment_reading_overrides,
     upload_recording_chunk,
 )
 from app.db import get_db
@@ -22,9 +25,11 @@ from app.schemas.practice import (
     FinishRecordingResponse,
     PracticeAttemptResultResponse,
     PracticeArticleProgressResponse,
+    SegmentReadingResponse,
     StartRecordingPayload,
     StartRecordingResponse,
     SttJobStatusResponse,
+    UpsertSegmentReadingOverridesPayload,
     UploadChunkResponse,
 )
 
@@ -60,6 +65,52 @@ def get_article_practice_progress(
         article_id=article_id,
         current_level=level,
         current_segment_order=current_segment_order,
+    )
+
+
+@router.get("/practice/segments/{segment_id}/reading", response_model=SegmentReadingResponse)
+def get_practice_segment_reading(
+    segment_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SegmentReadingResponse:
+    repository = PracticeRepository(db=db)
+    return get_segment_reading(
+        repository=repository,
+        current_user=current_user,
+        segment_id=segment_id,
+    )
+
+
+@router.put("/practice/segments/{segment_id}/reading-overrides", response_model=SegmentReadingResponse)
+def put_practice_segment_reading_overrides(
+    segment_id: str,
+    payload: UpsertSegmentReadingOverridesPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SegmentReadingResponse:
+    repository = PracticeRepository(db=db)
+    return upsert_segment_reading_overrides(
+        repository=repository,
+        current_user=current_user,
+        segment_id=segment_id,
+        payload=payload,
+    )
+
+
+@router.delete("/practice/segments/{segment_id}/reading-overrides/{token_index}", response_model=SegmentReadingResponse)
+def remove_practice_segment_reading_override(
+    segment_id: str,
+    token_index: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SegmentReadingResponse:
+    repository = PracticeRepository(db=db)
+    return delete_segment_reading_override(
+        repository=repository,
+        current_user=current_user,
+        segment_id=segment_id,
+        token_index=token_index,
     )
 
 

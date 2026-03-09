@@ -36,7 +36,13 @@ def _normalize_reading(*, surface: str, hira: str | None) -> str | None:
     return normalized if normalized else None
 
 
-def build_segment_reading_tokens(*, text: str, language: str) -> list[ReadingToken]:
+def build_segment_reading_tokens(
+    *,
+    text: str,
+    language: str,
+    reading_overrides: dict[int, str | None] | None = None,
+    reading_surface_overrides: dict[str, str | None] | None = None,
+) -> list[ReadingToken]:
     if language != "ja":
         return []
     if not text.strip():
@@ -49,11 +55,24 @@ def build_segment_reading_tokens(*, text: str, language: str) -> list[ReadingTok
 
     converted = converter.convert(text)
     tokens: list[ReadingToken] = []
-    for item in converted:
+    for index, item in enumerate(converted):
         surface = str(item.get("orig", ""))
         if not surface:
             continue
         yomi = _normalize_reading(surface=surface, hira=item.get("hira"))
+        if reading_overrides and index in reading_overrides:
+            override_raw = reading_overrides[index]
+            if override_raw is None:
+                yomi = None
+            else:
+                override = override_raw.strip()
+                yomi = override if override else None
+        elif reading_surface_overrides and surface in reading_surface_overrides:
+            surface_override_raw = reading_surface_overrides[surface]
+            if surface_override_raw is None:
+                yomi = None
+            else:
+                surface_override = surface_override_raw.strip()
+                yomi = surface_override if surface_override else None
         tokens.append(ReadingToken(surface=surface, yomi=yomi))
     return tokens
-

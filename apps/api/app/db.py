@@ -136,3 +136,45 @@ def apply_runtime_schema_fixes() -> None:
                 """
             )
         )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS segment_reading_overrides (
+                    id VARCHAR(32) PRIMARY KEY,
+                    user_id VARCHAR(32) NOT NULL REFERENCES users(id),
+                    segment_id VARCHAR(32) NOT NULL REFERENCES article_segments(id),
+                    token_index INTEGER NOT NULL,
+                    surface VARCHAR(128) NOT NULL,
+                    yomi VARCHAR(128) NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    CONSTRAINT uq_segment_reading_overrides_user_segment_token
+                        UNIQUE (user_id, segment_id, token_index)
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_segment_reading_overrides_user_id
+                ON segment_reading_overrides (user_id)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_segment_reading_overrides_segment_id
+                ON segment_reading_overrides (segment_id)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE IF EXISTS segment_reading_overrides
+                ALTER COLUMN yomi DROP NOT NULL
+                """
+            )
+        )

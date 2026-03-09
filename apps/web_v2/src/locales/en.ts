@@ -112,6 +112,18 @@ export default {
           unsupported: 'This browser does not support text-to-speech.',
           failed: 'Failed to read aloud. Please try again.',
         },
+        furigana: {
+          entry: 'Furigana edit',
+          finish: 'Done editing',
+          weakHint: 'You can adjust furigana before recording',
+          editingHint: 'Tap words to edit furigana before recording',
+          empty: 'Edit mode is on. Tap a word above to update reading.',
+          inputPlaceholder: 'Input reading (hiragana)',
+          reset: 'Reset',
+          prev: 'Prev',
+          next: 'Next',
+          saving: 'Saving furigana…',
+        },
         startRecording: 'Tap to start recording',
         recognizing: 'Recognizing…',
         score: {
