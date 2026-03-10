@@ -70,7 +70,7 @@ def get_practice_attempt_audio(
 @router.get("/practice/articles/{article_id}/progress", response_model=PracticeArticleProgressResponse)
 def get_article_practice_progress(
     article_id: str,
-    level: str = Query(default="L1", pattern="^L[1-4]$"),
+    level: str = Query(default="L0", pattern="^L[0-4]$"),
     current_segment_order: int | None = Query(default=None, ge=1),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

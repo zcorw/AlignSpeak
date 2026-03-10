@@ -1,6 +1,7 @@
 import type { PracticeLanguage, PracticeLevel, PracticeReadingToken } from '../../services/practiceService'
 
 const LEVEL_MASK_RATIO: Record<PracticeLevel, number> = {
+  L0: 0,
   L1: 0.2,
   L2: 0.4,
   L3: 0.7,

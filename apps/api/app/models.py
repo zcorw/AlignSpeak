@@ -166,7 +166,7 @@ class PracticeAttempt(Base):
     user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), nullable=False, index=True)
     article_id: Mapped[str] = mapped_column(String(32), ForeignKey("articles.id"), nullable=False, index=True)
     segment_id: Mapped[str] = mapped_column(String(32), ForeignKey("article_segments.id"), nullable=False, index=True)
-    practice_level: Mapped[str] = mapped_column(String(8), nullable=False, default="L1")
+    practice_level: Mapped[str] = mapped_column(String(8), nullable=False, default="L0")
     alignment_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="token")
     audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

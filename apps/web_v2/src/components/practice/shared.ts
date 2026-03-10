@@ -3,7 +3,7 @@ import type { PracticeLevel, PracticeProgressCellState } from '../../services/pr
 
 export type PracticeMatrix = Record<PracticeLevel, PracticeProgressCellState[]>
 
-export const PRACTICE_LEVELS: PracticeLevel[] = ['L1', 'L2', 'L3', 'L4']
+export const PRACTICE_LEVELS: PracticeLevel[] = ['L0', 'L1', 'L2', 'L3', 'L4']
 
 export const iconButtonSx: SxProps<Theme> = {
   width: 36,
@@ -19,4 +19,3 @@ export const iconButtonSx: SxProps<Theme> = {
   transition: 'background-color 0.15s, color 0.15s',
   '&:hover': { bgcolor: '#22223a', color: 'text.primary' },
 }
-

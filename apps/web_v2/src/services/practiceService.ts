@@ -20,7 +20,7 @@ function toCamelCase<T>(obj: unknown): T {
 
 export type PracticeLanguage = 'ja' | 'en' | 'zh'
 export type PracticeProgressCellState = 'pass' | 'current' | 'skip' | 'fail'
-export type PracticeLevel = 'L1' | 'L2' | 'L3' | 'L4'
+export type PracticeLevel = 'L0' | 'L1' | 'L2' | 'L3' | 'L4'
 
 export interface PracticeReadingToken {
   tokenIndex?: number
@@ -88,7 +88,7 @@ interface RawPracticeArticleProgress {
   recentScores?: number[]
 }
 
-const LEVELS: PracticeLevel[] = ['L1', 'L2', 'L3', 'L4']
+const LEVELS: PracticeLevel[] = ['L0', 'L1', 'L2', 'L3', 'L4']
 
 const toValidCellState = (value: string | undefined): PracticeProgressCellState => {
   if (value === 'pass' || value === 'current' || value === 'skip' || value === 'fail') return value
@@ -96,8 +96,8 @@ const toValidCellState = (value: string | undefined): PracticeProgressCellState 
 }
 
 const toValidLevel = (value: string | undefined): PracticeLevel => {
-  if (value === 'L1' || value === 'L2' || value === 'L3' || value === 'L4') return value
-  return 'L1'
+  if (value === 'L0' || value === 'L1' || value === 'L2' || value === 'L3' || value === 'L4') return value
+  return 'L0'
 }
 
 const createEmptyMatrix = (size: number): Record<PracticeLevel, PracticeProgressCellState[]> =>

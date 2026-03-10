@@ -19,7 +19,7 @@ class UploadChunkResponse(BaseModel):
 class FinishRecordingPayload(BaseModel):
     total_chunks: int = Field(ge=1, le=10000)
     duration_ms: int = Field(ge=0, le=600000)
-    level: str = Field(default="L1", pattern="^L[1-4]$")
+    level: str = Field(default="L0", pattern="^L[0-4]$")
 
 
 class FinishRecordingResponse(BaseModel):

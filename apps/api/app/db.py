@@ -96,7 +96,7 @@ def apply_runtime_schema_fixes() -> None:
             text(
                 """
                 UPDATE practice_attempts
-                SET practice_level = 'L1'
+                SET practice_level = 'L0'
                 WHERE practice_level IS NULL
                 """
             )
@@ -105,7 +105,7 @@ def apply_runtime_schema_fixes() -> None:
             text(
                 """
                 ALTER TABLE IF EXISTS practice_attempts
-                ALTER COLUMN practice_level SET DEFAULT 'L1'
+                ALTER COLUMN practice_level SET DEFAULT 'L0'
                 """
             )
         )

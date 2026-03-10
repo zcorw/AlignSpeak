@@ -6,17 +6,19 @@ export type MatrixState = PracticeProgressCellState
 export type Level = PracticeLevel
 
 export const TARGET = 85
-export const RESULT_LEVELS: Level[] = ['L1', 'L2', 'L3', 'L4']
+export const RESULT_LEVELS: Level[] = ['L0', 'L1', 'L2', 'L3', 'L4']
 
 export const parseLevelFromQuery = (value: string | null): Level => {
+  if (value === 'L0' || value === '0') return 'L0'
   if (value === 'L1' || value === '1') return 'L1'
   if (value === 'L2' || value === '2') return 'L2'
   if (value === 'L3' || value === '3') return 'L3'
   if (value === 'L4' || value === '4') return 'L4'
-  return 'L1'
+  return 'L0'
 }
 
 export const nextLevel = (level: Level): Level | null => {
+  if (level === 'L0') return 'L1'
   if (level === 'L1') return 'L2'
   if (level === 'L2') return 'L3'
   if (level === 'L3') return 'L4'
@@ -91,4 +93,3 @@ export const tokenSx = (state: AlignmentStatus) => ({
     color: 'text.secondary',
   }),
 })
-

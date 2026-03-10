@@ -20,7 +20,7 @@ export const useResultData = (searchParams: URLSearchParams): UseResultDataResul
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [detail, setDetail] = useState<AttemptResultDetail | null>(null)
-  const [matrix, setMatrix] = useState<PracticeMatrix>(createFallbackMatrix(0, 'L1', 1))
+  const [matrix, setMatrix] = useState<PracticeMatrix>(createFallbackMatrix(0, 'L0', 1))
   const [matrixLoading, setMatrixLoading] = useState(false)
 
   const level = parseLevelFromQuery(searchParams.get('lv'))
@@ -103,4 +103,3 @@ export const useResultData = (searchParams: URLSearchParams): UseResultDataResul
     matrixLoading,
   }
 }
-

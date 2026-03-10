@@ -42,7 +42,7 @@ from app.services.alignment_service import align_segment_text
 from app.services.reading_service import build_segment_reading_tokens
 from app.services.stt_service import transcribe_audio_by_provider
 
-PRACTICE_LEVELS = ("L1", "L2", "L3", "L4")
+PRACTICE_LEVELS = ("L0", "L1", "L2", "L3", "L4")
 
 
 def get_attempt_result(
@@ -449,7 +449,7 @@ def finish_recording(
     recording_id: str,
     total_chunks: int,
     duration_ms: int,
-    practice_level: str = "L1",
+    practice_level: str = "L0",
 ) -> FinishRecordingResponse:
     if practice_level not in PRACTICE_LEVELS:
         raise AppError(
