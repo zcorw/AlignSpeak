@@ -271,6 +271,20 @@ export const EditorTextOverlay = ({
               <Typography sx={{ fontSize: '12px', color: 'text.disabled' }}>{detectedLanguageHint}</Typography>
             </Box>
 
+            <Typography
+              sx={{
+                fontSize: '12px',
+                color: 'text.disabled',
+                px: '10px',
+                py: '6px',
+                borderRadius: '8px',
+                border: '1px dashed rgba(255,255,255,0.16)',
+                bgcolor: 'rgba(255,255,255,0.02)',
+              }}
+            >
+              {t('pages.editor.overlay.segmentRuleHint')}
+            </Typography>
+
             <Box
               component="textarea"
               ref={textareaRef}
@@ -279,7 +293,7 @@ export const EditorTextOverlay = ({
               placeholder={t('pages.editor.overlay.placeholder')}
               sx={{
                 flex: 1,
-                minHeight: 0,
+                minHeight: 180,
                 px: '14px',
                 py: '12px',
                 bgcolor: '#22223a',
@@ -299,6 +313,105 @@ export const EditorTextOverlay = ({
                 },
               }}
             />
+
+            <Box
+              sx={{
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '10px',
+                bgcolor: 'rgba(255,255,255,0.02)',
+                minHeight: 120,
+                maxHeight: 200,
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <Typography
+                sx={{
+                  px: '10px',
+                  py: '8px',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.7px',
+                  textTransform: 'uppercase',
+                  color: 'text.disabled',
+                }}
+              >
+                {t('pages.editor.overlay.segmentList', { count: segments.length })}
+              </Typography>
+              <Box
+                sx={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  p: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                {segments.length === 0 ? (
+                  <Typography
+                    sx={{
+                      fontSize: '12px',
+                      color: 'text.disabled',
+                      p: '10px',
+                      border: '1px dashed rgba(255,255,255,0.12)',
+                      borderRadius: '8px',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {t('pages.editor.overlay.segmentListEmpty')}
+                  </Typography>
+                ) : (
+                  segments.map((item, index) => (
+                    <Box
+                      key={`${index}-${item.slice(0, 24)}`}
+                      sx={{
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '8px',
+                        bgcolor: '#22223a',
+                        p: '8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          fontFamily: '"SF Mono", "Fira Code", monospace',
+                          fontSize: '11px',
+                          color: 'text.disabled',
+                        }}
+                      >
+                        <Box sx={{ color: 'text.secondary', fontWeight: 700 }}>{`#${index + 1}`}</Box>
+                        <Box>{t('pages.editor.overlay.segmentChars', { count: item.replace(/\s/g, '').length })}</Box>
+                      </Box>
+                      <Typography
+                        sx={{
+                          fontSize: '12px',
+                          color: 'text.secondary',
+                          lineHeight: 1.5,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {item}
+                      </Typography>
+                    </Box>
+                  ))
+                )}
+              </Box>
+            </Box>
           </Box>
 
           <Box
@@ -311,59 +424,6 @@ export const EditorTextOverlay = ({
               gap: '10px',
             }}
           >
-            {segments.length > 0 && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <Typography
-                  sx={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    letterSpacing: '0.7px',
-                    textTransform: 'uppercase',
-                    color: 'text.disabled',
-                  }}
-                >
-                  {t('pages.editor.overlay.segmentPreview')}
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {segments.slice(0, 4).map((item, index) => (
-                    <Box
-                      key={`${item}-${index}`}
-                      sx={{
-                        px: '10px',
-                        py: '4px',
-                        maxWidth: 120,
-                        borderRadius: '999px',
-                        bgcolor: '#22223a',
-                        border: '1px solid rgba(255,255,255,0.07)',
-                        fontSize: '12px',
-                        color: 'text.secondary',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {`#${index + 1} ${item.slice(0, 12)}${item.length > 12 ? '...' : ''}`}
-                    </Box>
-                  ))}
-                  {segments.length > 4 && (
-                    <Box
-                      sx={{
-                        px: '10px',
-                        py: '4px',
-                        borderRadius: '999px',
-                        bgcolor: '#22223a',
-                        border: '1px solid rgba(255,255,255,0.07)',
-                        fontSize: '12px',
-                        color: 'text.disabled',
-                      }}
-                    >
-                      {t('pages.editor.overlay.moreSegments', { count: segments.length - 4 })}
-                    </Box>
-                  )}
-                </Box>
-              </Box>
-            )}
-
             {validationMessage && (
               <Typography sx={{ fontSize: '13px', color: 'error.main' }}>{validationMessage}</Typography>
             )}
