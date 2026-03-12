@@ -39,6 +39,7 @@ export const usePracticeRecording = ({
   const uploadTasksRef = useRef<Array<Promise<void>>>([])
   const recordingStartAtRef = useRef<number | null>(null)
   const finalizingRef = useRef(false)
+  const skipFinalizeRef = useRef(false)
   const recordSecondsRef = useRef(0)
 
   const [recordOverlayOpen, setRecordOverlayOpen] = useState(false)
@@ -164,6 +165,7 @@ export const usePracticeRecording = ({
       chunkSeqRef.current = 0
       uploadTasksRef.current = []
       recordingStartAtRef.current = Date.now()
+      skipFinalizeRef.current = false
       setRecordSeconds(0)
       setRecordOverlayOpen(true)
       setIsRecording(true)
@@ -179,6 +181,14 @@ export const usePracticeRecording = ({
         setIsRecording(false)
         if (mediaStreamRef.current) {
           mediaStreamRef.current.getTracks().forEach((track) => track.stop())
+        }
+        const skipFinalize = skipFinalizeRef.current
+        skipFinalizeRef.current = false
+        if (skipFinalize) {
+          cleanupRecordingMedia()
+          resetRecordingState()
+          setRecognizing(false)
+          return
         }
         void runFinishAndAlign()
       }
@@ -207,6 +217,7 @@ export const usePracticeRecording = ({
   ])
 
   const stopRecording = useCallback(() => {
+    skipFinalizeRef.current = false
     stopSpeaking()
     setRecordOverlayOpen(false)
     const recorder = mediaRecorderRef.current
@@ -217,6 +228,26 @@ export const usePracticeRecording = ({
     }
     void runFinishAndAlign()
   }, [runFinishAndAlign, stopSpeaking])
+
+  const cancelRecording = useCallback(() => {
+    skipFinalizeRef.current = true
+    stopSpeaking()
+    setRecordOverlayOpen(false)
+    const recorder = mediaRecorderRef.current
+    if (!recorder) {
+      cleanupRecordingMedia()
+      resetRecordingState()
+      setRecognizing(false)
+      return
+    }
+    if (recorder.state !== 'inactive') {
+      recorder.stop()
+      return
+    }
+    cleanupRecordingMedia()
+    resetRecordingState()
+    setRecognizing(false)
+  }, [cleanupRecordingMedia, resetRecordingState, stopSpeaking])
 
   const retrySync = useCallback(async () => {
     if (!lastAttemptId || !currentSegment) return
@@ -258,6 +289,7 @@ export const usePracticeRecording = ({
     isRecording,
     startRecording,
     stopRecording,
+    cancelRecording,
     retrySync,
     clearFeedback,
   }

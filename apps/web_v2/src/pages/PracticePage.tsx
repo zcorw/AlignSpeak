@@ -177,6 +177,7 @@ export const PracticePage = () => {
     isRecording,
     startRecording,
     stopRecording,
+    cancelRecording,
     retrySync,
     clearFeedback,
   } = usePracticeRecording({
@@ -499,7 +500,7 @@ export const PracticePage = () => {
         )}
         recordingStatusLabel={t('pages.practice.recording.status')}
         stopLabel={t('pages.practice.recording.stop')}
-        onClose={stopRecording}
+        onClose={cancelRecording}
         onStop={stopRecording}
       />
 
