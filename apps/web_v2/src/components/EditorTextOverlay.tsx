@@ -30,6 +30,21 @@ const fallbackDetectLanguage = (value: string): OverlayLanguageCode => {
 const isDetectableLanguage = (value: string): value is DetectableLanguageCode =>
   value === 'en' || value === 'zh' || value === 'ja'
 
+const normalizeTextForPreview = (value: string) => {
+  const unified = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const rightTrimmed = unified
+    .split('\n')
+    .map((line) => line.replace(/\s+$/g, ''))
+    .join('\n')
+  return rightTrimmed.replace(/\n{3,}/g, '\n\n').trim()
+}
+
+const splitSegmentsForPreview = (normalizedText: string) =>
+  normalizedText
+    .split(/\n\s*\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
 export const EditorTextOverlay = ({
   open,
   ocrLoading,
@@ -54,9 +69,9 @@ export const EditorTextOverlay = ({
     window.setTimeout(() => textareaRef.current?.focus(), 50)
   }, [focusVersion, open])
 
-  const trimmedText = text.trim()
+  const trimmedText = useMemo(() => normalizeTextForPreview(text), [text])
   const segments = useMemo(
-    () => (trimmedText ? trimmedText.split(/\n+/).map((item) => item.trim()).filter(Boolean) : []),
+    () => (trimmedText ? splitSegmentsForPreview(trimmedText) : []),
     [trimmedText]
   )
   const charCount = trimmedText.replace(/\s/g, '').length
