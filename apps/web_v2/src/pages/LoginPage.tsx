@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { loginSchema } from '../utils/validation'
 import { Alert } from '../components/Alert'
 import { AuthCardLayout } from '../components/auth/AuthCardLayout'
+import { AuthBrandIntro } from '../components/auth/AuthBrandIntro'
 import { AuthField } from '../components/auth/AuthField'
 import { AuthPrimaryButton } from '../components/auth/AuthPrimaryButton'
 import { AuthSecondaryButton } from '../components/auth/AuthSecondaryButton'
@@ -68,6 +69,7 @@ export const LoginPage = () => {
       title={t('pages.login.title')}
       description={t('pages.login.description')}
     >
+      <AuthBrandIntro />
       <Box
         component="form"
         onSubmit={handleSubmit}

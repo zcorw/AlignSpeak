@@ -265,6 +265,12 @@ export default {
       login: {
         title: 'Sign In to AlignSpeak',
         description: 'Use your email and password to continue.',
+        brandName: 'AlignSpeak',
+        brandTagline: '文章跟读练习',
+        brandSummary: '导入文章后进行跟读录音，并获得即时对齐反馈。',
+        featureImport: '导入文章',
+        featureShadowing: '影子跟读',
+        featureFeedback: '对齐反馈',
         email: 'EMAIL',
         password: 'PASSWORD',
         emailPlaceholder: 'you@example.com',

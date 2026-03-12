@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="alignspeakFaviconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7f72ff" />
+      <stop offset="100%" stop-color="#22d8a4" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="#0d1126" />
+  <circle cx="32" cy="32" r="22" fill="none" stroke="url(#alignspeakFaviconGradient)" stroke-width="3.5" />
+  <path d="M21 37c2.8-6.6 6.7-9.7 11-9.7 4.4 0 8.2 3.1 11 9.7" fill="none" stroke="#cbc6ff" stroke-width="3.1" stroke-linecap="round" />
+  <circle cx="24.5" cy="28.5" r="3" fill="#8f84ff" />
+  <circle cx="39.5" cy="28.5" r="3" fill="#24d2a3" />
+</svg>

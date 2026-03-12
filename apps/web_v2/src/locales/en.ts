@@ -265,6 +265,12 @@ export default {
       login: {
         title: 'Sign In to AlignSpeak',
         description: 'Use your email and password to continue.',
+        brandName: 'AlignSpeak',
+        brandTagline: 'Article Shadowing Studio',
+        brandSummary: 'Practice speaking with article-based shadowing and instant alignment feedback.',
+        featureImport: 'Import Article',
+        featureShadowing: 'Shadowing Practice',
+        featureFeedback: 'Alignment Feedback',
         email: 'EMAIL',
         password: 'PASSWORD',
         emailPlaceholder: 'you@example.com',
