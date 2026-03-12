@@ -193,13 +193,14 @@ export default {
           legendInserted: 'Inserted',
         },
         progress: {
-          title: 'L2 full-article pass progress',
-          hint: 'Pass all 5 segments to level up to L3',
+          title: '{{level}} full-article pass progress',
+          hint: 'Pass all {{total}} segments to level up to {{nextLevel}}',
+          hintMax: 'All levels completed',
         },
         levelUp: {
-          title: 'L2 fully completed!',
-          subtitle: 'L3 unlocked. Keep it up!',
-          button: 'Start L3 practice',
+          title: '{{level}} fully completed!',
+          subtitle: '{{nextLevel}} unlocked. Keep it up!',
+          button: 'Start {{nextLevel}} practice',
         },
         actions: {
           hintPassed: 'Passed. You can move to the next segment',

@@ -193,13 +193,14 @@ export default {
           legendInserted: '多读',
         },
         progress: {
-          title: 'L2 整篇达标进度',
-          hint: '所有 5 段达标后升至 L3',
+          title: '{{level}} 整篇达标进度',
+          hint: '所有 {{total}} 段达标后升至 {{nextLevel}}',
+          hintMax: '已完成全部等级',
         },
         levelUp: {
-          title: 'L2 全段达标！',
-          subtitle: '已解锁 L3，继续保持！',
-          button: '开始 L3 练习',
+          title: '{{level}} 全段达标！',
+          subtitle: '已解锁 {{nextLevel}}，继续保持！',
+          button: '开始 {{nextLevel}} 练习',
         },
         actions: {
           hintPassed: '已达标，可继续下一段',

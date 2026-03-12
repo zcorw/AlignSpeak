@@ -6,12 +6,18 @@ import { matrixCellSx, RESULT_LEVELS, type Level, type MatrixState } from './sha
 interface ResultProgressMatrixProps {
   matrix: PracticeMatrix
   loading: boolean
+  currentLevel: Level
+  nextUnlockedLevel: Level | null
+  totalSegments: number
   onSelectSegment: (level: Level, segmentOrder: number, state: MatrixState) => void
 }
 
 export const ResultProgressMatrix = ({
   matrix,
   loading,
+  currentLevel,
+  nextUnlockedLevel,
+  totalSegments,
   onSelectSegment,
 }: ResultProgressMatrixProps) => {
   const { t } = useTranslation()
@@ -19,7 +25,7 @@ export const ResultProgressMatrix = ({
   return (
     <>
       <Typography sx={{ px: '2px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'text.disabled' }}>
-        {t('pages.result.progress.title')}
+        {t('pages.result.progress.title', { level: currentLevel })}
       </Typography>
       <Box sx={{ bgcolor: '#1a1a2c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', p: '18px' }}>
         {loading && (
@@ -48,10 +54,11 @@ export const ResultProgressMatrix = ({
           ))}
         </Box>
         <Typography sx={{ mt: '12px', fontSize: '12px', color: 'text.disabled' }}>
-          {t('pages.result.progress.hint')}
+          {nextUnlockedLevel
+            ? t('pages.result.progress.hint', { total: totalSegments, nextLevel: nextUnlockedLevel })
+            : t('pages.result.progress.hintMax')}
         </Typography>
       </Box>
     </>
   )
 }
-

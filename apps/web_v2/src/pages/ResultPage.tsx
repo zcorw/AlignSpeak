@@ -27,12 +27,14 @@ export const ResultPage = () => {
   const unlockedLevel = nextLevel(level)
   const nextSegmentOrder =
     detail && detail.totalSegments > 0 ? Math.min(detail.segmentOrder + 1, detail.totalSegments) : 1
+  const nextPracticeLevel = levelUnlocked && unlockedLevel ? unlockedLevel : level
+  const nextPracticeSegment = levelUnlocked && unlockedLevel ? 1 : nextSegmentOrder
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <ResultTopBar
         articleTitle={detail?.articleTitle ?? '...'}
-        subtitle={detail ? `${level} 路 Segment ${detail.segmentOrder}/${detail.totalSegments}` : t('common.loading')}
+        subtitle={detail ? `${level} · Segment ${detail.segmentOrder}/${detail.totalSegments}` : t('common.loading')}
         onBack={() => navigate(detail ? `/practice?a=${detail.articleId}&seg=${detail.segmentOrder}&lv=${level}` : '/practice')}
         onOpenMe={() => navigate('/me')}
       />
@@ -72,6 +74,9 @@ export const ResultPage = () => {
             <ResultProgressMatrix
               matrix={matrix}
               loading={matrixLoading}
+              currentLevel={level}
+              nextUnlockedLevel={unlockedLevel}
+              totalSegments={detail.totalSegments}
               onSelectSegment={(selectedLevel, segmentOrder, state) => {
                 if (state === 'pass' || state === 'current') {
                   navigate(`/practice?a=${detail.articleId}&seg=${segmentOrder}&lv=${selectedLevel}`)
@@ -81,6 +86,7 @@ export const ResultPage = () => {
 
             {levelUnlocked && unlockedLevel && (
               <ResultLevelUpCard
+                currentLevel={level}
                 unlockedLevel={unlockedLevel}
                 onStart={(selectedLevel) => navigate(`/practice?a=${detail.articleId}&seg=1&lv=${selectedLevel}`)}
               />
@@ -89,7 +95,7 @@ export const ResultPage = () => {
             <ResultActionsCard
               passed={passed}
               onPracticeAgain={() => navigate(`/practice?a=${detail.articleId}&seg=${detail.segmentOrder}&lv=${level}`)}
-              onNextSegment={() => navigate(`/practice?a=${detail.articleId}&seg=${nextSegmentOrder}&lv=${level}`)}
+              onNextSegment={() => navigate(`/practice?a=${detail.articleId}&seg=${nextPracticeSegment}&lv=${nextPracticeLevel}`)}
             />
           </>
         )}
