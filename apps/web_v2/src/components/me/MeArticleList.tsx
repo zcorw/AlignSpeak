@@ -16,7 +16,11 @@ interface MeArticleListProps {
   practiceCountText: (article: MeArticle) => string
   doneBadgeLabel: string
   currentBadgeLabel: string
+  editLabel: string
+  deleteLabel: string
   onOpenArticle: (article: MeArticle) => void
+  onEditArticle: (article: MeArticle) => void
+  onDeleteArticle: (article: MeArticle) => void
   toArticleBadge: (title: string) => string
 }
 
@@ -34,7 +38,11 @@ export const MeArticleList = ({
   practiceCountText,
   doneBadgeLabel,
   currentBadgeLabel,
+  editLabel,
+  deleteLabel,
   onOpenArticle,
+  onEditArticle,
+  onDeleteArticle,
   toArticleBadge,
 }: MeArticleListProps) => (
   <Box sx={{ display: 'flex', flexDirection: 'column', px: '20px', pt: '4px', pb: '32px', gap: '10px' }}>
@@ -70,7 +78,11 @@ export const MeArticleList = ({
           practiceCountText={practiceCountText(article)}
           doneBadgeLabel={doneBadgeLabel}
           currentBadgeLabel={currentBadgeLabel}
+          editLabel={editLabel}
+          deleteLabel={deleteLabel}
           onOpen={onOpenArticle}
+          onEdit={onEditArticle}
+          onDelete={onDeleteArticle}
           toArticleBadge={toArticleBadge}
         />
       ))

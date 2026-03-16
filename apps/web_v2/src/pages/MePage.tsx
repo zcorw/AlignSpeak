@@ -8,8 +8,10 @@ import { MeFilterTabs } from '../components/me/MeFilterTabs'
 import { MeInviteEntry } from '../components/me/MeInviteEntry'
 import { MeProfileHeader } from '../components/me/MeProfileHeader'
 import { MeTopBar } from '../components/me/MeTopBar'
+import { useConfirm, useNotifier } from '../components/common/FeedbackProvider'
 import type { MeFilterType } from '../components/me/types'
 import { useChangePassword } from '../hooks/me/useChangePassword'
+import { articleService } from '../services/articleService'
 import { authService, getApiErrorMessage } from '../services/authService'
 import { useMeOverview } from '../hooks/me/useMeOverview'
 import { useAuthStore } from '../stores/authStore'
@@ -36,6 +38,8 @@ export const MePage = () => {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const clearAuth = useAuthStore((state) => state.clearAuth)
+  const { confirm } = useConfirm()
+  const { success: showSuccess, error: showError } = useNotifier()
   const [filter, setFilter] = useState<MeFilterType>('all')
   const {
     loading,
@@ -45,6 +49,7 @@ export const MePage = () => {
     totalPractices,
     activeArticleId,
     setActiveArticleId,
+    refresh,
   } = useMeOverview(filter)
   const password = useChangePassword()
   const [inviteGenerating, setInviteGenerating] = useState(false)
@@ -105,6 +110,34 @@ export const MePage = () => {
   const handleLogout = () => {
     clearAuth()
     navigate('/login', { replace: true })
+  }
+
+  const handleEditArticle = (articleId: string) => {
+    navigate(`/editor?article=${encodeURIComponent(articleId)}`)
+  }
+
+  const handleDeleteArticle = (articleId: string) => {
+    void (async () => {
+      const accepted = await confirm({
+        title: t('common.delete'),
+        message: t('pages.me.article.deleteConfirm'),
+        confirmLabel: t('common.delete'),
+        cancelLabel: t('common.cancel'),
+        danger: true,
+      })
+      if (!accepted) return
+
+      try {
+        await articleService.deleteArticle(articleId)
+        if (activeArticleId === articleId) {
+          sessionStorage.removeItem('article_id')
+        }
+        showSuccess(t('pages.me.article.deleteSuccess'))
+        refresh()
+      } catch (error: unknown) {
+        showError(getApiErrorMessage(error, t('common.error')))
+      }
+    })()
   }
 
   return (
@@ -173,9 +206,17 @@ export const MePage = () => {
           practiceCountText={(article) => t('pages.me.article.practiceCount', { count: article.practiceCount })}
           doneBadgeLabel={t('pages.me.article.doneBadge')}
           currentBadgeLabel={t('pages.me.article.currentBadge')}
+          editLabel={t('common.edit')}
+          deleteLabel={t('common.delete')}
           onOpenArticle={(article) => {
             setActiveArticleId(article.id)
             navigate(`/practice?a=${article.id}&seg=${article.currentSegmentOrder}&lv=L${article.level}`)
+          }}
+          onEditArticle={(article) => {
+            handleEditArticle(article.id)
+          }}
+          onDeleteArticle={(article) => {
+            handleDeleteArticle(article.id)
           }}
           toArticleBadge={toArticleBadge}
         />

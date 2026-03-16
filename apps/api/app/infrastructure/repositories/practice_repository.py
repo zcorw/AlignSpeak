@@ -28,6 +28,7 @@ class PracticeRepository:
             .join(ArticleSegment, ArticleSegment.article_id == Article.id)
             .where(
                 Article.user_id == user_id,
+                Article.deleted_at.is_(None),
                 ArticleSegment.id == segment_id,
             )
         )
@@ -43,6 +44,7 @@ class PracticeRepository:
             .where(
                 Article.id == article_id,
                 Article.user_id == user_id,
+                Article.deleted_at.is_(None),
             )
             .order_by(ArticleSegment.segment_order.asc())
         )

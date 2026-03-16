@@ -48,10 +48,12 @@ export default {
         topbar: {
           backAriaLabel: 'Back',
           title: 'New Article',
+          editTitle: 'Edit Article',
           meAriaLabel: 'My profile',
         },
         headline: 'Choose import method',
         description: 'After importing an article, you can proofread and confirm segment breaks.',
+        updateSuccess: 'Article updated.',
         methods: {
           clipboard: {
             name: 'Paste from clipboard',
@@ -236,6 +238,8 @@ export default {
           completed: 'Done',
           allPassed: 'All passed',
           lastPractice: 'Last practice: {{time}}',
+          deleteConfirm: 'Delete this article? It will no longer be available for practice.',
+          deleteSuccess: 'Article deleted.',
           lastPracticeValues: {
             today: 'Today',
             twoDaysAgo: '2 days ago',

@@ -1,6 +1,7 @@
 import base64
 from functools import lru_cache
 from io import BytesIO
+import logging
 from pathlib import Path
 from typing import Protocol
 
@@ -9,6 +10,11 @@ from fastapi import status
 
 from app.core.config import settings
 from app.core.errors import AppError
+from app.db import SessionLocal
+from app.infrastructure.repositories.openai_usage_repository import OpenAIUsageRepository
+from app.services.openai_usage_service import OpenAIUsageContext, enforce_budget_or_raise, record_openai_usage_event
+
+logger = logging.getLogger(__name__)
 
 
 class OCRProvider(Protocol):
@@ -45,6 +51,13 @@ class OpenAIOCRProvider:
         self.timeout_seconds = timeout_seconds
 
     def extract_text(self, *, filename: str, content: bytes, language: str) -> str:
+        usage_context = OpenAIUsageContext(
+            module="ocr",
+            provider="openai",
+            model=self.model,
+        )
+        _enforce_openai_budget_for_ocr(usage_context=usage_context)
+
         extension = Path(filename).suffix.lower()
         mime_type_map = {
             ".png": "image/png",
@@ -94,8 +107,24 @@ class OpenAIOCRProvider:
                 timeout=self.timeout_seconds,
             )
             response.raise_for_status()
-            return _extract_openai_text(response.json())
+            payload = response.json()
+            input_tokens, output_tokens = _extract_openai_usage_tokens(payload)
+            _record_ocr_usage_event(
+                usage_context=usage_context,
+                request_success=True,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                error_code=None,
+            )
+            return _extract_openai_text(payload)
         except httpx.HTTPStatusError as exc:
+            _record_ocr_usage_event(
+                usage_context=usage_context,
+                request_success=False,
+                input_tokens=None,
+                output_tokens=None,
+                error_code="OCR_PROVIDER_ERROR",
+            )
             detail = exc.response.text if exc.response is not None else str(exc)
             raise AppError(
                 code="OCR_PROVIDER_ERROR",
@@ -103,12 +132,26 @@ class OpenAIOCRProvider:
                 status_code=status.HTTP_502_BAD_GATEWAY,
             ) from exc
         except httpx.HTTPError as exc:
+            _record_ocr_usage_event(
+                usage_context=usage_context,
+                request_success=False,
+                input_tokens=None,
+                output_tokens=None,
+                error_code="OCR_PROVIDER_ERROR",
+            )
             raise AppError(
                 code="OCR_PROVIDER_ERROR",
                 message=f"OpenAI OCR request failed: {str(exc)}",
                 status_code=status.HTTP_502_BAD_GATEWAY,
             ) from exc
         except ValueError as exc:
+            _record_ocr_usage_event(
+                usage_context=usage_context,
+                request_success=False,
+                input_tokens=None,
+                output_tokens=None,
+                error_code="OCR_PROVIDER_ERROR",
+            )
             raise AppError(
                 code="OCR_PROVIDER_ERROR",
                 message="OpenAI OCR response is not valid JSON.",
@@ -152,6 +195,72 @@ def _extract_openai_text(response_payload: dict) -> str:
                 if isinstance(content, str):
                     return content.strip()
     return ""
+
+
+def _extract_openai_usage_tokens(response_payload: dict) -> tuple[int | None, int | None]:
+    usage = response_payload.get("usage")
+    if not isinstance(usage, dict):
+        return None, None
+    input_raw = usage.get("input_tokens", usage.get("prompt_tokens"))
+    output_raw = usage.get("output_tokens", usage.get("completion_tokens"))
+    input_tokens = int(input_raw) if isinstance(input_raw, (int, float)) else None
+    output_tokens = int(output_raw) if isinstance(output_raw, (int, float)) else None
+    return input_tokens, output_tokens
+
+
+def _enforce_openai_budget_for_ocr(*, usage_context: OpenAIUsageContext) -> None:
+    db = None
+    try:
+        db = SessionLocal()
+        repository = OpenAIUsageRepository(db=db)
+        enforce_budget_or_raise(repository=repository, context=usage_context)
+    except AppError as exc:
+        _record_ocr_usage_event(
+            usage_context=usage_context,
+            request_success=False,
+            input_tokens=None,
+            output_tokens=None,
+            error_code=exc.code,
+        )
+        raise
+    except Exception:
+        logger.exception("Failed to enforce OCR budget guard.")
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+
+def _record_ocr_usage_event(
+    *,
+    usage_context: OpenAIUsageContext,
+    request_success: bool,
+    input_tokens: int | None,
+    output_tokens: int | None,
+    error_code: str | None,
+) -> None:
+    db = None
+    try:
+        db = SessionLocal()
+        repository = OpenAIUsageRepository(db=db)
+        record_openai_usage_event(
+            repository=repository,
+            context=usage_context,
+            request_success=request_success,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            error_code=error_code,
+        )
+    except Exception:
+        logger.exception("Failed to persist OCR usage event.")
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
 
 
 @lru_cache(maxsize=1)

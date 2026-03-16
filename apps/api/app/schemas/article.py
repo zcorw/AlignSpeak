@@ -57,6 +57,27 @@ class ArticleListResponse(BaseModel):
     next_cursor: str | None = None
 
 
+class ArticleUpdatePayload(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    language: str | None = Field(default=None, min_length=2, max_length=8)
+    text: str | None = Field(default=None, min_length=1, max_length=20000)
+
+
+class ArticleUpdateResponse(BaseModel):
+    article_id: str
+    title: str
+    language: str
+    segment_count: int
+    text_updated: bool
+    updated_at: datetime
+
+
+class ArticleDeleteResponse(BaseModel):
+    article_id: str
+    deleted_at: datetime
+    status: str = "deleted"
+
+
 class CreateArticlePayload(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     language: str

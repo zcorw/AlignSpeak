@@ -40,6 +40,9 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_OCR_MODEL: ${OPENAI_OCR_MODEL:-gpt-4.1-mini}
       OPENAI_OCR_TIMEOUT_SECONDS: ${OPENAI_OCR_TIMEOUT_SECONDS:-45}
+      OPENAI_MONTHLY_BUDGET_USD: ${OPENAI_MONTHLY_BUDGET_USD:-10}
+      OPENAI_BUDGET_ALERT_THRESHOLD_USD: ${OPENAI_BUDGET_ALERT_THRESHOLD_USD:-8}
+      OPENAI_BUDGET_HARD_STOP_USD: ${OPENAI_BUDGET_HARD_STOP_USD:-9.5}
     volumes:
       - ./data/media/tts:/app/media/tts
       - ./data/media/stt:/app/media/stt
@@ -78,6 +81,9 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_OCR_MODEL: ${OPENAI_OCR_MODEL:-gpt-4.1-mini}
       OPENAI_OCR_TIMEOUT_SECONDS: ${OPENAI_OCR_TIMEOUT_SECONDS:-45}
+      OPENAI_MONTHLY_BUDGET_USD: ${OPENAI_MONTHLY_BUDGET_USD:-10}
+      OPENAI_BUDGET_ALERT_THRESHOLD_USD: ${OPENAI_BUDGET_ALERT_THRESHOLD_USD:-8}
+      OPENAI_BUDGET_HARD_STOP_USD: ${OPENAI_BUDGET_HARD_STOP_USD:-9.5}
     volumes:
       - ./data/media/tts:/app/media/tts
       - ./data/media/stt:/app/media/stt

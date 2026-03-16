@@ -1,6 +1,7 @@
-import { type ChangeEvent, useRef, useState } from 'react'
+import { type ChangeEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { useNotifier } from '../../components/common/FeedbackProvider'
 import type { OverlayLanguageCode } from '../../components/EditorTextOverlay'
 import { articleService } from '../../services/articleService'
 import { getApiErrorMessage } from '../../services/authService'
@@ -14,17 +15,24 @@ const buildArticleTitle = (text: string) => {
   return firstLine.length <= 50 ? firstLine : `${firstLine.slice(0, 50)}...`
 }
 
-export const useEditorImport = () => {
+const normalizeEditorText = (value: string) =>
+  value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+
+export const useEditorImport = (editingArticleId: string | null = null) => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { error: showError, success: showSuccess } = useNotifier()
   const inputRef = useRef<HTMLInputElement>(null)
+  const initialArticleRef = useRef<{ rawText: string; language: OverlayLanguageCode } | null>(null)
 
   const [overlayOpen, setOverlayOpen] = useState(false)
   const [ocrLoading, setOcrLoading] = useState(false)
   const [importedText, setImportedText] = useState('')
+  const [initialLanguage, setInitialLanguage] = useState<OverlayLanguageCode>('en')
   const [importVersion, setImportVersion] = useState(0)
   const [focusVersion, setFocusVersion] = useState(0)
   const [creatingArticle, setCreatingArticle] = useState(false)
+  const isEditing = Boolean(editingArticleId)
 
   const applyImportedText = (value: string) => {
     setImportedText(value)
@@ -76,7 +84,7 @@ export const useEditorImport = () => {
       })
       .catch((error: unknown) => {
         const message = getApiErrorMessage(error, t('common.error'))
-        window.alert(message)
+        showError(message)
       })
       .finally(() => {
         setOcrLoading(false)
@@ -88,6 +96,36 @@ export const useEditorImport = () => {
     setCreatingArticle(true)
 
     const title = buildArticleTitle(payload.text)
+    if (editingArticleId) {
+      const initial = initialArticleRef.current
+      const textChanged = normalizeEditorText(payload.text) !== normalizeEditorText(initial?.rawText ?? '')
+      const languageChanged = payload.language !== initial?.language
+      const updatePayload: {
+        title?: string
+        language?: OverlayLanguageCode
+        text?: string
+      } = { title }
+      if (textChanged) updatePayload.text = payload.text
+      if (languageChanged) updatePayload.language = payload.language
+
+      void articleService
+        .updateArticle(editingArticleId, updatePayload)
+        .then(() => {
+          sessionStorage.setItem('article_id', editingArticleId)
+          sessionStorage.setItem('article_lang', payload.language)
+          showSuccess(t('pages.editor.updateSuccess'))
+          navigate(`/practice?a=${encodeURIComponent(editingArticleId)}&seg=1&lv=L0`)
+        })
+        .catch((error: unknown) => {
+          const message = getApiErrorMessage(error, t('common.error'))
+          showError(message)
+        })
+        .finally(() => {
+          setCreatingArticle(false)
+        })
+      return
+    }
+
     void articleService
       .createArticle({
         title,
@@ -102,12 +140,39 @@ export const useEditorImport = () => {
       })
       .catch((error: unknown) => {
         const message = getApiErrorMessage(error, t('common.error'))
-        window.alert(message)
+        showError(message)
       })
       .finally(() => {
         setCreatingArticle(false)
       })
   }
+
+  useEffect(() => {
+    if (!editingArticleId) return
+    let active = true
+    setOverlayOpen(true)
+    setOcrLoading(true)
+    void articleService
+      .getArticleDetail(editingArticleId, false)
+      .then((detail) => {
+        if (!active) return
+        const language = detail.language === 'ja' || detail.language === 'zh' ? detail.language : 'en'
+        initialArticleRef.current = { rawText: detail.rawText, language }
+        setInitialLanguage(language)
+        applyImportedText(detail.rawText || '')
+      })
+      .catch((error: unknown) => {
+        if (!active) return
+        showError(getApiErrorMessage(error, t('common.error')))
+        navigate('/me', { replace: true })
+      })
+      .finally(() => {
+        if (active) setOcrLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [editingArticleId, navigate, showError, t])
 
   return {
     inputRef,
@@ -116,7 +181,9 @@ export const useEditorImport = () => {
     importedText,
     importVersion,
     focusVersion,
+    initialLanguage,
     creatingArticle,
+    isEditing,
     closeOverlay,
     openOverlay,
     pickFile,

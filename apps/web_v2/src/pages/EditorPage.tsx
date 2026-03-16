@@ -1,6 +1,6 @@
 import { Box, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { EditorTextOverlay } from '../components/EditorTextOverlay'
 import { EditorImportMethods } from '../components/editor/EditorImportMethods'
 import { EditorManualEntryTrigger } from '../components/editor/EditorManualEntryTrigger'
@@ -10,6 +10,8 @@ import { useEditorImport } from '../hooks/editor/useEditorImport'
 export const EditorPage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const editingArticleId = searchParams.get('article')?.trim() || null
   const {
     inputRef,
     overlayOpen,
@@ -17,21 +19,23 @@ export const EditorPage = () => {
     importedText,
     importVersion,
     focusVersion,
+    initialLanguage,
     creatingArticle,
+    isEditing,
     closeOverlay,
     openOverlay,
     pickFile,
     importFile,
     confirmArticle,
-  } = useEditorImport()
+  } = useEditorImport(editingArticleId)
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <EditorTopBar
-        title={t('pages.editor.topbar.title')}
+        title={isEditing ? t('pages.editor.topbar.editTitle') : t('pages.editor.topbar.title')}
         backAriaLabel={t('pages.editor.topbar.backAriaLabel')}
         meAriaLabel={t('pages.editor.topbar.meAriaLabel')}
-        onBack={() => navigate('/start')}
+        onBack={() => navigate(isEditing ? '/me' : '/start')}
         onOpenMe={() => navigate('/me')}
       />
 
@@ -108,6 +112,7 @@ export const EditorPage = () => {
         open={overlayOpen}
         ocrLoading={ocrLoading}
         importedText={importedText}
+        initialLanguage={initialLanguage}
         focusVersion={focusVersion}
         submitting={creatingArticle}
         onClose={closeOverlay}
@@ -116,4 +121,3 @@ export const EditorPage = () => {
     </Box>
   )
 }
-

@@ -12,6 +12,7 @@ interface UseMeOverviewResult {
   totalPractices: number
   activeArticleId: string | null
   setActiveArticleId: (articleId: string) => void
+  refresh: () => void
 }
 
 export const useMeOverview = (filter: MeFilterType): UseMeOverviewResult => {
@@ -19,6 +20,7 @@ export const useMeOverview = (filter: MeFilterType): UseMeOverviewResult => {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [articles, setArticles] = useState<MeArticle[]>([])
+  const [refreshVersion, setRefreshVersion] = useState(0)
   const [currentArticleId, setCurrentArticleId] = useState<string | null>(() => {
     const articleId = sessionStorage.getItem('article_id')?.trim()
     return articleId || null
@@ -52,11 +54,14 @@ export const useMeOverview = (filter: MeFilterType): UseMeOverviewResult => {
         setArticles(mapped)
         if (mapped.length > 0) {
           setCurrentArticleId((prev) => {
-            if (prev) return prev
+            if (prev && mapped.some((item) => item.id === prev)) return prev
             const nextCurrentArticleId = mapped[0].id
             sessionStorage.setItem('article_id', nextCurrentArticleId)
             return nextCurrentArticleId
           })
+        } else {
+          setCurrentArticleId(null)
+          sessionStorage.removeItem('article_id')
         }
       } catch (error: unknown) {
         if (!active) return
@@ -70,7 +75,7 @@ export const useMeOverview = (filter: MeFilterType): UseMeOverviewResult => {
     return () => {
       active = false
     }
-  }, [t])
+  }, [refreshVersion, t])
 
   const filteredArticles = useMemo(() => {
     if (filter === 'en') return articles.filter((item) => item.language === 'en')
@@ -83,11 +88,18 @@ export const useMeOverview = (filter: MeFilterType): UseMeOverviewResult => {
     () => articles.reduce((sum, item) => sum + item.practiceCount, 0),
     [articles]
   )
-  const activeArticleId = currentArticleId || articles[0]?.id || null
+  const activeArticleId =
+    currentArticleId && articles.some((item) => item.id === currentArticleId)
+      ? currentArticleId
+      : articles[0]?.id || null
 
   const setActiveArticleId = (articleId: string) => {
     setCurrentArticleId(articleId)
     sessionStorage.setItem('article_id', articleId)
+  }
+
+  const refresh = () => {
+    setRefreshVersion((prev) => prev + 1)
   }
 
   return {
@@ -98,6 +110,6 @@ export const useMeOverview = (filter: MeFilterType): UseMeOverviewResult => {
     totalPractices,
     activeArticleId,
     setActiveArticleId,
+    refresh,
   }
 }
-

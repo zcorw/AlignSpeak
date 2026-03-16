@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -62,6 +62,7 @@ class Article(Base):
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
     normalized_text: Mapped[str] = mapped_column(Text, nullable=False)
     source_type: Mapped[str] = mapped_column(String(24), nullable=False, default="manual")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
@@ -239,3 +240,23 @@ class AttemptNoiseSpan(Base):
     start_token: Mapped[int] = mapped_column(Integer, nullable=False)
     end_token: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class OpenAIUsageEvent(Base):
+    __tablename__ = "openai_usage_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now(), index=True
+    )
+    module: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False, default="openai")
+    model: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    estimated_cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    request_success: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    article_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    task_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)

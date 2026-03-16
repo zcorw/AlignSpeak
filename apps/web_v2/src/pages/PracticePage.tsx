@@ -27,6 +27,7 @@ import { usePracticeFuriganaSync } from '../hooks/practice/usePracticeFuriganaSy
 import { usePracticeRecording } from '../hooks/practice/usePracticeRecording'
 import { usePracticeRouteState } from '../hooks/practice/usePracticeRouteState'
 import { computeMaskedReadingTokenIndices } from '../components/practice/masking'
+import { useConfirm, useNotifier } from '../components/common/FeedbackProvider'
 
 type Level = PracticeLevel
 type SegmentResultState = {
@@ -40,6 +41,8 @@ const formatTimer = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds
 export const PracticePage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { confirm } = useConfirm()
+  const { error: notifyError } = useNotifier()
   const [showFullMode, setShowFullMode] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [segmentResultState, setSegmentResultState] = useState<SegmentResultState>({
@@ -75,10 +78,9 @@ export const PracticePage = () => {
     segmentResultState.segmentKey === activeSegmentKey ? segmentResultState.alignmentResult : null
   const showScore = segmentResultState.segmentKey === activeSegmentKey && segmentResultState.showScore
 
-  const alertFn = (globalThis as { alert?: (message?: string) => void }).alert
   const { isSpeaking, ttsLoading, speakSegment, stopSpeaking } = usePracticeAudio({
     failedMessage: t('pages.practice.readAloud.failed'),
-    onError: (message) => alertFn?.(message),
+    onError: notifyError,
   })
 
   const handleAligned = useCallback((result: AlignmentResult) => {
@@ -187,6 +189,7 @@ export const PracticePage = () => {
     ttsLoading,
     isSpeaking,
     stopSpeaking,
+    notifyError,
     errorMessage: t('common.error'),
     onBeforeStart: handleBeforeStart,
     onAligned: handleAligned,
@@ -204,21 +207,22 @@ export const PracticePage = () => {
     canEditFurigana && !recordOverlayOpen && !recognizing && !showScore && !loading && !loadError
   const isMaskingPhase = recordOverlayOpen || recognizing
   const maskingDisabled = !isMaskingPhase || (isEditMode && furiganaEditableUIVisible)
+  const supportsReadingTokens = articleLanguage === 'ja' || articleLanguage === 'zh'
 
   const maskedReadingTokenIndices = useMemo(() => {
-    if (articleLanguage !== 'ja') return new Set<number>()
+    if (!supportsReadingTokens) return new Set<number>()
     if (!currentSegment || maskingDisabled) return new Set<number>()
     return computeMaskedReadingTokenIndices(currentSegment.id, level, readingTokens)
-  }, [articleLanguage, currentSegment, level, maskingDisabled, readingTokens])
+  }, [currentSegment, level, maskingDisabled, readingTokens, supportsReadingTokens])
 
   const recordingMaskedReadingTokenIndices = useMemo(() => {
-    if (articleLanguage !== 'ja') return new Set<number>()
+    if (!supportsReadingTokens) return new Set<number>()
     if (!currentSegment) return new Set<number>()
     return computeMaskedReadingTokenIndices(currentSegment.id, level, readingTokens)
-  }, [articleLanguage, currentSegment, level, readingTokens])
+  }, [currentSegment, level, readingTokens, supportsReadingTokens])
 
   const recordingSegmentText = useMemo<ReactNode>(() => {
-    if (articleLanguage === 'ja') {
+    if (supportsReadingTokens) {
       return (
         <PracticeFuriganaText
           tokens={readingTokens}
@@ -237,9 +241,9 @@ export const PracticePage = () => {
         segmentId={currentSegment?.id ?? 'seg_unknown'}
       />
     )
-  }, [articleLanguage, currentSegment, level, readingTokens, recordingMaskedReadingTokenIndices, segmentText])
+  }, [articleLanguage, currentSegment, level, readingTokens, recordingMaskedReadingTokenIndices, segmentText, supportsReadingTokens])
 
-  const segmentContent = articleLanguage === 'ja' ? (
+  const segmentContent = supportsReadingTokens ? (
     <PracticeFuriganaText
       tokens={readingTokens}
       fallbackText={segmentText}
@@ -271,9 +275,14 @@ export const PracticePage = () => {
 
   const switchLevel = (nextLevel: Level) => {
     if (nextLevel === level) return
-    if (window.confirm(t('pages.practice.confirm.switchLevel', { level: nextLevel }))) {
-      setLevel(nextLevel)
-    }
+    void (async () => {
+      const accepted = await confirm({
+        message: t('pages.practice.confirm.switchLevel', { level: nextLevel }),
+      })
+      if (accepted) {
+        setLevel(nextLevel)
+      }
+    })()
   }
 
   const handleSelectSegment = useCallback((segmentOrder: number) => {
@@ -442,13 +451,18 @@ export const PracticePage = () => {
               navigate(`/result?${params.toString()}`)
             }}
             onSkipSegment={() => {
-              if (window.confirm(t('pages.practice.confirm.skipSegment'))) {
-                setSegmentResultState({
-                  segmentKey: activeSegmentKey,
-                  alignmentResult: null,
-                  showScore: false,
+              void (async () => {
+                const accepted = await confirm({
+                  message: t('pages.practice.confirm.skipSegment'),
                 })
-              }
+                if (accepted) {
+                  setSegmentResultState({
+                    segmentKey: activeSegmentKey,
+                    alignmentResult: null,
+                    showScore: false,
+                  })
+                }
+              })()
             }}
             labels={{
               passed: t('pages.practice.score.passed'),

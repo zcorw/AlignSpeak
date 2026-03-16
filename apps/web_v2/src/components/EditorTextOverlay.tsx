@@ -12,6 +12,7 @@ interface EditorTextOverlayProps {
   open: boolean
   ocrLoading: boolean
   importedText: string
+  initialLanguage?: OverlayLanguageCode
   focusVersion: number
   submitting: boolean
   onClose: () => void
@@ -49,6 +50,7 @@ export const EditorTextOverlay = ({
   open,
   ocrLoading,
   importedText,
+  initialLanguage,
   focusVersion,
   submitting,
   onClose,
@@ -58,7 +60,7 @@ export const EditorTextOverlay = ({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const detectRequestIdRef = useRef(0)
 
-  const [language, setLanguage] = useState<OverlayLanguageCode>(() => fallbackDetectLanguage(importedText))
+  const [language, setLanguage] = useState<OverlayLanguageCode>(() => initialLanguage || fallbackDetectLanguage(importedText))
   const [text, setText] = useState(importedText)
   const [detectingLanguage, setDetectingLanguage] = useState(false)
   const [detectedLanguage, setDetectedLanguage] = useState<DetectedLanguage | null>(null)

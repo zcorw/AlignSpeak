@@ -11,7 +11,11 @@ interface MeArticleCardProps {
   practiceCountText: string
   doneBadgeLabel: string
   currentBadgeLabel: string
+  editLabel: string
+  deleteLabel: string
   onOpen: (article: MeArticle) => void
+  onEdit: (article: MeArticle) => void
+  onDelete: (article: MeArticle) => void
   toArticleBadge: (title: string) => string
 }
 
@@ -25,7 +29,11 @@ export const MeArticleCard = ({
   practiceCountText,
   doneBadgeLabel,
   currentBadgeLabel,
+  editLabel,
+  deleteLabel,
   onOpen,
+  onEdit,
+  onDelete,
   toArticleBadge,
 }: MeArticleCardProps) => (
   <Box
@@ -95,6 +103,48 @@ export const MeArticleCard = ({
         </Box>
       )}
     </Box>
+
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', pt: '2px' }}>
+      <Box
+        component="button"
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          onEdit(article)
+        }}
+        sx={{
+          border: '1px solid rgba(255,255,255,0.16)',
+          bgcolor: 'transparent',
+          color: 'text.secondary',
+          borderRadius: '999px',
+          px: '10px',
+          py: '4px',
+          fontSize: '11px',
+          cursor: 'pointer',
+        }}
+      >
+        {editLabel}
+      </Box>
+      <Box
+        component="button"
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          onDelete(article)
+        }}
+        sx={{
+          border: '1px solid rgba(240,82,82,0.35)',
+          bgcolor: 'rgba(240,82,82,0.08)',
+          color: 'error.main',
+          borderRadius: '999px',
+          px: '10px',
+          py: '4px',
+          fontSize: '11px',
+          cursor: 'pointer',
+        }}
+      >
+        {deleteLabel}
+      </Box>
+    </Box>
   </Box>
 )
-

@@ -1,5 +1,4 @@
 import api from './api'
-import type { Article, ApiResponse } from '../types'
 
 type JsonLike = null | boolean | number | string | JsonLike[] | { [key: string]: JsonLike }
 
@@ -51,6 +50,64 @@ export interface CreateArticleResult {
   }>
 }
 
+export interface ArticleDetailToken {
+  surface: string
+  yomi?: string | null
+}
+
+export interface ArticleDetailSegment {
+  id: string
+  order: number
+  plainText: string
+  tokenCount: number
+  tokens?: ArticleDetailToken[] | null
+}
+
+export interface ArticleDetailResult {
+  articleId: string
+  title: string
+  language: ArticleLanguage
+  sourceType: string
+  rawText: string
+  normalizedText: string
+  segments: ArticleDetailSegment[]
+  createdAt: string
+}
+
+export interface ArticleListItem {
+  articleId: string
+  title: string
+  language: ArticleLanguage | string
+  segmentCount: number
+  createdAt: string
+}
+
+export interface ArticleListResult {
+  items: ArticleListItem[]
+  nextCursor?: string | null
+}
+
+export interface UpdateArticlePayload {
+  title?: string
+  language?: ArticleLanguage
+  text?: string
+}
+
+export interface UpdateArticleResult {
+  articleId: string
+  title: string
+  language: ArticleLanguage
+  segmentCount: number
+  textUpdated: boolean
+  updatedAt: string
+}
+
+export interface DeleteArticleResult {
+  articleId: string
+  deletedAt: string
+  status: 'deleted'
+}
+
 export interface UploadParseResult {
   text: string
   sourceType: 'upload' | 'ocr'
@@ -71,14 +128,28 @@ export const articleService = {
     return toCamelCase<CreateArticleResult>(response.data)
   },
 
-  async getArticle(id: string): Promise<Article> {
-    const response = await api.get<ApiResponse<unknown>>(`/bff/v1/articles/${id}`)
-    return toCamelCase<Article>(response.data.data)
+  async getArticleDetail(id: string, includeReading = true): Promise<ArticleDetailResult> {
+    const response = await api.get(`/bff/v1/articles/${id}`, {
+      params: { include_reading: includeReading },
+    })
+    return toCamelCase<ArticleDetailResult>(response.data)
   },
 
-  async listArticles(): Promise<Article[]> {
-    const response = await api.get<ApiResponse<unknown>>('/bff/v1/articles')
-    return toCamelCase<Article[]>(response.data.data)
+  async listArticles(limit = 20, cursor?: string): Promise<ArticleListResult> {
+    const response = await api.get('/bff/v1/articles', {
+      params: { limit, cursor },
+    })
+    return toCamelCase<ArticleListResult>(response.data)
+  },
+
+  async updateArticle(articleId: string, payload: UpdateArticlePayload): Promise<UpdateArticleResult> {
+    const response = await api.patch(`/bff/v1/articles/${articleId}`, payload)
+    return toCamelCase<UpdateArticleResult>(response.data)
+  },
+
+  async deleteArticle(articleId: string): Promise<DeleteArticleResult> {
+    const response = await api.delete(`/bff/v1/articles/${articleId}`)
+    return toCamelCase<DeleteArticleResult>(response.data)
   },
 
   async detectLanguage(text: string): Promise<DetectLanguageResult> {

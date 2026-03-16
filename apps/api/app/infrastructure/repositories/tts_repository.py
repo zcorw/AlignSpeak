@@ -21,6 +21,7 @@ class TtsRepository:
             .where(
                 Article.id == article_id,
                 Article.user_id == user_id,
+                Article.deleted_at.is_(None),
                 ArticleSegment.id == segment_id,
             )
         )
@@ -35,6 +36,7 @@ class TtsRepository:
             .join(ArticleSegment, ArticleSegment.article_id == Article.id)
             .where(
                 Article.user_id == user_id,
+                Article.deleted_at.is_(None),
                 ArticleSegment.id == segment_id,
             )
         )
@@ -57,4 +59,3 @@ class TtsRepository:
         self.db.commit()
         self.db.refresh(asset)
         return asset
-

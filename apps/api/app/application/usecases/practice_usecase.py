@@ -40,7 +40,7 @@ from app.schemas.practice import (
 )
 from app.services.alignment_service import align_segment_text
 from app.services.reading_service import build_segment_reading_tokens
-from app.services.stt_service import transcribe_audio_by_provider
+from app.services.stt_service import transcribe_audio_with_usage_tracking
 
 PRACTICE_LEVELS = ("L0", "L1", "L2", "L3", "L4")
 
@@ -557,7 +557,14 @@ def process_stt_job(job_id: str) -> None:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        result = transcribe_audio_by_provider(audio_path=audio_path, language=article.language)
+        result = transcribe_audio_with_usage_tracking(
+            audio_path=audio_path,
+            language=article.language,
+            user_id=job.user_id,
+            article_id=attempt.article_id,
+            task_id=job.id,
+            audio_duration_ms=recording.duration_ms,
+        )
         job.status = "done"
         job.recognized_text = result.recognized_text
         job.confidence = result.confidence

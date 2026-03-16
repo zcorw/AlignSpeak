@@ -15,6 +15,7 @@ interface UsePracticeRecordingOptions {
   ttsLoading: boolean
   isSpeaking: boolean
   stopSpeaking: () => void
+  notifyError: (message: string) => void
   errorMessage: string
   onBeforeStart: () => void | Promise<void>
   onAligned: (result: AlignmentResult, attemptId: string) => void
@@ -27,6 +28,7 @@ export const usePracticeRecording = ({
   ttsLoading,
   isSpeaking,
   stopSpeaking,
+  notifyError,
   errorMessage,
   onBeforeStart,
   onAligned,
@@ -140,8 +142,7 @@ export const usePracticeRecording = ({
     if (ttsLoading || !canPractice || !currentSegment || recognizing || isRecording) return
     if (isSpeaking) stopSpeaking()
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      const alertFn = (globalThis as { alert?: (message?: string) => void }).alert
-      alertFn?.('MediaRecorder is not supported in this browser.')
+      notifyError('MediaRecorder is not supported in this browser.')
       return
     }
 
@@ -214,6 +215,7 @@ export const usePracticeRecording = ({
     runFinishAndAlign,
     stopSpeaking,
     ttsLoading,
+    notifyError,
   ])
 
   const stopRecording = useCallback(() => {

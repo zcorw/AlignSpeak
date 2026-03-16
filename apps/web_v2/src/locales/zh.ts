@@ -48,10 +48,12 @@ export default {
         topbar: {
           backAriaLabel: '返回',
           title: '新建文章',
+          editTitle: '编辑文章',
           meAriaLabel: '我的',
         },
         headline: '选择导入方式',
         description: '将文章导入后，你可以进行校对和分段确认。',
+        updateSuccess: '文章已更新。',
         methods: {
           clipboard: {
             name: '从剪贴板粘贴',
@@ -236,6 +238,8 @@ export default {
           completed: '完成',
           allPassed: '全部达标',
           lastPractice: '上次练习：{{time}}',
+          deleteConfirm: '确认删除该文章吗？删除后将无法继续练习。',
+          deleteSuccess: '文章已删除。',
           lastPracticeValues: {
             today: '今天',
             twoDaysAgo: '2天前',

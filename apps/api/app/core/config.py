@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_ocr_model: str = "gpt-4.1-mini"
     openai_ocr_timeout_seconds: float = 45.0
+    openai_monthly_budget_usd: float = 10.0
+    openai_budget_alert_threshold_usd: float = 8.0
+    openai_budget_hard_stop_usd: float = 9.5
 
     # TTS configuration
     tts_media_dir: str = "./media/tts"

@@ -3,10 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.application.usecases.article_usecase import (
     create_article as create_article_usecase,
+    delete_article as delete_article_usecase,
     detect_article_language as detect_article_language_usecase,
     get_article_detail as get_article_detail_usecase,
     list_articles as list_articles_usecase,
     parse_uploaded_file as parse_uploaded_file_usecase,
+    update_article as update_article_usecase,
 )
 from app.db import get_db
 from app.deps import get_current_user
@@ -19,8 +21,11 @@ from app.routers.article_request_parser import (
 )
 from app.schemas.article import (
     ArticleCreateResponse,
+    ArticleDeleteResponse,
     ArticleDetailResponse,
     ArticleListResponse,
+    ArticleUpdatePayload,
+    ArticleUpdateResponse,
     DetectLanguageResponse,
     UploadParseResponse,
 )
@@ -73,6 +78,36 @@ def get_article(
         current_user=current_user,
         article_id=article_id,
         include_reading=include_reading,
+    )
+
+
+@router.patch("/{article_id}", response_model=ArticleUpdateResponse)
+def patch_article(
+    article_id: str,
+    payload: ArticleUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ArticleUpdateResponse:
+    repository = ArticleRepository(db=db)
+    return update_article_usecase(
+        repository=repository,
+        current_user=current_user,
+        article_id=article_id,
+        payload=payload,
+    )
+
+
+@router.delete("/{article_id}", response_model=ArticleDeleteResponse)
+def delete_article(
+    article_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ArticleDeleteResponse:
+    repository = ArticleRepository(db=db)
+    return delete_article_usecase(
+        repository=repository,
+        current_user=current_user,
+        article_id=article_id,
     )
 
 

@@ -211,3 +211,64 @@ def apply_runtime_schema_fixes() -> None:
                 """
             )
         )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE IF EXISTS articles
+                ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_articles_deleted_at
+                ON articles (deleted_at)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS openai_usage_events (
+                    id SERIAL PRIMARY KEY,
+                    requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    module VARCHAR(32) NOT NULL,
+                    provider VARCHAR(32) NOT NULL DEFAULT 'openai',
+                    model VARCHAR(128) NOT NULL,
+                    input_tokens INTEGER NULL,
+                    output_tokens INTEGER NULL,
+                    estimated_cost_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    request_success BOOLEAN NOT NULL DEFAULT FALSE,
+                    error_code VARCHAR(64) NULL,
+                    user_id VARCHAR(32) NULL,
+                    article_id VARCHAR(32) NULL,
+                    task_id VARCHAR(64) NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_openai_usage_events_requested_at
+                ON openai_usage_events (requested_at)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_openai_usage_events_module
+                ON openai_usage_events (module)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_openai_usage_events_model
+                ON openai_usage_events (model)
+                """
+            )
+        )

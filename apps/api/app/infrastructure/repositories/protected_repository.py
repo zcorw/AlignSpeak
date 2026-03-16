@@ -15,7 +15,10 @@ class ProtectedReadRepository:
     def list_recent_articles_by_user(self, user_id: str, limit: int = 20) -> list[Article]:
         statement = (
             select(Article)
-            .where(Article.user_id == user_id)
+            .where(
+                Article.user_id == user_id,
+                Article.deleted_at.is_(None),
+            )
             .order_by(Article.updated_at.desc(), Article.id.desc())
             .limit(limit)
         )
