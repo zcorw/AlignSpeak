@@ -67,6 +67,7 @@ Place these files at the target paths before the first deployment:
 - [`deploy/production/.env.production.example`](/d:/Workspace/money/AlignSpeak/deploy/production/.env.production.example) -> `/opt/alignspeak/.env.production`
 - [`deploy/production/readonly-user.sql`](/d:/Workspace/money/AlignSpeak/deploy/production/readonly-user.sql) -> `/opt/alignspeak/readonly-user.sql`
 - [`deploy/production/host-nginx/alignspeak.conf`](/d:/Workspace/money/AlignSpeak/deploy/production/host-nginx/alignspeak.conf) -> `/etc/nginx/sites-available/alignspeak.conf`
+- [`deploy/production/host-nginx/alignspeak-db-admin.conf`](/d:/Workspace/money/AlignSpeak/deploy/production/host-nginx/alignspeak-db-admin.conf) -> `/etc/nginx/sites-available/alignspeak-db-admin.conf` if you want Adminer behind host Nginx
 
 The deployment workflow will later update `compose.yml` and `.images.env` automatically inside `DEPLOY_PATH`.
 
@@ -93,6 +94,7 @@ Optional values:
 - `ACCESS_TOKEN_EXPIRE_SECONDS`: JWT validity duration in seconds
 - `WEB_PORT`: loopback port exposed by the frontend container for host Nginx upstream
 - `API_PORT`: loopback port exposed by the API container for host Nginx upstream
+- `DB_ADMIN_PORT`: loopback port reserved for the optional browser-based database admin container
 
 ### 5. Update values in the host Nginx config
 
@@ -109,6 +111,20 @@ The upstream ports in this file should match `WEB_PORT` and `API_PORT` from `/op
 After that:
 
 - Link the file into `/etc/nginx/sites-enabled/`
+- Run `nginx -t`
+- Reload Nginx
+
+If you also want browser access to Adminer through host Nginx, edit [`deploy/production/host-nginx/alignspeak-db-admin.conf`](/d:/Workspace/money/AlignSpeak/deploy/production/host-nginx/alignspeak-db-admin.conf) before enabling it:
+
+- Replace `server_name` with a dedicated admin-only domain such as `db-admin.your-domain.com`
+- Replace `ssl_certificate` and `ssl_certificate_key`
+- Replace the sample `allow` rule with your fixed office IP or VPN CIDR
+- Keep `deny all` unless you are intentionally opening access more broadly
+
+Then:
+
+- Enable the `db-admin` Compose profile
+- Link `/etc/nginx/sites-available/alignspeak-db-admin.conf` into `/etc/nginx/sites-enabled/`
 - Run `nginx -t`
 - Reload Nginx
 
@@ -136,6 +152,41 @@ After the first successful GitHub deployment:
 - Check `docker compose -f /opt/alignspeak/compose.yml ps`
 - Check `https://your-domain/`
 - Check `https://your-domain/api/health`
+
+## Browser Database Admin
+
+For local development, `docker-compose.yml` now includes an `Adminer` container bound to `127.0.0.1:${DB_ADMIN_PORT:-18080}`.
+
+Open:
+
+- `http://127.0.0.1:18080` by default
+
+Start the local stack as usual:
+
+```bash
+docker compose up -d
+```
+
+Use these login values:
+
+- System: `PostgreSQL`
+- Server: `db`
+- Username: `alignspeak`
+- Password: the `POSTGRES_PASSWORD` value from your secrets file
+- Database: `alignspeak`
+
+For production, the same `Adminer` container is present but disabled by default and only binds to loopback when enabled:
+
+```bash
+cd /opt/alignspeak
+docker compose -f compose.yml --profile db-admin up -d db_admin
+```
+
+Then access:
+
+- `http://127.0.0.1:18080`
+
+Keep this profile off when not in use. It is meant for temporary maintenance on the server or via SSH tunnel, not for public exposure.
 
 ## GitHub configuration
 

@@ -50,3 +50,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  db_admin:
+    image: adminer:4.8.1-standalone
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    ports:
+      - "127.0.0.1:${DB_ADMIN_PORT:-18080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - db-admin
