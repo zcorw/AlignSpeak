@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import logging
 from uuid import uuid4
 
@@ -22,6 +23,53 @@ from app.services.tts_service import (
 )
 
 logger = logging.getLogger(__name__)
+TIMELINE_VERSION = "v3"
+
+
+def _normalize_timeline_item(raw: dict) -> dict[str, int | float | str] | None:
+    try:
+        sentence_index = int(raw.get("sentence_index", 0))
+        text = str(raw.get("text") or "").strip()
+        start_ms = float(raw.get("start_ms", 0))
+        end_ms = float(raw.get("end_ms", 0))
+    except (TypeError, ValueError):
+        return None
+
+    if not text:
+        return None
+    if sentence_index < 0:
+        sentence_index = 0
+    if start_ms < 0:
+        start_ms = 0.0
+    if end_ms < start_ms:
+        end_ms = start_ms
+    return {
+        "sentence_index": sentence_index,
+        "text": text,
+        "start_ms": round(start_ms, 3),
+        "end_ms": round(end_ms, 3),
+    }
+
+
+def _load_timeline_from_asset(*, asset: TtsAsset) -> list[dict[str, int | float | str]] | None:
+    if not asset.timeline_json:
+        return None
+    try:
+        payload = json.loads(asset.timeline_json)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, list):
+        return None
+    normalized: list[dict[str, int | float | str]] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        normalized_item = _normalize_timeline_item(item)
+        if normalized_item is not None:
+            normalized.append(normalized_item)
+    if not normalized:
+        return None
+    return sorted(normalized, key=lambda item: int(item["sentence_index"]))
 
 
 def create_tts_job(
@@ -69,10 +117,30 @@ def create_tts_job(
     try:
         if existing is not None:
             existing_path = _resolve_media_path_from_audio_url(existing.audio_url)
-            if existing_path.exists():
-                mark_tts_job_done(job_id=job.job_id, audio_url=existing.audio_url, cached=True)
+            existing_timeline = _load_timeline_from_asset(asset=existing)
+            if (
+                existing_path.exists()
+                and existing_timeline is not None
+                and existing.timeline_version == TIMELINE_VERSION
+            ):
+                mark_tts_job_done(
+                    job_id=job.job_id,
+                    audio_url=existing.audio_url,
+                    cached=True,
+                    timeline=existing_timeline,
+                    timeline_version=existing.timeline_version,
+                )
                 logger.info("TTS cache hit: job_id=%s segment_id=%s audio_url=%s", job.job_id, segment_id, existing.audio_url)
                 return TtsJobCreateResponse(job_id=job.job_id, status="queued")
+            logger.info(
+                "TTS cache refresh required: job_id=%s segment_id=%s file_exists=%s has_timeline=%s timeline_version=%s expected=%s",
+                job.job_id,
+                segment_id,
+                existing_path.exists(),
+                existing_timeline is not None,
+                existing.timeline_version,
+                TIMELINE_VERSION,
+            )
 
         filename = build_tts_filename(
             segment_id=segment.id,
@@ -81,7 +149,7 @@ def create_tts_job(
             speed=speed,
         )
         output_path = resolve_media_output_path(filename)
-        synthesize_to_mp3(
+        timeline = synthesize_to_mp3(
             text=segment.plain_text,
             language=article.language,
             speed=speed,
@@ -89,19 +157,36 @@ def create_tts_job(
             voice=voice,
         )
         audio_url = f"/media/tts/{filename}"
+        timeline_payload = timeline
+        timeline_version = TIMELINE_VERSION
 
-        repository.create_tts_asset(
-            TtsAsset(
-                id=f"tts_{uuid4().hex[:12]}",
-                segment_id=segment.id,
-                voice=voice,
-                speed=speed,
-                audio_url=audio_url,
-                text_hash=text_hash,
-                created_at=utcnow(),
+        if existing is None:
+            repository.create_tts_asset(
+                TtsAsset(
+                    id=f"tts_{uuid4().hex[:12]}",
+                    segment_id=segment.id,
+                    voice=voice,
+                    speed=speed,
+                    audio_url=audio_url,
+                    text_hash=text_hash,
+                    timeline_json=json.dumps(timeline_payload, ensure_ascii=False),
+                    timeline_version=timeline_version,
+                    created_at=utcnow(),
+                )
             )
+        else:
+            existing.audio_url = audio_url
+            existing.timeline_json = json.dumps(timeline_payload, ensure_ascii=False)
+            existing.timeline_version = timeline_version
+            existing.created_at = utcnow()
+            repository.update_tts_asset(existing)
+        mark_tts_job_done(
+            job_id=job.job_id,
+            audio_url=audio_url,
+            cached=False,
+            timeline=timeline_payload,
+            timeline_version=timeline_version,
         )
-        mark_tts_job_done(job_id=job.job_id, audio_url=audio_url, cached=False)
         logger.info("TTS job done: job_id=%s segment_id=%s audio_url=%s", job.job_id, segment_id, audio_url)
     except AppError as exc:
         logger.error(
@@ -139,6 +224,8 @@ def get_tts_job(*, current_user: User, job_id: str) -> TtsJobStatusResponse:
         audio_url=job.audio_url,
         cached=job.cached,
         error_code=job.error_code,
+        timeline=job.timeline,
+        timeline_version=job.timeline_version,
     )
 
 
@@ -184,6 +271,8 @@ def get_segment_tts(
         audio_url=asset.audio_url,
         voice=asset.voice,
         speed=float(asset.speed),
+        timeline=_load_timeline_from_asset(asset=asset),
+        timeline_version=asset.timeline_version,
     )
 
 

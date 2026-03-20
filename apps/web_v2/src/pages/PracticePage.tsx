@@ -27,6 +27,7 @@ import { usePracticeFuriganaSync } from '../hooks/practice/usePracticeFuriganaSy
 import { usePracticeRecording } from '../hooks/practice/usePracticeRecording'
 import { usePracticeRouteState } from '../hooks/practice/usePracticeRouteState'
 import { computeMaskedReadingTokenIndices } from '../components/practice/masking'
+import { buildSentenceTextRanges, splitTextToSentences } from '../components/practice/timelineText'
 import { useConfirm, useNotifier } from '../components/common/FeedbackProvider'
 
 type Level = PracticeLevel
@@ -78,7 +79,15 @@ export const PracticePage = () => {
     segmentResultState.segmentKey === activeSegmentKey ? segmentResultState.alignmentResult : null
   const showScore = segmentResultState.segmentKey === activeSegmentKey && segmentResultState.showScore
 
-  const { isSpeaking, ttsLoading, speakSegment, stopSpeaking } = usePracticeAudio({
+  const {
+    isSpeaking,
+    ttsLoading,
+    speakSegment,
+    stopSpeaking,
+    timelineSentences,
+    activeTimelineSentenceIndex,
+    playSentence,
+  } = usePracticeAudio({
     failedMessage: t('pages.practice.readAloud.failed'),
     onError: notifyError,
   })
@@ -221,6 +230,25 @@ export const PracticePage = () => {
     return computeMaskedReadingTokenIndices(currentSegment.id, level, readingTokens)
   }, [currentSegment, level, readingTokens, supportsReadingTokens])
 
+  const displayTimelineSentences = useMemo(
+    () => (timelineSentences.length ? timelineSentences : splitTextToSentences(segmentText)),
+    [segmentText, timelineSentences]
+  )
+
+  const timelineSentenceRanges = useMemo(
+    () => buildSentenceTextRanges(segmentText, displayTimelineSentences),
+    [displayTimelineSentences, segmentText]
+  )
+
+  const handleSelectTimelineSentence = useCallback((sentenceIndex: number) => {
+    void playSentence({
+      canPractice,
+      articleId,
+      segment: currentSegment,
+      sentenceIndex,
+    })
+  }, [articleId, canPractice, currentSegment, playSentence])
+
   const recordingSegmentText = useMemo<ReactNode>(() => {
     if (supportsReadingTokens) {
       return (
@@ -230,6 +258,9 @@ export const PracticePage = () => {
           editable={false}
           activeTokenIndex={null}
           maskedTokenIndices={recordingMaskedReadingTokenIndices}
+          sentenceRanges={timelineSentenceRanges}
+          activeSentenceIndex={activeTimelineSentenceIndex}
+          onSelectSentence={handleSelectTimelineSentence}
         />
       )
     }
@@ -239,9 +270,23 @@ export const PracticePage = () => {
         language={articleLanguage}
         level={level}
         segmentId={currentSegment?.id ?? 'seg_unknown'}
+        sentenceRanges={timelineSentenceRanges}
+        activeSentenceIndex={activeTimelineSentenceIndex}
+        onSelectSentence={handleSelectTimelineSentence}
       />
     )
-  }, [articleLanguage, currentSegment, level, readingTokens, recordingMaskedReadingTokenIndices, segmentText, supportsReadingTokens])
+  }, [
+    activeTimelineSentenceIndex,
+    articleLanguage,
+    currentSegment,
+    handleSelectTimelineSentence,
+    level,
+    readingTokens,
+    recordingMaskedReadingTokenIndices,
+    segmentText,
+    supportsReadingTokens,
+    timelineSentenceRanges,
+  ])
 
   const segmentContent = supportsReadingTokens ? (
     <PracticeFuriganaText
@@ -251,6 +296,9 @@ export const PracticePage = () => {
       activeTokenIndex={activeTokenIndex}
       maskedTokenIndices={maskedReadingTokenIndices}
       onSelectToken={selectToken}
+      sentenceRanges={timelineSentenceRanges}
+      activeSentenceIndex={activeTimelineSentenceIndex}
+      onSelectSentence={handleSelectTimelineSentence}
     />
   ) : (
     <PracticeMaskedPlainText
@@ -259,6 +307,9 @@ export const PracticePage = () => {
       level={level}
       segmentId={currentSegment?.id ?? 'seg_unknown'}
       maskingDisabled={maskingDisabled}
+      sentenceRanges={timelineSentenceRanges}
+      activeSentenceIndex={activeTimelineSentenceIndex}
+      onSelectSentence={handleSelectTimelineSentence}
     />
   )
 

@@ -2,6 +2,11 @@ import { Box } from '@mui/material'
 import { Fragment } from 'react'
 import type { PracticeReadingToken } from '../../services/practiceService'
 import { buildMaskPlaceholder } from './masking'
+import {
+  buildSurfaceTextRanges,
+  findSentenceIndexForTextRange,
+  type SentenceTextRange,
+} from './timelineText'
 
 interface PracticeFuriganaTextProps {
   tokens: PracticeReadingToken[]
@@ -10,6 +15,9 @@ interface PracticeFuriganaTextProps {
   activeTokenIndex: number | null
   maskedTokenIndices?: ReadonlySet<number>
   onSelectToken?: (tokenIndex: number) => void
+  sentenceRanges?: ReadonlyArray<SentenceTextRange>
+  activeSentenceIndex?: number | null
+  onSelectSentence?: (sentenceIndex: number) => void
 }
 
 const hasReading = (token: PracticeReadingToken): token is PracticeReadingToken & { yomi: string } =>
@@ -22,14 +30,21 @@ export const PracticeFuriganaText = ({
   activeTokenIndex,
   maskedTokenIndices,
   onSelectToken,
+  sentenceRanges = [],
+  activeSentenceIndex = null,
+  onSelectSentence,
 }: PracticeFuriganaTextProps) => {
   if (!tokens.length) return <>{fallbackText || '...'}</>
+  const tokenTextRanges = buildSurfaceTextRanges(fallbackText, tokens.map((token) => token.surface))
 
   return (
     <>
       {tokens.map((token, index) => {
         const tokenIndex = typeof token.tokenIndex === 'number' ? token.tokenIndex : index
         const masked = Boolean(maskedTokenIndices?.has(tokenIndex))
+        const sentenceIndex = findSentenceIndexForTextRange(sentenceRanges, tokenTextRanges[index] ?? { start: 0, end: 0 })
+        const sentenceActive = sentenceIndex !== null && sentenceIndex === activeSentenceIndex
+        const sentenceClickable = !editable && sentenceIndex !== null && typeof onSelectSentence === 'function'
         const content = masked
           ? (
             <Box
@@ -39,7 +54,7 @@ export const PracticeFuriganaText = ({
                 alignItems: 'center',
                 px: '4px',
                 borderRadius: '4px',
-                bgcolor: 'rgba(110,96,238,0.18)',
+                bgcolor: sentenceActive ? 'rgba(255,214,102,0.42)' : 'rgba(110,96,238,0.18)',
                 color: 'rgba(255,255,255,0.88)',
                 lineHeight: 1.4,
               }}
@@ -56,7 +71,24 @@ export const PracticeFuriganaText = ({
               )
             : token.surface
         if (!editable || !token.editable) {
-          return <Fragment key={`${token.surface}-${tokenIndex}-${index}`}>{content}</Fragment>
+          if (!sentenceActive && !sentenceClickable) {
+            return <Fragment key={`${token.surface}-${tokenIndex}-${index}`}>{content}</Fragment>
+          }
+          return (
+            <Box
+              key={`${token.surface}-${tokenIndex}-${index}`}
+              component="span"
+              onClick={sentenceClickable ? () => onSelectSentence?.(sentenceIndex) : undefined}
+              sx={{
+                borderRadius: '6px',
+                bgcolor: sentenceActive ? 'rgba(255,214,102,0.2)' : 'transparent',
+                cursor: sentenceClickable ? 'pointer' : 'text',
+                transition: 'background-color 0.12s',
+              }}
+            >
+              {content}
+            </Box>
+          )
         }
         const active = tokenIndex === activeTokenIndex
         return (
@@ -70,7 +102,7 @@ export const PracticeFuriganaText = ({
               borderRadius: '6px',
               border: '1px solid',
               borderColor: active ? 'rgba(110,96,238,0.75)' : 'transparent',
-              bgcolor: active ? 'rgba(110,96,238,0.2)' : 'transparent',
+              bgcolor: active ? 'rgba(110,96,238,0.2)' : sentenceActive ? 'rgba(255,214,102,0.2)' : 'transparent',
               cursor: 'pointer',
               transition: 'all 0.12s',
               '&:hover': {

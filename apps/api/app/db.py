@@ -38,6 +38,22 @@ def apply_runtime_schema_fixes() -> None:
         conn.execute(
             text(
                 """
+                ALTER TABLE IF EXISTS tts_assets
+                ADD COLUMN IF NOT EXISTS timeline_json TEXT
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE IF EXISTS tts_assets
+                ADD COLUMN IF NOT EXISTS timeline_version VARCHAR(16)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
                 ALTER TABLE IF EXISTS attempt_compare_blocks
                 ALTER COLUMN created_at SET DEFAULT now()
                 """

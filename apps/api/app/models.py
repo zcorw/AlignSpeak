@@ -126,6 +126,8 @@ class TtsAsset(Base):
     audio_url: Mapped[str] = mapped_column(Text, nullable=False)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     text_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    timeline_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timeline_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
     )

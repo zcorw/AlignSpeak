@@ -59,3 +59,9 @@ class TtsRepository:
         self.db.commit()
         self.db.refresh(asset)
         return asset
+
+    def update_tts_asset(self, asset: TtsAsset) -> TtsAsset:
+        self.db.add(asset)
+        self.db.commit()
+        self.db.refresh(asset)
+        return asset

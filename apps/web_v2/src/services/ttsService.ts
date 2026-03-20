@@ -5,12 +5,21 @@ export interface CreateTtsJobResult {
   status: 'queued' | 'processing' | 'done' | 'failed'
 }
 
+export interface TtsTimelineSentence {
+  sentenceIndex: number
+  text: string
+  startMs: number
+  endMs: number
+}
+
 export interface TtsJobStatusResult {
   jobId: string
   status: 'queued' | 'processing' | 'done' | 'failed'
   audioUrl?: string
   cached?: boolean
   errorCode?: string
+  timeline?: TtsTimelineSentence[]
+  timelineVersion?: string
 }
 
 interface CreateTtsJobResponse {
@@ -24,6 +33,13 @@ interface TtsJobStatusResponse {
   audio_url?: string
   cached?: boolean
   error_code?: string
+  timeline_version?: string
+  timeline?: Array<{
+    sentence_index: number
+    text: string
+    start_ms: number
+    end_ms: number
+  }>
 }
 
 const normalizeCreateResult = (data: CreateTtsJobResponse): CreateTtsJobResult => ({
@@ -37,6 +53,13 @@ const normalizeStatusResult = (data: TtsJobStatusResponse): TtsJobStatusResult =
   audioUrl: data.audio_url,
   cached: data.cached,
   errorCode: data.error_code,
+  timelineVersion: data.timeline_version,
+  timeline: data.timeline?.map((item) => ({
+    sentenceIndex: item.sentence_index,
+    text: item.text,
+    startMs: item.start_ms,
+    endMs: item.end_ms,
+  })),
 })
 
 export const ttsService = {
