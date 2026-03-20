@@ -1,7 +1,7 @@
 import { type ChangeEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { useNotifier } from '../../components/common/FeedbackProvider'
+import { useNotifier } from '../../components/common/feedbackHooks'
 import type { OverlayLanguageCode } from '../../components/EditorTextOverlay'
 import { articleService } from '../../services/articleService'
 import { getApiErrorMessage } from '../../services/authService'

@@ -28,7 +28,7 @@ import { usePracticeRecording } from '../hooks/practice/usePracticeRecording'
 import { usePracticeRouteState } from '../hooks/practice/usePracticeRouteState'
 import { computeMaskedReadingTokenIndices } from '../components/practice/masking'
 import { buildSentenceTextRanges, splitTextToSentences } from '../components/practice/timelineText'
-import { useConfirm, useNotifier } from '../components/common/FeedbackProvider'
+import { useConfirm, useNotifier } from '../components/common/feedbackHooks'
 
 type Level = PracticeLevel
 type SegmentResultState = {

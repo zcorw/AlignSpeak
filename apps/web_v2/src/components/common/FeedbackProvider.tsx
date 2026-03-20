@@ -1,16 +1,18 @@
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar } from '@mui/material'
 import {
   type ReactNode,
-  createContext,
   useCallback,
-  useContext,
   useMemo,
   useRef,
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-
-type NoticeLevel = 'success' | 'error' | 'info' | 'warning'
+import {
+  type ConfirmOptions,
+  FeedbackContext,
+  type FeedbackContextValue,
+  type NoticeLevel,
+} from './feedbackHooks'
 
 interface SnackbarState {
   open: boolean
@@ -18,25 +20,6 @@ interface SnackbarState {
   message: string
   durationMs: number
 }
-
-interface ConfirmOptions {
-  title?: string
-  message: string
-  confirmLabel?: string
-  cancelLabel?: string
-  danger?: boolean
-}
-
-interface FeedbackContextValue {
-  notify: (level: NoticeLevel, message: string, durationMs?: number) => void
-  success: (message: string, durationMs?: number) => void
-  error: (message: string, durationMs?: number) => void
-  info: (message: string, durationMs?: number) => void
-  warning: (message: string, durationMs?: number) => void
-  confirm: (options: ConfirmOptions) => Promise<boolean>
-}
-
-const FeedbackContext = createContext<FeedbackContextValue | null>(null)
 
 interface ConfirmState extends ConfirmOptions {
   open: boolean
@@ -140,22 +123,4 @@ export const FeedbackProvider = ({ children }: { children: ReactNode }) => {
       </Dialog>
     </FeedbackContext.Provider>
   )
-}
-
-const useFeedbackContext = () => {
-  const context = useContext(FeedbackContext)
-  if (!context) {
-    throw new Error('FeedbackProvider is required.')
-  }
-  return context
-}
-
-export const useNotifier = () => {
-  const { notify, success, error, info, warning } = useFeedbackContext()
-  return { notify, success, error, info, warning }
-}
-
-export const useConfirm = () => {
-  const { confirm } = useFeedbackContext()
-  return { confirm }
 }
