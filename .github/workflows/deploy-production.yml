@@ -258,6 +258,12 @@ jobs:
             . ./.deploy-flags.env
             set +a
 
+            db_admin_enabled="$(printf '%s' "${DB_ADMIN_ENABLED:-false}" | tr '[:upper:]' '[:lower:]')"
+            compose_profile_args=""
+            if [ "$db_admin_enabled" = "true" ] || [ "$db_admin_enabled" = "1" ] || [ "$db_admin_enabled" = "yes" ]; then
+              compose_profile_args="--profile db-admin"
+            fi
+
             if [ -f .images.env ]; then
               set -a
               . ./.images.env
@@ -283,14 +289,14 @@ jobs:
             set +a
 
             if [ "$DEPLOY_WEB" = "true" ] && [ "$DEPLOY_API" = "true" ]; then
-              docker compose -f compose.yml pull
-              docker compose -f compose.yml up -d --remove-orphans
+              docker compose -f compose.yml $compose_profile_args pull
+              docker compose -f compose.yml $compose_profile_args up -d --remove-orphans
             elif [ "$DEPLOY_WEB" = "true" ]; then
-              docker compose -f compose.yml pull web
-              docker compose -f compose.yml up -d --no-deps web
+              docker compose -f compose.yml $compose_profile_args pull web
+              docker compose -f compose.yml $compose_profile_args up -d --no-deps web
             elif [ "$DEPLOY_API" = "true" ]; then
-              docker compose -f compose.yml pull api
-              docker compose -f compose.yml up -d --no-deps api
+              docker compose -f compose.yml $compose_profile_args pull api
+              docker compose -f compose.yml $compose_profile_args up -d --no-deps api
             else
               echo "No deployable service changes detected"
               exit 0
@@ -303,12 +309,15 @@ jobs:
             if [ "$DEPLOY_API" = "true" ]; then
               services_to_check="$services_to_check api"
             fi
+            if [ -n "$compose_profile_args" ] && [ "$DEPLOY_WEB" = "true" ] && [ "$DEPLOY_API" = "true" ]; then
+              services_to_check="$services_to_check db_admin"
+            fi
 
             for service in $services_to_check; do
-              container_id="$(docker compose -f compose.yml ps -q "$service")"
+              container_id="$(docker compose -f compose.yml $compose_profile_args ps -q "$service")"
               if [ -z "$container_id" ]; then
                 echo "$service container was not created"
-                docker compose -f compose.yml ps
+                docker compose -f compose.yml $compose_profile_args ps
                 exit 1
               fi
 
@@ -319,7 +328,7 @@ jobs:
                 fi
                 if [ "$attempt" = "20" ]; then
                   echo "$service did not become healthy"
-                  docker compose -f compose.yml ps
+                  docker compose -f compose.yml $compose_profile_args ps
                   exit 1
                 fi
                 sleep 3

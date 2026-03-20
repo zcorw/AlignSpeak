@@ -95,6 +95,7 @@ Optional values:
 - `WEB_PORT`: loopback port exposed by the frontend container for host Nginx upstream
 - `API_PORT`: loopback port exposed by the API container for host Nginx upstream
 - `DB_ADMIN_PORT`: loopback port reserved for the optional browser-based database admin container
+- `DB_ADMIN_ENABLED`: whether the deployment workflow should include the `db-admin` Compose profile on the server
 
 ### 5. Update values in the host Nginx config
 
@@ -181,6 +182,8 @@ For production, the same `Adminer` container is present but disabled by default 
 cd /opt/alignspeak
 docker compose -f compose.yml --profile db-admin up -d db_admin
 ```
+
+If you want future GitHub deployments to keep this container running automatically, set `DB_ADMIN_ENABLED=true` in `/opt/alignspeak/.env.production`.
 
 Then access:
 
