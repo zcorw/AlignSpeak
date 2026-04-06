@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import lru_cache
+import unicodedata
 
 
 @dataclass(frozen=True)
@@ -15,7 +16,7 @@ def _contains_kanji(text: str) -> bool:
             return True
         if 0x4E00 <= code_point <= 0x9FFF:  # CJK Unified Ideographs
             return True
-        if char in {"\u3005", "\u3006", "\u30F5", "\u30F6"}:  # 々, 〆, ヵ, ヶ
+        if char in {"\u3005", "\u3006", "\u30F5", "\u30F6"}:
             return True
     return False
 
@@ -32,13 +33,104 @@ def _build_kakasi_converter():
     return pykakasi.kakasi()
 
 
+@lru_cache(maxsize=1)
+def _build_sudachi_tokenizer():
+    from sudachipy import Dictionary, SplitMode  # type: ignore
+
+    return Dictionary().create(), SplitMode.C
+
+
+def _katakana_to_hiragana(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", text)
+    chars: list[str] = []
+    for char in normalized:
+        code_point = ord(char)
+        if 0x30A1 <= code_point <= 0x30F6:
+            chars.append(chr(code_point - 0x60))
+        else:
+            chars.append(char)
+    return "".join(chars)
+
+
 def _normalize_reading(*, surface: str, hira: str | None) -> str | None:
     if not hira:
         return None
     if not _contains_kanji(surface):
         return None
-    normalized = hira.strip()
+    normalized = _katakana_to_hiragana(hira).strip()
+    if normalized == "*":
+        return None
     return normalized if normalized else None
+
+
+def _kakasi_reading_for_surface(surface: str) -> str | None:
+    if not _contains_kanji(surface):
+        return None
+    try:
+        converter = _build_kakasi_converter()
+    except Exception:
+        return None
+    converted = converter.convert(surface)
+    hira = "".join(str(item.get("hira") or item.get("orig") or "") for item in converted)
+    return _normalize_reading(surface=surface, hira=hira)
+
+
+def _build_ja_tokens_with_kakasi(text: str) -> list[ReadingToken]:
+    try:
+        converter = _build_kakasi_converter()
+    except Exception:
+        return []
+
+    converted = converter.convert(text)
+    tokens: list[ReadingToken] = []
+    for item in converted:
+        surface = str(item.get("orig", ""))
+        if not surface:
+            continue
+        yomi = _normalize_reading(surface=surface, hira=item.get("hira"))
+        tokens.append(ReadingToken(surface=surface, yomi=yomi))
+    return tokens
+
+
+def _build_ja_tokens_with_sudachi(text: str) -> list[ReadingToken]:
+    try:
+        tokenizer, split_mode = _build_sudachi_tokenizer()
+    except Exception:
+        return []
+
+    try:
+        morphemes = tokenizer.tokenize(text, split_mode)
+    except Exception:
+        return []
+
+    tokens: list[ReadingToken] = []
+    for morpheme in morphemes:
+        surface = str(morpheme.surface() or "")
+        if not surface:
+            continue
+        reading_form: str | None
+        try:
+            reading_form = morpheme.reading_form()
+        except Exception:
+            reading_form = None
+
+        yomi = _normalize_reading(surface=surface, hira=reading_form)
+        if yomi is None and _contains_kanji(surface):
+            yomi = _kakasi_reading_for_surface(surface)
+        tokens.append(ReadingToken(surface=surface, yomi=yomi))
+
+    # Keep token mapping stable; if tokenization changed text shape, use kakasi fallback path.
+    reconstructed = "".join(token.surface for token in tokens)
+    if reconstructed != text:
+        return []
+    return tokens
+
+
+def _build_ja_tokens(text: str) -> list[ReadingToken]:
+    tokens = _build_ja_tokens_with_sudachi(text)
+    if tokens:
+        return tokens
+    return _build_ja_tokens_with_kakasi(text)
 
 
 @lru_cache(maxsize=1)
@@ -113,18 +205,13 @@ def build_segment_reading_tokens(
             adjusted_tokens.append(ReadingToken(surface=token.surface, yomi=yomi))
         return adjusted_tokens
 
-    try:
-        converter = _build_kakasi_converter()
-    except Exception:
+    tokens = _build_ja_tokens(text)
+    if not tokens:
         return []
 
-    converted = converter.convert(text)
-    tokens: list[ReadingToken] = []
-    for index, item in enumerate(converted):
-        surface = str(item.get("orig", ""))
-        if not surface:
-            continue
-        yomi = _normalize_reading(surface=surface, hira=item.get("hira"))
+    adjusted_tokens: list[ReadingToken] = []
+    for index, token in enumerate(tokens):
+        yomi = token.yomi
         if reading_overrides and index in reading_overrides:
             override_raw = reading_overrides[index]
             if override_raw is None:
@@ -132,12 +219,12 @@ def build_segment_reading_tokens(
             else:
                 override = override_raw.strip()
                 yomi = override if override else None
-        elif reading_surface_overrides and surface in reading_surface_overrides:
-            surface_override_raw = reading_surface_overrides[surface]
+        elif reading_surface_overrides and token.surface in reading_surface_overrides:
+            surface_override_raw = reading_surface_overrides[token.surface]
             if surface_override_raw is None:
                 yomi = None
             else:
                 surface_override = surface_override_raw.strip()
                 yomi = surface_override if surface_override else None
-        tokens.append(ReadingToken(surface=surface, yomi=yomi))
-    return tokens
+        adjusted_tokens.append(ReadingToken(surface=token.surface, yomi=yomi))
+    return adjusted_tokens

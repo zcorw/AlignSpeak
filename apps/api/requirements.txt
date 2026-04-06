@@ -14,4 +14,6 @@ Pillow==10.4.0
 pytesseract==0.3.13
 pycld2==0.42
 pykakasi==2.3.0
+SudachiPy==0.6.10
+sudachidict_core==20260116
 pypinyin==0.53.0
