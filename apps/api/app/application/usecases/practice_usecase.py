@@ -713,12 +713,24 @@ def _build_segment_reading_response(
     for index, token in enumerate(tokens):
         is_override = index in override_map
         source = "override" if is_override else ("auto" if token.yomi else "none")
+        editable = language == "ja" and _is_reading_token_editable(token.surface)
+        if is_override:
+            candidates = [token.yomi] if token.yomi else None
+            confidence = 1.0 if token.yomi else None
+            needs_confirmation = False
+        else:
+            candidates = list(token.candidates) if token.candidates else ([token.yomi] if token.yomi else None)
+            confidence = round(float(token.confidence), 3) if token.confidence is not None else None
+            needs_confirmation = bool(token.needs_confirmation and editable)
         response_tokens.append(
             SegmentReadingToken(
                 token_index=index,
                 surface=token.surface,
                 yomi=token.yomi,
-                editable=language == "ja" and _is_reading_token_editable(token.surface),
+                reading_candidates=candidates,
+                reading_confidence=confidence,
+                needs_confirmation=needs_confirmation,
+                editable=editable,
                 source=source,
             )
         )

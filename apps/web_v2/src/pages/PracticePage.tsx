@@ -148,6 +148,8 @@ export const PracticePage = () => {
     activeTokenIndex,
     activeToken,
     activeYomi,
+    activeCandidates,
+    activeNeedsConfirmation,
     mergedTokens: readingTokens,
     setEditMode,
     toggleEditMode,
@@ -421,6 +423,8 @@ export const PracticePage = () => {
                 visible={furiganaEditableUIVisible && isEditMode}
                 activeSurface={activeToken?.surface ?? null}
                 activeYomi={activeYomi}
+                activeCandidates={activeCandidates}
+                activeNeedsConfirmation={activeNeedsConfirmation}
                 saving={furiganaSaving}
                 syncError={furiganaSyncError}
                 emptyLabel={t('pages.practice.furigana.empty')}
@@ -430,6 +434,7 @@ export const PracticePage = () => {
                 nextLabel={t('pages.practice.furigana.next')}
                 savingLabel={t('pages.practice.furigana.saving')}
                 onChangeYomi={setActiveYomi}
+                onPickCandidate={setActiveYomi}
                 onReset={resetActiveToken}
                 onPrev={focusPrevToken}
                 onNext={focusNextToken}

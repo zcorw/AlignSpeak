@@ -7,6 +7,9 @@ import unicodedata
 class ReadingToken:
     surface: str
     yomi: str | None = None
+    candidates: tuple[str, ...] = ()
+    confidence: float | None = None
+    needs_confirmation: bool = False
 
 
 def _contains_kanji(text: str) -> bool:
@@ -63,6 +66,26 @@ def _normalize_reading(*, surface: str, hira: str | None) -> str | None:
     return normalized if normalized else None
 
 
+def _clamp_confidence(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def _dedupe_candidates(*values: str | None) -> tuple[str, ...]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if value is None:
+            continue
+        normalized = value.strip()
+        if not normalized:
+            continue
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(normalized)
+    return tuple(result)
+
+
 def _kakasi_reading_for_surface(surface: str) -> str | None:
     if not _contains_kanji(surface):
         return None
@@ -88,7 +111,17 @@ def _build_ja_tokens_with_kakasi(text: str) -> list[ReadingToken]:
         if not surface:
             continue
         yomi = _normalize_reading(surface=surface, hira=item.get("hira"))
-        tokens.append(ReadingToken(surface=surface, yomi=yomi))
+        candidates = _dedupe_candidates(yomi)
+        confidence = 0.55 if yomi is not None else None
+        tokens.append(
+            ReadingToken(
+                surface=surface,
+                yomi=yomi,
+                candidates=candidates,
+                confidence=confidence,
+                needs_confirmation=False,
+            )
+        )
     return tokens
 
 
@@ -114,10 +147,47 @@ def _build_ja_tokens_with_sudachi(text: str) -> list[ReadingToken]:
         except Exception:
             reading_form = None
 
-        yomi = _normalize_reading(surface=surface, hira=reading_form)
-        if yomi is None and _contains_kanji(surface):
-            yomi = _kakasi_reading_for_surface(surface)
-        tokens.append(ReadingToken(surface=surface, yomi=yomi))
+        has_kanji = _contains_kanji(surface)
+        sudachi_yomi = _normalize_reading(surface=surface, hira=reading_form)
+        kakasi_yomi = _kakasi_reading_for_surface(surface) if has_kanji else None
+        yomi = sudachi_yomi or kakasi_yomi
+        candidates = _dedupe_candidates(sudachi_yomi, kakasi_yomi)
+
+        confidence: float | None = None
+        needs_confirmation = False
+        if yomi is not None and has_kanji:
+            source_is_sudachi = sudachi_yomi is not None
+            confidence_score = 0.88 if source_is_sudachi else 0.55
+
+            pos0 = ""
+            try:
+                pos = morpheme.part_of_speech()
+                if pos:
+                    pos0 = str(pos[0] or "")
+            except Exception:
+                pos0 = ""
+
+            if pos0 == "接尾辞":
+                confidence_score += 0.08
+            if pos0 == "名詞" and len(surface) > 1:
+                confidence_score += 0.05
+            if source_is_sudachi and kakasi_yomi is not None and kakasi_yomi != sudachi_yomi:
+                confidence_score -= 0.25
+            if pos0 == "代名詞" and source_is_sudachi and kakasi_yomi is not None and kakasi_yomi != sudachi_yomi:
+                confidence_score -= 0.1
+
+            confidence = _clamp_confidence(confidence_score)
+            needs_confirmation = len(candidates) >= 2 and confidence < 0.75
+
+        tokens.append(
+            ReadingToken(
+                surface=surface,
+                yomi=yomi,
+                candidates=candidates,
+                confidence=confidence,
+                needs_confirmation=needs_confirmation,
+            )
+        )
 
     # Keep token mapping stable; if tokenization changed text shape, use kakasi fallback path.
     reconstructed = "".join(token.surface for token in tokens)
@@ -162,7 +232,16 @@ def _build_zh_tokens(text: str) -> list[ReadingToken]:
             if buffer:
                 tokens.append(ReadingToken(surface=buffer, yomi=None))
                 buffer = ""
-            tokens.append(ReadingToken(surface=char, yomi=_normalize_pinyin_reading(surface=char)))
+            yomi = _normalize_pinyin_reading(surface=char)
+            tokens.append(
+                ReadingToken(
+                    surface=char,
+                    yomi=yomi,
+                    candidates=_dedupe_candidates(yomi),
+                    confidence=0.65 if yomi is not None else None,
+                    needs_confirmation=False,
+                )
+            )
             continue
         if char.isspace():
             if buffer:
@@ -202,7 +281,26 @@ def build_segment_reading_tokens(
                 else:
                     override = override_raw.strip()
                     yomi = override if override else None
-            adjusted_tokens.append(ReadingToken(surface=token.surface, yomi=yomi))
+            if reading_overrides and index in reading_overrides:
+                adjusted_tokens.append(
+                    ReadingToken(
+                        surface=token.surface,
+                        yomi=yomi,
+                        candidates=_dedupe_candidates(yomi),
+                        confidence=1.0 if yomi is not None else None,
+                        needs_confirmation=False,
+                    )
+                )
+            else:
+                adjusted_tokens.append(
+                    ReadingToken(
+                        surface=token.surface,
+                        yomi=yomi,
+                        candidates=token.candidates,
+                        confidence=token.confidence,
+                        needs_confirmation=False,
+                    )
+                )
         return adjusted_tokens
 
     tokens = _build_ja_tokens(text)
@@ -219,6 +317,15 @@ def build_segment_reading_tokens(
             else:
                 override = override_raw.strip()
                 yomi = override if override else None
+            adjusted_tokens.append(
+                ReadingToken(
+                    surface=token.surface,
+                    yomi=yomi,
+                    candidates=_dedupe_candidates(yomi),
+                    confidence=1.0 if yomi is not None else None,
+                    needs_confirmation=False,
+                )
+            )
         elif reading_surface_overrides and token.surface in reading_surface_overrides:
             surface_override_raw = reading_surface_overrides[token.surface]
             if surface_override_raw is None:
@@ -226,5 +333,23 @@ def build_segment_reading_tokens(
             else:
                 surface_override = surface_override_raw.strip()
                 yomi = surface_override if surface_override else None
-        adjusted_tokens.append(ReadingToken(surface=token.surface, yomi=yomi))
+            adjusted_tokens.append(
+                ReadingToken(
+                    surface=token.surface,
+                    yomi=yomi,
+                    candidates=_dedupe_candidates(yomi),
+                    confidence=1.0 if yomi is not None else None,
+                    needs_confirmation=False,
+                )
+            )
+        else:
+            adjusted_tokens.append(
+                ReadingToken(
+                    surface=token.surface,
+                    yomi=yomi,
+                    candidates=token.candidates,
+                    confidence=token.confidence,
+                    needs_confirmation=token.needs_confirmation,
+                )
+            )
     return adjusted_tokens

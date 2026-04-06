@@ -73,6 +73,9 @@ class SegmentReadingToken(BaseModel):
     token_index: int = Field(ge=0)
     surface: str
     yomi: str | None = None
+    reading_candidates: list[str] | None = None
+    reading_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    needs_confirmation: bool = False
     editable: bool
     source: str
 

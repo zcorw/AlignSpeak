@@ -26,6 +26,9 @@ export interface PracticeReadingToken {
   tokenIndex?: number
   surface: string
   yomi?: string | null
+  readingCandidates?: string[]
+  readingConfidence?: number | null
+  needsConfirmation?: boolean
   editable?: boolean
   source?: 'auto' | 'override' | 'none'
 }

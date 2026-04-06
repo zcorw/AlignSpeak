@@ -15,7 +15,12 @@ const getSourceKey = (enabled: boolean, language: PracticeLanguage, tokens: Prac
       const yomi = token.yomi ?? ''
       const source = token.source ?? ''
       const editable = token.editable ? '1' : '0'
-      return `${tokenIndex}:${surface}:${yomi}:${source}:${editable}`
+      const confidence = typeof token.readingConfidence === 'number' ? token.readingConfidence.toFixed(3) : ''
+      const needsConfirmation = token.needsConfirmation ? '1' : '0'
+      const candidates = Array.isArray(token.readingCandidates)
+        ? token.readingCandidates.join(',')
+        : ''
+      return `${tokenIndex}:${surface}:${yomi}:${source}:${editable}:${confidence}:${needsConfirmation}:${candidates}`
     })
     .join('|')
 }
@@ -98,6 +103,9 @@ export const usePracticeFuriganaEditor = ({
           tokenIndex,
           yomi: normalizedOverride || null,
           source: 'override',
+          readingCandidates: normalizedOverride ? [normalizedOverride] : [],
+          readingConfidence: normalizedOverride ? 1 : null,
+          needsConfirmation: false,
         }
       }),
     [overrides, tokens]
@@ -186,9 +194,25 @@ export const usePracticeFuriganaEditor = ({
       setEditModeState({ sourceKey, value })
       if (!value) {
         setActiveTokenState({ sourceKey, tokenIndex: null })
+        return
       }
+      const pendingTokenArrayIndex = mergedTokens.findIndex((token, index) => {
+        const tokenIndex = normalizeTokenIndex(token, index)
+        return Boolean(token.needsConfirmation) && editableTokenIndices.includes(tokenIndex)
+      })
+      if (pendingTokenArrayIndex >= 0) {
+        setActiveTokenState({
+          sourceKey,
+          tokenIndex: normalizeTokenIndex(mergedTokens[pendingTokenArrayIndex], pendingTokenArrayIndex),
+        })
+        return
+      }
+      setActiveTokenState({
+        sourceKey,
+        tokenIndex: editableTokenIndices[0] ?? null,
+      })
     },
-    [canEdit, sourceKey]
+    [canEdit, editableTokenIndices, mergedTokens, sourceKey]
   )
 
   const toggleEditMode = useCallback(() => {
@@ -241,12 +265,28 @@ export const usePracticeFuriganaEditor = ({
     return typeof activeToken.yomi === 'string' ? activeToken.yomi : ''
   }, [activeToken])
 
+  const activeCandidates = useMemo(() => {
+    if (activeToken == null) return []
+    const candidates = Array.isArray(activeToken.readingCandidates)
+      ? activeToken.readingCandidates
+          .map((item) => item.trim())
+          .filter((item) => item.length > 0)
+      : []
+    const uniqueCandidates = Array.from(new Set(candidates))
+    if (uniqueCandidates.length > 0) return uniqueCandidates
+    return activeYomi ? [activeYomi] : []
+  }, [activeToken, activeYomi])
+
+  const activeNeedsConfirmation = Boolean(activeToken?.needsConfirmation)
+
   return {
     canEdit,
     isEditMode,
     activeTokenIndex,
     activeToken,
     activeYomi,
+    activeCandidates,
+    activeNeedsConfirmation,
     mergedTokens,
     setEditMode,
     toggleEditMode,

@@ -36,6 +36,34 @@ class JapaneseReadingServiceTests(unittest.TestCase):
         self.assertEqual(len(tokens), 1)
         self.assertEqual(tokens[0].surface, "\u4eba")
         self.assertEqual(tokens[0].yomi, "\u306b\u3093")
+        self.assertEqual(tokens[0].candidates, ("\u306b\u3093",))
+        self.assertFalse(tokens[0].needs_confirmation)
+
+    def test_pronoun_returns_candidates_and_low_confidence(self) -> None:
+        tokens = build_segment_reading_tokens(
+            text="\u79c1\u306f\u5b66\u751f\u3067\u3059",
+            language="ja",
+        )
+        self.assertGreaterEqual(len(tokens), 1)
+        self.assertEqual(tokens[0].surface, "\u79c1")
+        self.assertEqual(tokens[0].yomi, "\u308f\u305f\u304f\u3057")
+        self.assertEqual(tokens[0].candidates, ("\u308f\u305f\u304f\u3057", "\u308f\u305f\u3057"))
+        self.assertIsNotNone(tokens[0].confidence)
+        self.assertLess(tokens[0].confidence or 1.0, 0.75)
+        self.assertTrue(tokens[0].needs_confirmation)
+
+    def test_counter_context_keeps_high_confidence(self) -> None:
+        tokens = build_segment_reading_tokens(
+            text="\u4e09\u4eba",
+            language="ja",
+        )
+        self.assertEqual(len(tokens), 2)
+        self.assertEqual(tokens[1].surface, "\u4eba")
+        self.assertEqual(tokens[1].yomi, "\u306b\u3093")
+        self.assertEqual(tokens[1].candidates, ("\u306b\u3093",))
+        self.assertIsNotNone(tokens[1].confidence)
+        self.assertGreaterEqual(tokens[1].confidence or 0.0, 0.75)
+        self.assertFalse(tokens[1].needs_confirmation)
 
 
 if __name__ == "__main__":

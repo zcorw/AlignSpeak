@@ -20,6 +20,13 @@ const normalizeFallbackTokens = (tokens: PracticeReadingToken[] | undefined): Pr
     tokenIndex: typeof token.tokenIndex === 'number' ? token.tokenIndex : index,
     surface: token.surface,
     yomi: token.yomi ?? null,
+    readingCandidates: Array.isArray(token.readingCandidates)
+      ? token.readingCandidates.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      : token.yomi
+        ? [token.yomi]
+        : [],
+    readingConfidence: typeof token.readingConfidence === 'number' ? token.readingConfidence : null,
+    needsConfirmation: Boolean(token.needsConfirmation && token.source !== 'override'),
     editable: !isPunctuationToken(token.surface),
     source: token.source ?? (token.yomi ? 'auto' : 'none'),
   }))

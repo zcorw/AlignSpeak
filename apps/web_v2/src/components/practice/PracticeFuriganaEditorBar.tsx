@@ -4,15 +4,20 @@ interface PracticeFuriganaEditorBarProps {
   visible: boolean
   activeSurface: string | null
   activeYomi: string
+  activeCandidates: string[]
+  activeNeedsConfirmation: boolean
   saving: boolean
   syncError: string | null
   emptyLabel: string
   placeholder: string
+  candidatesLabel?: string
+  needsConfirmLabel?: string
   resetLabel: string
   prevLabel: string
   nextLabel: string
   savingLabel: string
   onChangeYomi: (value: string) => void
+  onPickCandidate: (value: string) => void
   onReset: () => void
   onPrev: () => void
   onNext: () => void
@@ -37,15 +42,20 @@ export const PracticeFuriganaEditorBar = ({
   visible,
   activeSurface,
   activeYomi,
+  activeCandidates,
+  activeNeedsConfirmation,
   saving,
   syncError,
   emptyLabel,
   placeholder,
+  candidatesLabel = 'Candidates',
+  needsConfirmLabel = 'Need confirmation',
   resetLabel,
   prevLabel,
   nextLabel,
   savingLabel,
   onChangeYomi,
+  onPickCandidate,
   onReset,
   onPrev,
   onNext,
@@ -74,8 +84,15 @@ export const PracticeFuriganaEditorBar = ({
             <Box sx={{ px: '8px', py: '3px', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.15)', fontSize: '13px' }}>
               {activeSurface}
             </Box>
-            <Box component="button" type="button" onClick={onReset} sx={{ border: 'none', bgcolor: 'transparent', color: 'text.disabled', fontSize: '12px', cursor: 'pointer' }}>
-              {resetLabel}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {activeNeedsConfirmation && (
+                <Typography sx={{ fontSize: '11px', color: '#f3b15f' }}>
+                  {needsConfirmLabel}
+                </Typography>
+              )}
+              <Box component="button" type="button" onClick={onReset} sx={{ border: 'none', bgcolor: 'transparent', color: 'text.disabled', fontSize: '12px', cursor: 'pointer' }}>
+                {resetLabel}
+              </Box>
             </Box>
           </Box>
           <TextField
@@ -92,6 +109,39 @@ export const PracticeFuriganaEditorBar = ({
               },
             }}
           />
+          {activeCandidates.length > 0 && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <Typography sx={{ fontSize: '11px', color: 'text.disabled' }}>
+                {candidatesLabel}
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {activeCandidates.map((candidate) => {
+                  const selected = candidate === activeYomi
+                  return (
+                    <Box
+                      key={candidate}
+                      component="button"
+                      type="button"
+                      onClick={() => onPickCandidate(candidate)}
+                      sx={{
+                        border: '1px solid',
+                        borderColor: selected ? '#6da5ff' : 'rgba(255,255,255,0.18)',
+                        bgcolor: selected ? 'rgba(109,165,255,0.18)' : 'transparent',
+                        color: selected ? '#dce9ff' : 'text.secondary',
+                        borderRadius: '999px',
+                        px: '10px',
+                        py: '3px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {candidate}
+                    </Box>
+                  )
+                })}
+              </Box>
+            </Box>
+          )}
           <Box sx={{ display: 'flex', gap: '8px' }}>
             <Box component="button" type="button" onClick={onPrev} sx={navButtonSx}>
               {prevLabel}
@@ -116,4 +166,3 @@ export const PracticeFuriganaEditorBar = ({
     </Box>
   )
 }
-
