@@ -25,14 +25,20 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
   const inputRef = useRef<HTMLInputElement>(null)
   const initialArticleRef = useRef<{ rawText: string; language: OverlayLanguageCode } | null>(null)
 
-  const [overlayOpen, setOverlayOpen] = useState(false)
-  const [ocrLoading, setOcrLoading] = useState(false)
+  const [overlayOpenByUser, setOverlayOpenByUser] = useState(false)
+  const [dismissedEditingOverlayForId, setDismissedEditingOverlayForId] = useState<string | null>(null)
+  const [uploadOcrLoading, setUploadOcrLoading] = useState(false)
+  const [loadedEditingArticleId, setLoadedEditingArticleId] = useState<string | null>(null)
   const [importedText, setImportedText] = useState('')
   const [initialLanguage, setInitialLanguage] = useState<OverlayLanguageCode>('en')
   const [importVersion, setImportVersion] = useState(0)
   const [focusVersion, setFocusVersion] = useState(0)
   const [creatingArticle, setCreatingArticle] = useState(false)
   const isEditing = Boolean(editingArticleId)
+  const editingOverlayAutoOpen = isEditing && dismissedEditingOverlayForId !== editingArticleId
+  const overlayOpen = editingOverlayAutoOpen || overlayOpenByUser
+  const editingOcrLoading = isEditing && loadedEditingArticleId !== editingArticleId
+  const ocrLoading = editingOcrLoading || uploadOcrLoading
 
   const applyImportedText = (value: string) => {
     setImportedText(value)
@@ -41,12 +47,14 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
   }
 
   const closeOverlay = () => {
-    setOcrLoading(false)
-    setOverlayOpen(false)
+    setUploadOcrLoading(false)
+    setOverlayOpenByUser(false)
+    if (editingArticleId) setDismissedEditingOverlayForId(editingArticleId)
   }
 
   const openOverlay = (source: 'clipboard' | 'manual') => {
-    setOverlayOpen(true)
+    setOverlayOpenByUser(true)
+    if (editingArticleId) setDismissedEditingOverlayForId(null)
     if (source === 'manual') {
       setFocusVersion((prev) => prev + 1)
       return
@@ -71,8 +79,8 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
     event.target.value = ''
     if (!file) return
 
-    setOverlayOpen(true)
-    setOcrLoading(true)
+    setOverlayOpenByUser(true)
+    setUploadOcrLoading(true)
 
     const locale = navigator.language.toLowerCase()
     const languageHint = locale.startsWith('zh') ? 'zh' : locale.startsWith('ja') ? 'ja' : 'en'
@@ -87,7 +95,7 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
         showError(message)
       })
       .finally(() => {
-        setOcrLoading(false)
+        setUploadOcrLoading(false)
       })
   }
 
@@ -150,8 +158,6 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
   useEffect(() => {
     if (!editingArticleId) return
     let active = true
-    setOverlayOpen(true)
-    setOcrLoading(true)
     void articleService
       .getArticleDetail(editingArticleId, false)
       .then((detail) => {
@@ -167,7 +173,7 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
         navigate('/me', { replace: true })
       })
       .finally(() => {
-        if (active) setOcrLoading(false)
+        if (active) setLoadedEditingArticleId(editingArticleId)
       })
     return () => {
       active = false
