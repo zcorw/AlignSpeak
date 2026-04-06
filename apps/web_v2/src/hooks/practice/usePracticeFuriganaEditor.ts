@@ -4,25 +4,14 @@ import type { PracticeLanguage, PracticeReadingToken, SegmentReadingOverrideInpu
 const normalizeTokenIndex = (token: PracticeReadingToken, fallbackIndex: number): number =>
   typeof token.tokenIndex === 'number' ? token.tokenIndex : fallbackIndex
 
-const getSourceKey = (enabled: boolean, language: PracticeLanguage, tokens: PracticeReadingToken[]): string => {
-  if (!enabled || language !== 'ja') {
-    return `disabled:${language}:${enabled ? '1' : '0'}`
-  }
-  return tokens
-    .map((token, index) => {
-      const tokenIndex = normalizeTokenIndex(token, index)
-      const surface = token.surface ?? ''
-      const yomi = token.yomi ?? ''
-      const source = token.source ?? ''
-      const editable = token.editable ? '1' : '0'
-      const confidence = typeof token.readingConfidence === 'number' ? token.readingConfidence.toFixed(3) : ''
-      const needsConfirmation = token.needsConfirmation ? '1' : '0'
-      const candidates = Array.isArray(token.readingCandidates)
-        ? token.readingCandidates.join(',')
-        : ''
-      return `${tokenIndex}:${surface}:${yomi}:${source}:${editable}:${confidence}:${needsConfirmation}:${candidates}`
-    })
-    .join('|')
+const getSourceKey = (
+  enabled: boolean,
+  language: PracticeLanguage,
+  scopeId: string | null | undefined
+): string => {
+  const mode = enabled && language === 'ja' ? 'ja-enabled' : `disabled:${language}:${enabled ? '1' : '0'}`
+  const scope = scopeId ?? 'global'
+  return `${scope}:${mode}`
 }
 
 const getOverrideMapFromTokens = (tokens: PracticeReadingToken[]): Record<number, string> => {
@@ -37,6 +26,7 @@ const getOverrideMapFromTokens = (tokens: PracticeReadingToken[]): Record<number
 
 interface UsePracticeFuriganaEditorOptions {
   language: PracticeLanguage
+  scopeId?: string | null
   tokens: PracticeReadingToken[]
   enabled: boolean
   onOverridesChange: (overrides: SegmentReadingOverrideInput[]) => void
@@ -60,12 +50,13 @@ interface KeyedOverridesState {
 
 export const usePracticeFuriganaEditor = ({
   language,
+  scopeId,
   tokens,
   enabled,
   onOverridesChange,
   onTokenSurfacesChange,
 }: UsePracticeFuriganaEditorOptions) => {
-  const sourceKey = useMemo(() => getSourceKey(enabled, language, tokens), [enabled, language, tokens])
+  const sourceKey = useMemo(() => getSourceKey(enabled, language, scopeId), [enabled, language, scopeId])
 
   const baseOverrides = useMemo(() => getOverrideMapFromTokens(tokens), [tokens])
 
@@ -120,6 +111,14 @@ export const usePracticeFuriganaEditor = ({
         .map((token, index) => normalizeTokenIndex(token, index)),
     [mergedTokens]
   )
+  const firstEditableTokenIndex = editableTokenIndices[0] ?? null
+  const defaultEditEntryTokenIndex = useMemo(() => {
+    for (const [index, token] of mergedTokens.entries()) {
+      if (!token.editable || !token.needsConfirmation) continue
+      return normalizeTokenIndex(token, index)
+    }
+    return firstEditableTokenIndex
+  }, [firstEditableTokenIndex, mergedTokens])
 
   const canEdit = enabled && language === 'ja' && editableTokenIndices.length > 0
   const isEditMode = canEdit && editModeState.sourceKey === sourceKey ? editModeState.value : false
@@ -198,23 +197,12 @@ export const usePracticeFuriganaEditor = ({
         setActiveTokenState({ sourceKey, tokenIndex: null })
         return
       }
-      const pendingTokenArrayIndex = mergedTokens.findIndex((token, index) => {
-        const tokenIndex = normalizeTokenIndex(token, index)
-        return Boolean(token.needsConfirmation) && editableTokenIndices.includes(tokenIndex)
-      })
-      if (pendingTokenArrayIndex >= 0) {
-        setActiveTokenState({
-          sourceKey,
-          tokenIndex: normalizeTokenIndex(mergedTokens[pendingTokenArrayIndex], pendingTokenArrayIndex),
-        })
-        return
-      }
       setActiveTokenState({
         sourceKey,
-        tokenIndex: editableTokenIndices[0] ?? null,
+        tokenIndex: defaultEditEntryTokenIndex,
       })
     },
-    [canEdit, editableTokenIndices, mergedTokens, sourceKey]
+    [canEdit, defaultEditEntryTokenIndex, sourceKey]
   )
 
   const toggleEditMode = useCallback(() => {
@@ -278,10 +266,8 @@ export const usePracticeFuriganaEditor = ({
       const nextSurfaces = mergedTokens.map((token) => token.surface)
       nextSurfaces.splice(activeArrayIndex, 1, left, right)
       onTokenSurfacesChange(nextSurfaces)
-      setEditModeState({ sourceKey, value: false })
-      setActiveTokenState({ sourceKey, tokenIndex: null })
     },
-    [activeTokenIndex, isEditMode, mergedTokens, onTokenSurfacesChange, sourceKey]
+    [activeTokenIndex, isEditMode, mergedTokens, onTokenSurfacesChange]
   )
 
   const mergeActiveTokenWithPrev = useCallback(() => {
@@ -296,9 +282,7 @@ export const usePracticeFuriganaEditor = ({
     const nextSurfaces = mergedTokens.map((token) => token.surface)
     nextSurfaces.splice(activeArrayIndex - 1, 2, `${left.surface}${right.surface}`)
     onTokenSurfacesChange(nextSurfaces)
-    setEditModeState({ sourceKey, value: false })
-    setActiveTokenState({ sourceKey, tokenIndex: null })
-  }, [activeTokenIndex, isEditMode, mergedTokens, onTokenSurfacesChange, sourceKey])
+  }, [activeTokenIndex, isEditMode, mergedTokens, onTokenSurfacesChange])
 
   const mergeActiveTokenWithNext = useCallback(() => {
     if (!isEditMode || activeTokenIndex == null || !onTokenSurfacesChange) return
@@ -312,9 +296,7 @@ export const usePracticeFuriganaEditor = ({
     const nextSurfaces = mergedTokens.map((token) => token.surface)
     nextSurfaces.splice(activeArrayIndex, 2, `${left.surface}${right.surface}`)
     onTokenSurfacesChange(nextSurfaces)
-    setEditModeState({ sourceKey, value: false })
-    setActiveTokenState({ sourceKey, tokenIndex: null })
-  }, [activeTokenIndex, isEditMode, mergedTokens, onTokenSurfacesChange, sourceKey])
+  }, [activeTokenIndex, isEditMode, mergedTokens, onTokenSurfacesChange])
 
   const activeYomi = useMemo(() => {
     if (activeToken == null) return ''

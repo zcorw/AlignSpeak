@@ -176,6 +176,7 @@ export const PracticePage = () => {
     focusNextToken,
   } = usePracticeFuriganaEditor({
     language: articleLanguage,
+    scopeId: currentSegment?.id ?? null,
     tokens: syncedReadingTokens,
     enabled: canPractice,
     onOverridesChange: handleOverridesChange,
@@ -226,12 +227,19 @@ export const PracticePage = () => {
   })
 
   const handleSpeakSegment = useCallback(() => {
-    void speakSegment({
-      canPractice,
-      articleId,
-      segment: currentSegment,
-    })
-  }, [articleId, canPractice, currentSegment, speakSegment])
+    void (async () => {
+      try {
+        await flushPendingOverrides()
+      } catch {
+        // Keep current flow even if pending furigana save fails.
+      }
+      await speakSegment({
+        canPractice,
+        articleId,
+        segment: currentSegment,
+      })
+    })()
+  }, [articleId, canPractice, currentSegment, flushPendingOverrides, speakSegment])
 
   const furiganaEditableUIVisible =
     canEditFurigana && !recordOverlayOpen && !recognizing && !showScore && !loading && !loadError
@@ -341,9 +349,9 @@ export const PracticePage = () => {
   }, [clearFeedback, segmentIndex, setEditMode, stopSpeaking])
 
   useEffect(() => {
-    if (furiganaEditableUIVisible) return
+    if (canEditFurigana) return
     setEditMode(false)
-  }, [furiganaEditableUIVisible, setEditMode])
+  }, [canEditFurigana, setEditMode])
 
   const switchLevel = (nextLevel: Level) => {
     if (nextLevel === level) return
@@ -439,7 +447,7 @@ export const PracticePage = () => {
                 onToggle={toggleEditMode}
               />
               <PracticeFuriganaEditorBar
-                visible={furiganaEditableUIVisible && isEditMode}
+                visible={canEditFurigana && isEditMode}
                 activeSurface={activeToken?.surface ?? null}
                 activeYomi={activeYomi}
                 activeCandidates={activeCandidates}
