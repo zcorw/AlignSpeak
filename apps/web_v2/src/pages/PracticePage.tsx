@@ -128,6 +128,7 @@ export const PracticePage = () => {
     error: furiganaSyncError,
     scheduleReplaceOverrides,
     flushPendingOverrides,
+    replaceTokenSurfaces,
   } = usePracticeFuriganaSync({
     segmentId: currentSegment?.id ?? null,
     language: articleLanguage,
@@ -140,6 +141,18 @@ export const PracticePage = () => {
       scheduleReplaceOverrides(overrides)
     },
     [scheduleReplaceOverrides]
+  )
+
+  const handleTokenSurfacesChange = useCallback(
+    async (surfaces: string[]) => {
+      try {
+        await flushPendingOverrides()
+      } catch {
+        // Ignore pending reading save failure; token operation should still be attempted.
+      }
+      await replaceTokenSurfaces(surfaces)
+    },
+    [flushPendingOverrides, replaceTokenSurfaces]
   )
 
   const {
@@ -156,6 +169,9 @@ export const PracticePage = () => {
     selectToken,
     setActiveYomi,
     resetActiveToken,
+    splitActiveToken,
+    mergeActiveTokenWithPrev,
+    mergeActiveTokenWithNext,
     focusPrevToken,
     focusNextToken,
   } = usePracticeFuriganaEditor({
@@ -163,6 +179,9 @@ export const PracticePage = () => {
     tokens: syncedReadingTokens,
     enabled: canPractice,
     onOverridesChange: handleOverridesChange,
+    onTokenSurfacesChange: (surfaces) => {
+      void handleTokenSurfacesChange(surfaces)
+    },
   })
 
   const handleBeforeStart = useCallback(async () => {
@@ -435,6 +454,9 @@ export const PracticePage = () => {
                 savingLabel={t('pages.practice.furigana.saving')}
                 onChangeYomi={setActiveYomi}
                 onPickCandidate={setActiveYomi}
+                onSplitToken={splitActiveToken}
+                onMergeWithPrev={mergeActiveTokenWithPrev}
+                onMergeWithNext={mergeActiveTokenWithNext}
                 onReset={resetActiveToken}
                 onPrev={focusPrevToken}
                 onNext={focusNextToken}

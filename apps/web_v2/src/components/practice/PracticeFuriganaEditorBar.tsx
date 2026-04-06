@@ -1,4 +1,5 @@
 import { Box, TextField, Typography } from '@mui/material'
+import { useMemo, useState } from 'react'
 
 interface PracticeFuriganaEditorBarProps {
   visible: boolean
@@ -12,12 +13,19 @@ interface PracticeFuriganaEditorBarProps {
   placeholder: string
   candidatesLabel?: string
   needsConfirmLabel?: string
+  splitLabel?: string
+  splitAtLabel?: string
+  mergePrevLabel?: string
+  mergeNextLabel?: string
   resetLabel: string
   prevLabel: string
   nextLabel: string
   savingLabel: string
   onChangeYomi: (value: string) => void
   onPickCandidate: (value: string) => void
+  onSplitToken: (splitAt: number) => void
+  onMergeWithPrev: () => void
+  onMergeWithNext: () => void
   onReset: () => void
   onPrev: () => void
   onNext: () => void
@@ -50,16 +58,34 @@ export const PracticeFuriganaEditorBar = ({
   placeholder,
   candidatesLabel = 'Candidates',
   needsConfirmLabel = 'Need confirmation',
+  splitLabel = 'Split',
+  splitAtLabel = 'Split at',
+  mergePrevLabel = 'Merge Prev',
+  mergeNextLabel = 'Merge Next',
   resetLabel,
   prevLabel,
   nextLabel,
   savingLabel,
   onChangeYomi,
   onPickCandidate,
+  onSplitToken,
+  onMergeWithPrev,
+  onMergeWithNext,
   onReset,
   onPrev,
   onNext,
 }: PracticeFuriganaEditorBarProps) => {
+  const [splitAtState, setSplitAtState] = useState<{ surfaceKey: string; value: string }>({
+    surfaceKey: '',
+    value: '1',
+  })
+  const activeSurfaceLength = useMemo(() => (activeSurface ? Array.from(activeSurface).length : 0), [activeSurface])
+  const surfaceKey = activeSurface ?? ''
+  const defaultSplitText = activeSurfaceLength <= 1 ? '1' : String(Math.max(1, Math.floor(activeSurfaceLength / 2)))
+  const splitAtText = splitAtState.surfaceKey === surfaceKey ? splitAtState.value : defaultSplitText
+  const parsedSplitAt = Number(splitAtText)
+  const splitAtValid = Number.isInteger(parsedSplitAt) && parsedSplitAt > 0 && parsedSplitAt < activeSurfaceLength
+
   if (!visible) return null
   return (
     <Box
@@ -142,6 +168,44 @@ export const PracticeFuriganaEditorBar = ({
               </Box>
             </Box>
           )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <Typography sx={{ fontSize: '11px', color: 'text.disabled' }}>
+              {splitAtLabel}
+            </Typography>
+            <TextField
+              type="number"
+              size="small"
+              value={splitAtText}
+              onChange={(event) => setSplitAtState({ surfaceKey, value: event.target.value })}
+              inputProps={{ min: 1, max: Math.max(activeSurfaceLength - 1, 1), step: 1 }}
+              sx={{
+                width: '88px',
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: '#1a1a2c',
+                  '& fieldset': { borderColor: 'rgba(255,255,255,0.16)' },
+                },
+              }}
+            />
+            <Box
+              component="button"
+              type="button"
+              onClick={() => onSplitToken(parsedSplitAt)}
+              disabled={!splitAtValid}
+              sx={{
+                ...navButtonSx,
+                opacity: splitAtValid ? 1 : 0.45,
+                cursor: splitAtValid ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {splitLabel}
+            </Box>
+            <Box component="button" type="button" onClick={onMergeWithPrev} sx={navButtonSx}>
+              {mergePrevLabel}
+            </Box>
+            <Box component="button" type="button" onClick={onMergeWithNext} sx={navButtonSx}>
+              {mergeNextLabel}
+            </Box>
+          </Box>
           <Box sx={{ display: 'flex', gap: '8px' }}>
             <Box component="button" type="button" onClick={onPrev} sx={navButtonSx}>
               {prevLabel}

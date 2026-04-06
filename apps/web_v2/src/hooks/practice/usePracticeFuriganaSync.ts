@@ -5,6 +5,7 @@ import {
   type PracticeLanguage,
   type PracticeReadingToken,
   type SegmentReadingOverrideInput,
+  type SegmentTokenOverrideInput,
 } from '../../services/practiceService'
 
 const SAVE_DEBOUNCE_MS = 450
@@ -136,6 +137,30 @@ export const usePracticeFuriganaSync = ({
 
   const hasPendingSave = pendingOverridesRef.current !== null
 
+  const replaceTokenSurfaces = useCallback(
+    async (surfaces: string[]) => {
+      if (language !== 'ja' || !segmentId) return
+      clearDebounce()
+      pendingOverridesRef.current = null
+      setSaving(true)
+      setError(null)
+      try {
+        const payload: SegmentTokenOverrideInput[] = surfaces.map((surface, tokenIndex) => ({
+          tokenIndex,
+          surface,
+        }))
+        const response = await practiceService.replaceSegmentTokenOverrides(segmentId, payload)
+        setTokens(normalizeFallbackTokens(response.tokens))
+      } catch (cause: unknown) {
+        setError(getApiErrorMessage(cause, errorMessage))
+        throw cause
+      } finally {
+        setSaving(false)
+      }
+    },
+    [clearDebounce, errorMessage, language, segmentId]
+  )
+
   return {
     tokens,
     loading,
@@ -144,5 +169,6 @@ export const usePracticeFuriganaSync = ({
     hasPendingSave,
     scheduleReplaceOverrides,
     flushPendingOverrides,
+    replaceTokenSurfaces,
   }
 }

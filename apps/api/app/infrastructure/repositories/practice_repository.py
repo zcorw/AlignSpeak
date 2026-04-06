@@ -14,6 +14,7 @@ from app.models import (
     PracticeRecording,
     PracticeRecordingChunk,
     SegmentReadingOverride,
+    SegmentTokenOverride,
     SttJob,
 )
 
@@ -371,6 +372,53 @@ class PracticeRepository:
                 SegmentReadingOverride.user_id == user_id,
                 SegmentReadingOverride.segment_id == segment_id,
                 SegmentReadingOverride.token_index == token_index,
+            )
+        )
+        self.db.commit()
+
+    def list_segment_token_overrides(
+        self,
+        *,
+        user_id: str,
+        segment_id: str,
+    ) -> list[SegmentTokenOverride]:
+        statement = (
+            select(SegmentTokenOverride)
+            .where(
+                SegmentTokenOverride.user_id == user_id,
+                SegmentTokenOverride.segment_id == segment_id,
+            )
+            .order_by(SegmentTokenOverride.token_index.asc())
+        )
+        return list(self.db.scalars(statement).all())
+
+    def replace_segment_token_overrides(
+        self,
+        *,
+        user_id: str,
+        segment_id: str,
+        overrides: list[SegmentTokenOverride],
+    ) -> None:
+        self.db.execute(
+            delete(SegmentTokenOverride).where(
+                SegmentTokenOverride.user_id == user_id,
+                SegmentTokenOverride.segment_id == segment_id,
+            )
+        )
+        for item in overrides:
+            self.db.add(item)
+        self.db.commit()
+
+    def delete_segment_token_overrides(
+        self,
+        *,
+        user_id: str,
+        segment_id: str,
+    ) -> None:
+        self.db.execute(
+            delete(SegmentTokenOverride).where(
+                SegmentTokenOverride.user_id == user_id,
+                SegmentTokenOverride.segment_id == segment_id,
             )
         )
         self.db.commit()

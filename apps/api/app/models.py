@@ -107,6 +107,30 @@ class SegmentReadingOverride(Base):
     )
 
 
+class SegmentTokenOverride(Base):
+    __tablename__ = "segment_token_overrides"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "segment_id",
+            "token_index",
+            name="uq_segment_token_overrides_user_segment_token",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), nullable=False, index=True)
+    segment_id: Mapped[str] = mapped_column(String(32), ForeignKey("article_segments.id"), nullable=False, index=True)
+    token_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    surface: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class TtsAsset(Base):
     __tablename__ = "tts_assets"
     __table_args__ = (

@@ -69,6 +69,11 @@ export interface SegmentReadingOverrideInput {
   yomi: string | null
 }
 
+export interface SegmentTokenOverrideInput {
+  tokenIndex: number
+  surface: string
+}
+
 interface BffMeResponse {
   historyDocs?: Array<{ id?: string }>
   history_docs?: Array<{ id?: string }>
@@ -194,6 +199,24 @@ export const practiceService = {
     tokenIndex: number
   ): Promise<SegmentReading> {
     const response = await api.delete(`/practice/segments/${segmentId}/reading-overrides/${tokenIndex}`)
+    return toCamelCase<SegmentReading>(response.data)
+  },
+
+  async replaceSegmentTokenOverrides(
+    segmentId: string,
+    tokens: SegmentTokenOverrideInput[]
+  ): Promise<SegmentReading> {
+    const response = await api.put(`/practice/segments/${segmentId}/token-overrides`, {
+      tokens: tokens.map((item) => ({
+        token_index: item.tokenIndex,
+        surface: item.surface,
+      })),
+    })
+    return toCamelCase<SegmentReading>(response.data)
+  },
+
+  async deleteSegmentTokenOverrides(segmentId: string): Promise<SegmentReading> {
+    const response = await api.delete(`/practice/segments/${segmentId}/token-overrides`)
     return toCamelCase<SegmentReading>(response.data)
   },
 }

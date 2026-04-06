@@ -16,6 +16,7 @@ from app.models import (
     PracticeAttempt,
     PracticeRecording,
     SegmentReadingOverride,
+    SegmentTokenOverride,
     SttJob,
     User,
 )
@@ -33,6 +34,7 @@ from app.schemas.practice import (
     SegmentReadingToken,
     SegmentReadingOverrideItem,
     UpsertSegmentReadingOverridesPayload,
+    UpsertSegmentTokenOverridesPayload,
     NoiseSpan,
     StartRecordingResponse,
     SttJobStatusResponse,
@@ -84,11 +86,17 @@ def get_attempt_result(
                 user_id=current_user.id,
                 segment_id=segment.id,
             )
+            token_surface_overrides = _load_segment_token_override_surfaces(
+                repository=repository,
+                user_id=current_user.id,
+                segment_id=segment.id,
+            )
             alignment = align_segment_text(
                 reference_text=segment.plain_text,
                 recognized_text=recognized_text,
                 language=article.language,
                 reading_overrides=reading_overrides if article.language == "ja" else None,
+                token_surface_overrides=token_surface_overrides if article.language == "ja" else None,
             )
             _persist_alignment(
                 repository=repository,
@@ -264,11 +272,17 @@ def get_segment_reading(
         user_id=current_user.id,
         segment_id=segment.id,
     )
+    token_surface_overrides = _load_segment_token_override_surfaces(
+        repository=repository,
+        user_id=current_user.id,
+        segment_id=segment.id,
+    )
     return _build_segment_reading_response(
         segment_id=segment.id,
         language=article.language,
         text=segment.plain_text,
         override_map=override_map,
+        token_surface_overrides=token_surface_overrides,
     )
 
 
@@ -294,7 +308,16 @@ def upsert_segment_reading_overrides(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
-    base_tokens = build_segment_reading_tokens(text=segment.plain_text, language=article.language)
+    token_surface_overrides = _load_segment_token_override_surfaces(
+        repository=repository,
+        user_id=current_user.id,
+        segment_id=segment.id,
+    )
+    base_tokens = build_segment_reading_tokens(
+        text=segment.plain_text,
+        language=article.language,
+        token_surface_overrides=token_surface_overrides if article.language == "ja" else None,
+    )
     seen: set[int] = set()
     override_map: dict[int, str | None] = {}
     rows: list[SegmentReadingOverride] = []
@@ -325,6 +348,7 @@ def upsert_segment_reading_overrides(
         language=article.language,
         text=segment.plain_text,
         override_map=override_map,
+        token_surface_overrides=token_surface_overrides,
     )
 
 
@@ -365,11 +389,112 @@ def delete_segment_reading_override(
         user_id=current_user.id,
         segment_id=segment.id,
     )
+    token_surface_overrides = _load_segment_token_override_surfaces(
+        repository=repository,
+        user_id=current_user.id,
+        segment_id=segment.id,
+    )
     return _build_segment_reading_response(
         segment_id=segment.id,
         language=article.language,
         text=segment.plain_text,
         override_map=override_map,
+        token_surface_overrides=token_surface_overrides,
+    )
+
+
+def upsert_segment_token_overrides(
+    *,
+    repository: PracticeRepository,
+    current_user: User,
+    segment_id: str,
+    payload: UpsertSegmentTokenOverridesPayload,
+) -> SegmentReadingResponse:
+    pair = repository.get_segment_for_user(segment_id=segment_id, user_id=current_user.id)
+    if pair is None:
+        raise AppError(
+            code="SEGMENT_NOT_FOUND",
+            message="Segment not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    article, segment = pair
+    if article.language != "ja":
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Token override is only supported for Japanese segments.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not payload.tokens:
+        repository.delete_segment_token_overrides(user_id=current_user.id, segment_id=segment.id)
+        repository.replace_segment_reading_overrides(user_id=current_user.id, segment_id=segment.id, overrides=[])
+        return _build_segment_reading_response(
+            segment_id=segment.id,
+            language=article.language,
+            text=segment.plain_text,
+            override_map={},
+            token_surface_overrides=None,
+        )
+
+    surfaces = _validate_token_overrides_payload(payload=payload, source_text=segment.plain_text)
+    rows: list[SegmentTokenOverride] = []
+    for token_index, surface in enumerate(surfaces):
+        rows.append(
+            SegmentTokenOverride(
+                id=f"sto_{uuid4().hex[:12]}",
+                user_id=current_user.id,
+                segment_id=segment.id,
+                token_index=token_index,
+                surface=surface,
+                created_at=datetime.now(tz=timezone.utc),
+                updated_at=datetime.now(tz=timezone.utc),
+            )
+        )
+
+    repository.replace_segment_token_overrides(
+        user_id=current_user.id,
+        segment_id=segment.id,
+        overrides=rows,
+    )
+    # Token shape changed; clear old reading overrides to avoid index/surface mismatch.
+    repository.replace_segment_reading_overrides(user_id=current_user.id, segment_id=segment.id, overrides=[])
+    return _build_segment_reading_response(
+        segment_id=segment.id,
+        language=article.language,
+        text=segment.plain_text,
+        override_map={},
+        token_surface_overrides=surfaces,
+    )
+
+
+def delete_segment_token_overrides(
+    *,
+    repository: PracticeRepository,
+    current_user: User,
+    segment_id: str,
+) -> SegmentReadingResponse:
+    pair = repository.get_segment_for_user(segment_id=segment_id, user_id=current_user.id)
+    if pair is None:
+        raise AppError(
+            code="SEGMENT_NOT_FOUND",
+            message="Segment not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    article, segment = pair
+    if article.language != "ja":
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Token override is only supported for Japanese segments.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    repository.delete_segment_token_overrides(user_id=current_user.id, segment_id=segment.id)
+    repository.replace_segment_reading_overrides(user_id=current_user.id, segment_id=segment.id, overrides=[])
+    return _build_segment_reading_response(
+        segment_id=segment.id,
+        language=article.language,
+        text=segment.plain_text,
+        override_map={},
+        token_surface_overrides=None,
     )
 
 
@@ -671,6 +796,15 @@ def align_attempt(
             if article.language == "ja"
             else None
         ),
+        token_surface_overrides=(
+            _load_segment_token_override_surfaces(
+                repository=repository,
+                user_id=current_user.id,
+                segment_id=segment.id,
+            )
+            if article.language == "ja"
+            else None
+        ),
     )
     _persist_alignment(
         repository=repository,
@@ -703,11 +837,13 @@ def _build_segment_reading_response(
     language: str,
     text: str,
     override_map: dict[int, str | None],
+    token_surface_overrides: list[str] | None = None,
 ) -> SegmentReadingResponse:
     tokens = build_segment_reading_tokens(
         text=text,
         language=language,
         reading_overrides=override_map if language == "ja" else None,
+        token_surface_overrides=token_surface_overrides if language == "ja" else None,
     )
     response_tokens: list[SegmentReadingToken] = []
     for index, token in enumerate(tokens):
@@ -754,6 +890,18 @@ def _load_segment_override_map(
     }
 
 
+def _load_segment_token_override_surfaces(
+    *,
+    repository: PracticeRepository,
+    user_id: str,
+    segment_id: str,
+) -> list[str] | None:
+    rows = repository.list_segment_token_overrides(user_id=user_id, segment_id=segment_id)
+    if not rows:
+        return None
+    return [str(row.surface or "") for row in rows if str(row.surface or "")]
+
+
 def _validate_override_item(
     *,
     item: SegmentReadingOverrideItem,
@@ -787,6 +935,48 @@ def _validate_override_item(
             message="token at token_index is not editable.",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
+
+
+def _validate_token_overrides_payload(
+    *,
+    payload: UpsertSegmentTokenOverridesPayload,
+    source_text: str,
+) -> list[str]:
+    seen_indices: set[int] = set()
+    surfaces: list[str] = []
+    expected_index = 0
+    for item in payload.tokens:
+        if item.token_index in seen_indices:
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message="Duplicate token_index in token overrides.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        seen_indices.add(item.token_index)
+        if item.token_index != expected_index:
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message="token_index must be continuous starting from 0.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        expected_index += 1
+
+        normalized_surface = item.surface
+        if normalized_surface == "":
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message="Token surface cannot be empty.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        surfaces.append(normalized_surface)
+
+    if "".join(surfaces) != source_text:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Token surfaces must concatenate to original segment text.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    return surfaces
 
 
 def _is_reading_token_editable(surface: str) -> bool:

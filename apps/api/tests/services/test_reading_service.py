@@ -65,6 +65,26 @@ class JapaneseReadingServiceTests(unittest.TestCase):
         self.assertGreaterEqual(tokens[1].confidence or 0.0, 0.75)
         self.assertFalse(tokens[1].needs_confirmation)
 
+    def test_token_surface_overrides_can_change_segmentation(self) -> None:
+        tokens = build_segment_reading_tokens(
+            text="\u6771\u4eac\u90fd",
+            language="ja",
+            token_surface_overrides=["\u6771\u4eac", "\u90fd"],
+        )
+        self.assertEqual([token.surface for token in tokens], ["\u6771\u4eac", "\u90fd"])
+        self.assertEqual("".join(token.surface for token in tokens), "\u6771\u4eac\u90fd")
+
+    def test_reading_override_works_with_token_surface_overrides(self) -> None:
+        tokens = build_segment_reading_tokens(
+            text="\u6771\u4eac\u90fd",
+            language="ja",
+            token_surface_overrides=["\u6771\u4eac", "\u90fd"],
+            reading_overrides={1: "\u3068"},
+        )
+        self.assertEqual([token.surface for token in tokens], ["\u6771\u4eac", "\u90fd"])
+        self.assertEqual(tokens[1].yomi, "\u3068")
+        self.assertEqual(tokens[1].candidates, ("\u3068",))
+
 
 if __name__ == "__main__":
     unittest.main()

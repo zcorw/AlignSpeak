@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.application.usecases.practice_usecase import (
     align_attempt,
     delete_segment_reading_override,
+    delete_segment_token_overrides,
     finish_recording,
     get_attempt_result,
     resolve_attempt_audio_path,
@@ -14,6 +15,7 @@ from app.application.usecases.practice_usecase import (
     process_stt_job,
     start_recording,
     upsert_segment_reading_overrides,
+    upsert_segment_token_overrides,
     upload_recording_chunk,
 )
 from app.db import get_db
@@ -32,6 +34,7 @@ from app.schemas.practice import (
     StartRecordingResponse,
     SttJobStatusResponse,
     UpsertSegmentReadingOverridesPayload,
+    UpsertSegmentTokenOverridesPayload,
     UploadChunkResponse,
 )
 
@@ -128,6 +131,36 @@ def remove_practice_segment_reading_override(
         current_user=current_user,
         segment_id=segment_id,
         token_index=token_index,
+    )
+
+
+@router.put("/practice/segments/{segment_id}/token-overrides", response_model=SegmentReadingResponse)
+def put_practice_segment_token_overrides(
+    segment_id: str,
+    payload: UpsertSegmentTokenOverridesPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SegmentReadingResponse:
+    repository = PracticeRepository(db=db)
+    return upsert_segment_token_overrides(
+        repository=repository,
+        current_user=current_user,
+        segment_id=segment_id,
+        payload=payload,
+    )
+
+
+@router.delete("/practice/segments/{segment_id}/token-overrides", response_model=SegmentReadingResponse)
+def remove_practice_segment_token_overrides(
+    segment_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SegmentReadingResponse:
+    repository = PracticeRepository(db=db)
+    return delete_segment_token_overrides(
+        repository=repository,
+        current_user=current_user,
+        segment_id=segment_id,
     )
 
 

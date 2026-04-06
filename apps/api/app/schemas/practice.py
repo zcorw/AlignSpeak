@@ -96,6 +96,15 @@ class UpsertSegmentReadingOverridesPayload(BaseModel):
     overrides: list[SegmentReadingOverrideItem] = Field(default_factory=list, max_length=512)
 
 
+class SegmentTokenOverrideItem(BaseModel):
+    token_index: int = Field(ge=0)
+    surface: str = Field(min_length=1, max_length=128)
+
+
+class UpsertSegmentTokenOverridesPayload(BaseModel):
+    tokens: list[SegmentTokenOverrideItem] = Field(default_factory=list, max_length=512)
+
+
 class PracticeProgressCell(BaseModel):
     segment_order: int = Field(ge=1)
     state: str

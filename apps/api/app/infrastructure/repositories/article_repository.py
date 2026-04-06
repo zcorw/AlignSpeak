@@ -3,7 +3,15 @@ from datetime import datetime
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Article, ArticleSegment, PracticeAttempt, PracticeRecording, SegmentReadingOverride, TtsAsset
+from app.models import (
+    Article,
+    ArticleSegment,
+    PracticeAttempt,
+    PracticeRecording,
+    SegmentReadingOverride,
+    SegmentTokenOverride,
+    TtsAsset,
+)
 from app.services.article_service import CursorPosition
 
 
@@ -123,6 +131,7 @@ class ArticleRepository:
         )
         if old_segment_ids:
             self.db.execute(delete(SegmentReadingOverride).where(SegmentReadingOverride.segment_id.in_(old_segment_ids)))
+            self.db.execute(delete(SegmentTokenOverride).where(SegmentTokenOverride.segment_id.in_(old_segment_ids)))
             self.db.execute(delete(TtsAsset).where(TtsAsset.segment_id.in_(old_segment_ids)))
             self.db.execute(delete(ArticleSegment).where(ArticleSegment.article_id == article.id))
         article.language = language

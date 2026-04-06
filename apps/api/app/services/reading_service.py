@@ -203,6 +203,54 @@ def _build_ja_tokens(text: str) -> list[ReadingToken]:
     return _build_ja_tokens_with_kakasi(text)
 
 
+def _build_ja_tokens_from_surfaces(surfaces: list[str]) -> list[ReadingToken]:
+    tokens: list[ReadingToken] = []
+    for surface in surfaces:
+        if not surface:
+            continue
+        if not _contains_kanji(surface):
+            tokens.append(
+                ReadingToken(
+                    surface=surface,
+                    yomi=None,
+                    candidates=(),
+                    confidence=None,
+                    needs_confirmation=False,
+                )
+            )
+            continue
+
+        sudachi_single = _build_ja_tokens_with_sudachi(surface)
+        sudachi_yomi = (
+            sudachi_single[0].yomi
+            if len(sudachi_single) == 1 and sudachi_single[0].surface == surface
+            else None
+        )
+        kakasi_yomi = _kakasi_reading_for_surface(surface)
+        yomi = sudachi_yomi or kakasi_yomi
+        candidates = _dedupe_candidates(sudachi_yomi, kakasi_yomi)
+
+        confidence = None
+        needs_confirmation = False
+        if yomi is not None:
+            confidence_score = 0.82 if sudachi_yomi is not None else 0.55
+            if sudachi_yomi is not None and kakasi_yomi is not None and sudachi_yomi != kakasi_yomi:
+                confidence_score -= 0.25
+            confidence = _clamp_confidence(confidence_score)
+            needs_confirmation = len(candidates) >= 2 and confidence < 0.75
+
+        tokens.append(
+            ReadingToken(
+                surface=surface,
+                yomi=yomi,
+                candidates=candidates,
+                confidence=confidence,
+                needs_confirmation=needs_confirmation,
+            )
+        )
+    return tokens
+
+
 @lru_cache(maxsize=1)
 def _load_pypinyin_helpers():
     from pypinyin import Style, lazy_pinyin  # type: ignore
@@ -261,6 +309,7 @@ def build_segment_reading_tokens(
     language: str,
     reading_overrides: dict[int, str | None] | None = None,
     reading_surface_overrides: dict[str, str | None] | None = None,
+    token_surface_overrides: list[str] | None = None,
 ) -> list[ReadingToken]:
     if language not in {"ja", "zh"}:
         return []
@@ -303,7 +352,10 @@ def build_segment_reading_tokens(
                 )
         return adjusted_tokens
 
-    tokens = _build_ja_tokens(text)
+    if token_surface_overrides is not None:
+        tokens = _build_ja_tokens_from_surfaces(token_surface_overrides)
+    else:
+        tokens = _build_ja_tokens(text)
     if not tokens:
         return []
 

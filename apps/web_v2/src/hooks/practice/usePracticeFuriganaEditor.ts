@@ -40,6 +40,7 @@ interface UsePracticeFuriganaEditorOptions {
   tokens: PracticeReadingToken[]
   enabled: boolean
   onOverridesChange: (overrides: SegmentReadingOverrideInput[]) => void
+  onTokenSurfacesChange?: (surfaces: string[]) => void
 }
 
 interface KeyedBooleanState {
@@ -62,6 +63,7 @@ export const usePracticeFuriganaEditor = ({
   tokens,
   enabled,
   onOverridesChange,
+  onTokenSurfacesChange,
 }: UsePracticeFuriganaEditorOptions) => {
   const sourceKey = useMemo(() => getSourceKey(enabled, language, tokens), [enabled, language, tokens])
 
@@ -260,6 +262,60 @@ export const usePracticeFuriganaEditor = ({
     })
   }, [activeTokenIndex, updateOverrides])
 
+  const splitActiveToken = useCallback(
+    (splitAt: number) => {
+      if (!isEditMode || activeTokenIndex == null || !onTokenSurfacesChange) return
+      const activeArrayIndex = mergedTokens.findIndex(
+        (token, index) => normalizeTokenIndex(token, index) === activeTokenIndex
+      )
+      if (activeArrayIndex < 0) return
+      const activeSurface = mergedTokens[activeArrayIndex]?.surface ?? ''
+      const chars = Array.from(activeSurface)
+      if (splitAt <= 0 || splitAt >= chars.length) return
+      const left = chars.slice(0, splitAt).join('')
+      const right = chars.slice(splitAt).join('')
+      if (!left || !right) return
+      const nextSurfaces = mergedTokens.map((token) => token.surface)
+      nextSurfaces.splice(activeArrayIndex, 1, left, right)
+      onTokenSurfacesChange(nextSurfaces)
+      setEditModeState({ sourceKey, value: false })
+      setActiveTokenState({ sourceKey, tokenIndex: null })
+    },
+    [activeTokenIndex, isEditMode, mergedTokens, onTokenSurfacesChange, sourceKey]
+  )
+
+  const mergeActiveTokenWithPrev = useCallback(() => {
+    if (!isEditMode || activeTokenIndex == null || !onTokenSurfacesChange) return
+    const activeArrayIndex = mergedTokens.findIndex(
+      (token, index) => normalizeTokenIndex(token, index) === activeTokenIndex
+    )
+    if (activeArrayIndex <= 0) return
+    const left = mergedTokens[activeArrayIndex - 1]
+    const right = mergedTokens[activeArrayIndex]
+    if (!left || !right) return
+    const nextSurfaces = mergedTokens.map((token) => token.surface)
+    nextSurfaces.splice(activeArrayIndex - 1, 2, `${left.surface}${right.surface}`)
+    onTokenSurfacesChange(nextSurfaces)
+    setEditModeState({ sourceKey, value: false })
+    setActiveTokenState({ sourceKey, tokenIndex: null })
+  }, [activeTokenIndex, isEditMode, mergedTokens, onTokenSurfacesChange, sourceKey])
+
+  const mergeActiveTokenWithNext = useCallback(() => {
+    if (!isEditMode || activeTokenIndex == null || !onTokenSurfacesChange) return
+    const activeArrayIndex = mergedTokens.findIndex(
+      (token, index) => normalizeTokenIndex(token, index) === activeTokenIndex
+    )
+    if (activeArrayIndex < 0 || activeArrayIndex >= mergedTokens.length - 1) return
+    const left = mergedTokens[activeArrayIndex]
+    const right = mergedTokens[activeArrayIndex + 1]
+    if (!left || !right) return
+    const nextSurfaces = mergedTokens.map((token) => token.surface)
+    nextSurfaces.splice(activeArrayIndex, 2, `${left.surface}${right.surface}`)
+    onTokenSurfacesChange(nextSurfaces)
+    setEditModeState({ sourceKey, value: false })
+    setActiveTokenState({ sourceKey, tokenIndex: null })
+  }, [activeTokenIndex, isEditMode, mergedTokens, onTokenSurfacesChange, sourceKey])
+
   const activeYomi = useMemo(() => {
     if (activeToken == null) return ''
     return typeof activeToken.yomi === 'string' ? activeToken.yomi : ''
@@ -293,6 +349,9 @@ export const usePracticeFuriganaEditor = ({
     selectToken,
     setActiveYomi,
     resetActiveToken,
+    splitActiveToken,
+    mergeActiveTokenWithPrev,
+    mergeActiveTokenWithNext,
     focusPrevToken,
     focusNextToken,
   }
