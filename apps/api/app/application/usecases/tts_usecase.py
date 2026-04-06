@@ -10,6 +10,7 @@ from app.core.errors import AppError
 from app.infrastructure.repositories.tts_repository import TtsRepository
 from app.models import TtsAsset, User, utcnow
 from app.schemas.tts import SegmentTtsResponse, TtsJobCreateResponse, TtsJobStatusResponse
+from app.services.reading_service import build_segment_reading_tokens
 from app.services.tts_service import (
     build_tts_filename,
     calculate_text_hash,
@@ -72,6 +73,82 @@ def _load_timeline_from_asset(*, asset: TtsAsset) -> list[dict[str, int | float 
     return sorted(normalized, key=lambda item: int(item["sentence_index"]))
 
 
+def _load_reading_override_map(
+    *,
+    repository: TtsRepository,
+    user_id: str,
+    segment_id: str,
+) -> dict[int, str]:
+    rows = repository.list_segment_reading_overrides(user_id=user_id, segment_id=segment_id)
+    override_map: dict[int, str] = {}
+    for row in rows:
+        yomi = str(row.yomi or "").strip()
+        if not yomi:
+            continue
+        override_map[int(row.token_index)] = yomi
+    return override_map
+
+
+def _load_token_override_surfaces(
+    *,
+    repository: TtsRepository,
+    user_id: str,
+    segment_id: str,
+) -> list[str] | None:
+    rows = repository.list_segment_token_overrides(user_id=user_id, segment_id=segment_id)
+    if not rows:
+        return None
+    return [str(row.surface or "") for row in rows]
+
+
+def _build_tts_input_text(
+    *,
+    language: str,
+    source_text: str,
+    reading_overrides: dict[int, str],
+    token_surface_overrides: list[str] | None,
+) -> str:
+    if language != "ja":
+        return source_text
+    if not reading_overrides:
+        return source_text
+
+    tokens = build_segment_reading_tokens(
+        text=source_text,
+        language=language,
+        token_surface_overrides=token_surface_overrides,
+    )
+    if not tokens:
+        return source_text
+
+    joined_surface = "".join(token.surface for token in tokens)
+    if joined_surface != source_text:
+        logger.warning(
+            "TTS override skipped due to tokenization mismatch: source_len=%d joined_len=%d",
+            len(source_text),
+            len(joined_surface),
+        )
+        return source_text
+
+    parts: list[str] = []
+    for token_index, token in enumerate(tokens):
+        override_yomi = reading_overrides.get(token_index)
+        if override_yomi:
+            parts.append(override_yomi)
+        else:
+            parts.append(token.surface)
+
+    next_text = "".join(parts)
+    return next_text or source_text
+
+
+def _resolve_tts_text_hash(*, normalized_text: str, plain_text: str, tts_input_text: str) -> str:
+    # Preserve the historical hash key when no pronunciation override is applied.
+    if tts_input_text == plain_text:
+        return calculate_text_hash(normalized_text)
+    return calculate_text_hash(tts_input_text)
+
+
 def create_tts_job(
     *,
     repository: TtsRepository,
@@ -102,7 +179,27 @@ def create_tts_job(
         )
 
     article, segment = pair
-    text_hash = calculate_text_hash(segment.normalized_text)
+    reading_overrides = _load_reading_override_map(
+        repository=repository,
+        user_id=current_user.id,
+        segment_id=segment.id,
+    )
+    token_surface_overrides = _load_token_override_surfaces(
+        repository=repository,
+        user_id=current_user.id,
+        segment_id=segment.id,
+    )
+    tts_input_text = _build_tts_input_text(
+        language=article.language,
+        source_text=segment.plain_text,
+        reading_overrides=reading_overrides,
+        token_surface_overrides=token_surface_overrides,
+    )
+    text_hash = _resolve_tts_text_hash(
+        normalized_text=segment.normalized_text,
+        plain_text=segment.plain_text,
+        tts_input_text=tts_input_text,
+    )
     existing = repository.get_tts_asset(
         segment_id=segment.id,
         voice=voice,
@@ -150,7 +247,7 @@ def create_tts_job(
         )
         output_path = resolve_media_output_path(filename)
         timeline = synthesize_to_mp3(
-            text=segment.plain_text,
+            text=tts_input_text,
             language=article.language,
             speed=speed,
             output_path=output_path,
@@ -244,8 +341,28 @@ def get_segment_tts(
             message="Segment not found.",
             status_code=status.HTTP_404_NOT_FOUND,
         )
-    _article, segment = pair
-    text_hash = calculate_text_hash(segment.normalized_text)
+    article, segment = pair
+    reading_overrides = _load_reading_override_map(
+        repository=repository,
+        user_id=current_user.id,
+        segment_id=segment.id,
+    )
+    token_surface_overrides = _load_token_override_surfaces(
+        repository=repository,
+        user_id=current_user.id,
+        segment_id=segment.id,
+    )
+    tts_input_text = _build_tts_input_text(
+        language=article.language,
+        source_text=segment.plain_text,
+        reading_overrides=reading_overrides,
+        token_surface_overrides=token_surface_overrides,
+    )
+    text_hash = _resolve_tts_text_hash(
+        normalized_text=segment.normalized_text,
+        plain_text=segment.plain_text,
+        tts_input_text=tts_input_text,
+    )
     asset = repository.get_tts_asset(
         segment_id=segment.id,
         voice=voice,

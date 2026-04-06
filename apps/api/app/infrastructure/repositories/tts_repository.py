@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Article, ArticleSegment, TtsAsset
+from app.models import Article, ArticleSegment, SegmentReadingOverride, SegmentTokenOverride, TtsAsset
 
 
 class TtsRepository:
@@ -53,6 +53,38 @@ class TtsRepository:
             TtsAsset.text_hash == text_hash,
         )
         return self.db.scalar(statement)
+
+    def list_segment_reading_overrides(
+        self,
+        *,
+        user_id: str,
+        segment_id: str,
+    ) -> list[SegmentReadingOverride]:
+        statement = (
+            select(SegmentReadingOverride)
+            .where(
+                SegmentReadingOverride.user_id == user_id,
+                SegmentReadingOverride.segment_id == segment_id,
+            )
+            .order_by(SegmentReadingOverride.token_index.asc())
+        )
+        return list(self.db.scalars(statement).all())
+
+    def list_segment_token_overrides(
+        self,
+        *,
+        user_id: str,
+        segment_id: str,
+    ) -> list[SegmentTokenOverride]:
+        statement = (
+            select(SegmentTokenOverride)
+            .where(
+                SegmentTokenOverride.user_id == user_id,
+                SegmentTokenOverride.segment_id == segment_id,
+            )
+            .order_by(SegmentTokenOverride.token_index.asc())
+        )
+        return list(self.db.scalars(statement).all())
 
     def create_tts_asset(self, asset: TtsAsset) -> TtsAsset:
         self.db.add(asset)
