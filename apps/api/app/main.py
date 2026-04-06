@@ -1,5 +1,10 @@
+import logging
+from time import perf_counter
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi import Request
+from starlette.responses import Response
 
 from app.core.errors import (
     AppError,
@@ -17,10 +22,27 @@ from app.routers.tts import router as tts_router
 
 app = FastAPI(title="AlignSpeak API", version="0.1.0")
 API_PREFIX = "/api"
+logger = logging.getLogger(__name__)
 
 app.add_exception_handler(AppError, app_error_handler)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
 app.add_exception_handler(Exception, unhandled_error_handler)
+
+
+@app.middleware("http")
+async def log_server_errors(request: Request, call_next) -> Response:
+    start = perf_counter()
+    response = await call_next(request)
+    if response.status_code >= 500:
+        elapsed_ms = round((perf_counter() - start) * 1000.0, 2)
+        logger.error(
+            "HTTP5xx: method=%s path=%s status=%s duration_ms=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed_ms,
+        )
+    return response
 
 
 @app.on_event("startup")
