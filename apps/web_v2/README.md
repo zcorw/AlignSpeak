@@ -105,3 +105,17 @@ See `docs/` directory for detailed specifications:
 - `TECH_STACK.md` - Technology stack details
 - `GUIDED_FLOW_V2_FINAL.md` - Flow architecture
 - `pages/` - Individual page specifications
+
+## Search Engine Indexing
+
+The production Nginx config now serves these SEO endpoints automatically by request host:
+
+- `/robots.txt`
+- `/sitemap.xml`
+
+After deployment, verify both URLs are reachable on your public domain, then submit:
+
+1. `https://your-domain/sitemap.xml` in Google Search Console
+2. Request indexing for `https://your-domain/`
+
+Important: Most app routes are authentication-protected. Search engines can mainly index public entry pages unless you add public, crawlable content pages or move to SSR/prerender for those pages.
