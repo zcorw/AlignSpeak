@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>What is AlignSpeak | AI Reading and Speaking Practice</title>
+    <meta
+      name="description"
+      content="AlignSpeak is an AI reading and speaking practice app for language learners with text import, segmented practice, alignment scoring, and result review."
+    />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <link rel="canonical" href="/about.html" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="What is AlignSpeak" />
+    <meta
+      property="og:description"
+      content="Use AI-assisted reading and speaking practice with alignment scoring and feedback."
+    />
+    <meta property="og:url" content="/about.html" />
+    <style>
+      :root {
+        --bg: #0a0a13;
+        --bg-soft: #13131f;
+        --card: #1a1a2c;
+        --text: #eeeef6;
+        --text-soft: #9a9ab3;
+        --line: rgba(255, 255, 255, 0.09);
+        --brand-a: #7f72ff;
+        --brand-b: #22d8a4;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1000px 520px at 0% 0%, rgba(127, 114, 255, 0.2), transparent 65%),
+          radial-gradient(800px 450px at 100% 0%, rgba(34, 216, 164, 0.15), transparent 60%),
+          linear-gradient(180deg, #080910 0%, var(--bg) 45%, #090a14 100%);
+        min-height: 100vh;
+      }
+
+      .page {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 28px 18px 72px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 22px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-mark {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        border: 1px solid rgba(127, 114, 255, 0.4);
+        display: grid;
+        place-items: center;
+        background: linear-gradient(140deg, rgba(127, 114, 255, 0.2), rgba(34, 216, 164, 0.12));
+      }
+
+      .brand-name {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+      }
+
+      .brand-sub {
+        margin: 2px 0 0;
+        color: var(--text-soft);
+        font-size: 12px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .btn {
+        color: var(--text);
+        text-decoration: none;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        padding: 9px 14px;
+        font-size: 13px;
+        transition: 0.2s ease;
+      }
+
+      .btn:hover {
+        border-color: rgba(127, 114, 255, 0.45);
+        background: rgba(127, 114, 255, 0.14);
+      }
+
+      .btn.primary {
+        border-color: rgba(127, 114, 255, 0.52);
+        background: linear-gradient(135deg, rgba(127, 114, 255, 0.3), rgba(34, 216, 164, 0.2));
+      }
+
+      .hero {
+        border: 1px solid var(--line);
+        background: linear-gradient(145deg, rgba(26, 26, 44, 0.94), rgba(19, 19, 31, 0.92));
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
+        animation: rise 520ms ease-out both;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(28px, 5vw, 40px);
+        line-height: 1.08;
+      }
+
+      .lead {
+        margin: 14px 0 0;
+        color: #d0d0e3;
+        font-size: 16px;
+        line-height: 1.7;
+        max-width: 72ch;
+      }
+
+      .chips {
+        list-style: none;
+        margin: 18px 0 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chips li {
+        font-size: 12px;
+        color: #d7d7e8;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(10, 12, 28, 0.5);
+        padding: 6px 10px;
+      }
+
+      .grid {
+        margin-top: 16px;
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .card {
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: linear-gradient(160deg, rgba(26, 26, 44, 0.88), rgba(14, 14, 26, 0.82));
+        padding: 14px;
+        animation: rise 520ms ease-out both;
+      }
+
+      .card:nth-child(2) {
+        animation-delay: 60ms;
+      }
+
+      .card:nth-child(3) {
+        animation-delay: 120ms;
+      }
+
+      .card h2 {
+        margin: 0;
+        font-size: 15px;
+      }
+
+      .card p {
+        margin: 8px 0 0;
+        color: var(--text-soft);
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .footer-note {
+        margin: 16px 2px 0;
+        color: #b2b2ca;
+        font-size: 13px;
+      }
+
+      .footer-note a {
+        color: #c8c3ff;
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 820px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 580px) {
+        .topbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .actions {
+          width: 100%;
+        }
+
+        .btn {
+          text-align: center;
+          flex: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 40 40" width="24" height="24">
+              <defs>
+                <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#7f72ff" />
+                  <stop offset="100%" stop-color="#22d8a4" />
+                </linearGradient>
+              </defs>
+              <circle cx="20" cy="20" r="17" fill="none" stroke="url(#brandGradient)" stroke-width="2.3" />
+              <path d="M11 23c2.2-5.8 5.8-8.6 9-8.6 3.6 0 6.4 2.4 9 8.6" fill="none" stroke="#c5beff" stroke-width="2.1" stroke-linecap="round" />
+              <circle cx="14" cy="17.5" r="2.2" fill="#8f84ff" />
+              <circle cx="26" cy="17.5" r="2.2" fill="#24d2a3" />
+            </svg>
+          </div>
+          <div>
+            <p class="brand-name">AlignSpeak</p>
+            <p class="brand-sub">AI reading and speaking practice</p>
+          </div>
+        </div>
+        <nav class="actions" aria-label="Primary">
+          <a class="btn" href="/">Home</a>
+          <a class="btn" href="/login">Log in</a>
+          <a class="btn primary" href="/register">Create account</a>
+        </nav>
+      </header>
+
+      <section class="hero">
+        <h1>Train pronunciation with aligned, feedback-driven practice.</h1>
+        <p class="lead">
+          AlignSpeak helps language learners move from text to spoken output with a guided flow,
+          segment-level practice, and AI-assisted scoring you can actually use to improve.
+        </p>
+        <ul class="chips">
+          <li>Text Import</li>
+          <li>Segment Practice</li>
+          <li>Alignment Score</li>
+          <li>Progress Review</li>
+        </ul>
+      </section>
+
+      <section class="grid" aria-label="Core features">
+        <article class="card">
+          <h2>Import and Start Fast</h2>
+          <p>
+            Bring in a text and jump into a structured learning flow without setup friction.
+          </p>
+        </article>
+        <article class="card">
+          <h2>Practice by Segment</h2>
+          <p>
+            Focus sentence by sentence or segment by segment to isolate weak spots and repeat with
+            intent.
+          </p>
+        </article>
+        <article class="card">
+          <h2>Review Useful Feedback</h2>
+          <p>
+            Get alignment-aware scoring and summary views to understand what changed and what to
+            train next.
+          </p>
+        </article>
+      </section>
+
+      <p class="footer-note">
+        Start from <a href="/login">Log in</a> or <a href="/register">Create account</a>.
+      </p>
+    </main>
+  </body>
+</html>
