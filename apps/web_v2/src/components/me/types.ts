@@ -13,5 +13,5 @@ export interface MeArticle {
   progressRate: number
   isDone: boolean
   practiceCount: number
+  isLegacy: boolean
 }
-

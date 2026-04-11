@@ -16,6 +16,7 @@ interface MeArticleListProps {
   practiceCountText: (article: MeArticle) => string
   doneBadgeLabel: string
   currentBadgeLabel: string
+  legacyBadgeLabel: string
   editLabel: string
   deleteLabel: string
   onOpenArticle: (article: MeArticle) => void
@@ -38,6 +39,7 @@ export const MeArticleList = ({
   practiceCountText,
   doneBadgeLabel,
   currentBadgeLabel,
+  legacyBadgeLabel,
   editLabel,
   deleteLabel,
   onOpenArticle,
@@ -78,6 +80,7 @@ export const MeArticleList = ({
           practiceCountText={practiceCountText(article)}
           doneBadgeLabel={doneBadgeLabel}
           currentBadgeLabel={currentBadgeLabel}
+          legacyBadgeLabel={legacyBadgeLabel}
           editLabel={editLabel}
           deleteLabel={deleteLabel}
           onOpen={onOpenArticle}

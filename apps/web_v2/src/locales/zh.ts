@@ -54,6 +54,7 @@ export default {
         headline: '选择导入方式',
         description: '将文章导入后，你可以进行校对和分段确认。',
         updateSuccess: '文章已更新。',
+        cloneSuccess: '已创建新文章，原文章已标记为旧版。',
         methods: {
           clipboard: {
             name: '从剪贴板粘贴',
@@ -248,6 +249,7 @@ export default {
           practiceCount: '练习 {{count}} 次',
           doneBadge: '✓ 已完成',
           currentBadge: '▶ 当前',
+          legacyBadge: '旧版',
         },
         invitation: {
           title: '邀请码',

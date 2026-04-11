@@ -206,6 +206,7 @@ export const MePage = () => {
           practiceCountText={(article) => t('pages.me.article.practiceCount', { count: article.practiceCount })}
           doneBadgeLabel={t('pages.me.article.doneBadge')}
           currentBadgeLabel={t('pages.me.article.currentBadge')}
+          legacyBadgeLabel={t('pages.me.article.legacyBadge')}
           editLabel={t('common.edit')}
           deleteLabel={t('common.delete')}
           onOpenArticle={(article) => {

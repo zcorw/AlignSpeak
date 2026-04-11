@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useNotifier } from '../../components/common/feedbackHooks'
 import type { OverlayLanguageCode } from '../../components/EditorTextOverlay'
+import { markLegacyArticle } from '../../services/articleLegacyService'
 import { articleService } from '../../services/articleService'
 import { getApiErrorMessage } from '../../services/authService'
 
@@ -15,15 +16,11 @@ const buildArticleTitle = (text: string) => {
   return firstLine.length <= 50 ? firstLine : `${firstLine.slice(0, 50)}...`
 }
 
-const normalizeEditorText = (value: string) =>
-  value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
-
 export const useEditorImport = (editingArticleId: string | null = null) => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { error: showError, success: showSuccess } = useNotifier()
   const inputRef = useRef<HTMLInputElement>(null)
-  const initialArticleRef = useRef<{ rawText: string; language: OverlayLanguageCode } | null>(null)
 
   const [overlayOpenByUser, setOverlayOpenByUser] = useState(false)
   const [dismissedEditingOverlayForId, setDismissedEditingOverlayForId] = useState<string | null>(null)
@@ -105,24 +102,19 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
 
     const title = buildArticleTitle(payload.text)
     if (editingArticleId) {
-      const initial = initialArticleRef.current
-      const textChanged = normalizeEditorText(payload.text) !== normalizeEditorText(initial?.rawText ?? '')
-      const languageChanged = payload.language !== initial?.language
-      const updatePayload: {
-        title?: string
-        language?: OverlayLanguageCode
-        text?: string
-      } = { title }
-      if (textChanged) updatePayload.text = payload.text
-      if (languageChanged) updatePayload.language = payload.language
-
       void articleService
-        .updateArticle(editingArticleId, updatePayload)
-        .then(() => {
-          sessionStorage.setItem('article_id', editingArticleId)
+        .createArticle({
+          title,
+          language: payload.language,
+          text: payload.text,
+        })
+        .then((article) => {
+          markLegacyArticle(editingArticleId, article.articleId)
+          sessionStorage.setItem('article_id', article.articleId)
+          sessionStorage.setItem('article_text', payload.text)
           sessionStorage.setItem('article_lang', payload.language)
-          showSuccess(t('pages.editor.updateSuccess'))
-          navigate(`/practice?a=${encodeURIComponent(editingArticleId)}&seg=1&lv=L0`)
+          showSuccess(t('pages.editor.cloneSuccess'))
+          navigate(`/practice?a=${encodeURIComponent(article.articleId)}&seg=1&lv=L0`)
         })
         .catch((error: unknown) => {
           const message = getApiErrorMessage(error, t('common.error'))
@@ -163,7 +155,6 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
       .then((detail) => {
         if (!active) return
         const language = detail.language === 'ja' || detail.language === 'zh' ? detail.language : 'en'
-        initialArticleRef.current = { rawText: detail.rawText, language }
         setInitialLanguage(language)
         applyImportedText(detail.rawText || '')
       })

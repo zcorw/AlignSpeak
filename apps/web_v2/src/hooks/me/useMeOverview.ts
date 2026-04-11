@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MeArticle, MeFilterType } from '../../components/me/types'
+import { resolveLegacyArticleIds } from '../../services/articleLegacyService'
 import { getApiErrorMessage } from '../../services/authService'
 import { startService } from '../../services/startService'
 
@@ -35,7 +36,7 @@ export const useMeOverview = (filter: MeFilterType): UseMeOverviewResult => {
       try {
         const overview = await startService.getOverview()
         if (!active) return
-        const mapped: MeArticle[] = overview.historyDocs.map((item) => {
+        const mappedBase = overview.historyDocs.map((item) => {
           const totalSegments = item.totalSegments > 0 ? item.totalSegments : 1
           const currentSegmentOrder = Math.min(Math.max(item.currentSegmentOrder, 1), totalSegments)
           return {
@@ -49,8 +50,14 @@ export const useMeOverview = (filter: MeFilterType): UseMeOverviewResult => {
             progressRate: item.progressRate,
             isDone: item.isDone || (totalSegments > 0 && item.passedSegments >= totalSegments) || item.progressRate >= 1,
             practiceCount: item.practiceCount,
+            isLegacy: false,
           }
         })
+        const legacyIds = resolveLegacyArticleIds(mappedBase.map((item) => item.id))
+        const mapped: MeArticle[] = mappedBase.map((item) => ({
+          ...item,
+          isLegacy: legacyIds.has(item.id),
+        }))
         setArticles(mapped)
         if (mapped.length > 0) {
           setCurrentArticleId((prev) => {

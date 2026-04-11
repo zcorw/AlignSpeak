@@ -11,6 +11,7 @@ interface MeArticleCardProps {
   practiceCountText: string
   doneBadgeLabel: string
   currentBadgeLabel: string
+  legacyBadgeLabel: string
   editLabel: string
   deleteLabel: string
   onOpen: (article: MeArticle) => void
@@ -29,6 +30,7 @@ export const MeArticleCard = ({
   practiceCountText,
   doneBadgeLabel,
   currentBadgeLabel,
+  legacyBadgeLabel,
   editLabel,
   deleteLabel,
   onOpen,
@@ -100,6 +102,11 @@ export const MeArticleCard = ({
       {isActive && (
         <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'primary.light' }}>
           {currentBadgeLabel}
+        </Box>
+      )}
+      {article.isLegacy && (
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px', px: '8px', py: '2px', borderRadius: '999px', bgcolor: 'rgba(255,255,255,0.06)', color: 'text.secondary', fontSize: '11px', fontWeight: 600 }}>
+          {legacyBadgeLabel}
         </Box>
       )}
     </Box>

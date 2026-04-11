@@ -54,6 +54,7 @@ export default {
         headline: 'Choose import method',
         description: 'After importing an article, you can proofread and confirm segment breaks.',
         updateSuccess: 'Article updated.',
+        cloneSuccess: 'Created a new article. Original article is kept as legacy.',
         methods: {
           clipboard: {
             name: 'Paste from clipboard',
@@ -248,6 +249,7 @@ export default {
           practiceCount: '{{count}} practices',
           doneBadge: '✓ Completed',
           currentBadge: '▶ Current',
+          legacyBadge: 'Legacy',
         },
         invitation: {
           title: 'Invitation Codes',
