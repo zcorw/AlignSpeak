@@ -17,6 +17,16 @@ from app.services.article_service import normalize_text
 from app.services.explain_service import explain_segment_text, explain_sentence_grammar
 
 
+def _normalize_response_language(response_language: str | None, article_language: str) -> str:
+    candidate = (response_language or "").strip().lower()
+    if candidate in {"en", "zh", "ja"}:
+        return candidate
+    article_candidate = (article_language or "").strip().lower()
+    if article_candidate in {"en", "zh", "ja"}:
+        return article_candidate
+    return "en"
+
+
 def _not_found_error() -> AppError:
     return AppError(
         code="NOT_FOUND",
@@ -42,6 +52,7 @@ def explain_segment(
     explain_result = explain_segment_text(
         segment_text=segment.plain_text,
         language=article.language,
+        response_language=_normalize_response_language(payload.response_language, article.language),
         user_id=current_user.id,
         article_id=article.id,
         segment_order=segment.segment_order,
@@ -95,6 +106,7 @@ def explain_grammar(
     grammar_result = explain_sentence_grammar(
         sentence_text=sentence_text,
         language=article.language,
+        response_language=_normalize_response_language(payload.response_language, article.language),
         user_id=current_user.id,
         article_id=article.id,
         segment_order=segment.segment_order,
@@ -116,4 +128,3 @@ def explain_grammar(
         ],
         warnings=grammar_result.warnings,
     )
-

@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 class ExplainSegmentPayload(BaseModel):
     article_id: str = Field(min_length=1, max_length=32)
     segment_order: int = Field(ge=1, le=5000)
+    response_language: str | None = Field(default=None, min_length=2, max_length=12)
 
 
 class ExplainKeywordItem(BaseModel):
@@ -26,6 +27,7 @@ class ExplainGrammarPayload(BaseModel):
     article_id: str = Field(min_length=1, max_length=32)
     segment_order: int = Field(ge=1, le=5000)
     sentence_text: str = Field(min_length=1, max_length=2000)
+    response_language: str | None = Field(default=None, min_length=2, max_length=12)
 
 
 class GrammarPointItem(BaseModel):
@@ -43,4 +45,3 @@ class ExplainGrammarResponse(BaseModel):
     sentence_text: str
     grammar_points: list[GrammarPointItem]
     warnings: list[str] = []
-

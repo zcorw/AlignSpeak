@@ -55,7 +55,8 @@ class OpenAIExplainProvider:
         self,
         *,
         segment_text: str,
-        language: str,
+        source_language: str,
+        response_language: str,
         usage_context: OpenAIUsageContext,
     ) -> ExplainSegmentResult:
         prompt = (
@@ -69,8 +70,10 @@ class OpenAIExplainProvider:
             "- summary should be concise and easy for learners.\n"
             "- keywords: 3 to 6 items.\n"
             "- explanations should be short and practical.\n"
+            "- summary and keyword explanations must be in the response language.\n"
             "- do not return markdown.\n"
-            f"Language code: {language}\n"
+            f"Source language code: {source_language}\n"
+            f"Response language code: {response_language}\n"
             "Paragraph:\n"
             f"{segment_text}"
         )
@@ -104,7 +107,8 @@ class OpenAIExplainProvider:
         self,
         *,
         sentence_text: str,
-        language: str,
+        source_language: str,
+        response_language: str,
         usage_context: OpenAIUsageContext,
     ) -> ExplainGrammarResult:
         prompt = (
@@ -123,9 +127,11 @@ class OpenAIExplainProvider:
             "Rules:\n"
             "- 2 to 5 grammar points.\n"
             "- snippets must be exact spans from the input sentence.\n"
-            "- explanations should be short and learner-friendly.\n"
+            "- snippets must stay in source language text form.\n"
+            "- explanations should be short and learner-friendly in the response language.\n"
             "- do not return markdown.\n"
-            f"Language code: {language}\n"
+            f"Source language code: {source_language}\n"
+            f"Response language code: {response_language}\n"
             "Sentence:\n"
             f"{sentence_text}"
         )
@@ -247,6 +253,7 @@ def explain_segment_text(
     *,
     segment_text: str,
     language: str,
+    response_language: str,
     user_id: str,
     article_id: str,
     segment_order: int,
@@ -254,7 +261,7 @@ def explain_segment_text(
     normalized = normalize_text(segment_text)
     provider = _build_explain_provider()
     if provider is None:
-        return _fallback_explain_segment(normalized, language)
+        return _fallback_explain_segment(normalized, response_language)
     task_id = f"seg:{segment_order}"
     context = OpenAIUsageContext(
         module="explain_segment",
@@ -267,12 +274,13 @@ def explain_segment_text(
     try:
         return provider.explain_segment(
             segment_text=normalized,
-            language=language,
+            source_language=language,
+            response_language=response_language,
             usage_context=context,
         )
     except AppError as exc:
         logger.warning("Explain segment fallback. reason=%s", exc.code)
-        fallback = _fallback_explain_segment(normalized, language)
+        fallback = _fallback_explain_segment(normalized, response_language)
         return ExplainSegmentResult(
             summary=fallback.summary,
             keywords=fallback.keywords,
@@ -284,6 +292,7 @@ def explain_sentence_grammar(
     *,
     sentence_text: str,
     language: str,
+    response_language: str,
     user_id: str,
     article_id: str,
     segment_order: int,
@@ -291,7 +300,7 @@ def explain_sentence_grammar(
     normalized = normalize_text(sentence_text)
     provider = _build_explain_provider()
     if provider is None:
-        return _fallback_explain_grammar(normalized, language)
+        return _fallback_explain_grammar(normalized, response_language)
     task_id = f"seg:{segment_order}:grammar"
     context = OpenAIUsageContext(
         module="explain_grammar",
@@ -304,19 +313,20 @@ def explain_sentence_grammar(
     try:
         return provider.explain_grammar(
             sentence_text=normalized,
-            language=language,
+            source_language=language,
+            response_language=response_language,
             usage_context=context,
         )
     except AppError as exc:
         logger.warning("Explain grammar fallback. reason=%s", exc.code)
-        fallback = _fallback_explain_grammar(normalized, language)
+        fallback = _fallback_explain_grammar(normalized, response_language)
         return ExplainGrammarResult(
             grammar_points=fallback.grammar_points,
             warnings=[*fallback.warnings, "AI grammar unavailable. Returned fallback result."],
         )
 
 
-def _fallback_explain_segment(segment_text: str, language: str) -> ExplainSegmentResult:
+def _fallback_explain_segment(segment_text: str, response_language: str) -> ExplainSegmentResult:
     collapsed = re.sub(r"\s+", " ", segment_text).strip()
     summary = collapsed[:180] if collapsed else ""
     if len(collapsed) > 180:
@@ -325,7 +335,7 @@ def _fallback_explain_segment(segment_text: str, language: str) -> ExplainSegmen
         summary = "This segment introduces key ideas from the selected paragraph."
 
     keywords: list[ExplainKeyword] = []
-    if language == "en":
+    if response_language == "en":
         words = re.findall(r"[A-Za-z][A-Za-z'-]{3,}", segment_text)
         seen: set[str] = set()
         for word in words:
@@ -353,9 +363,9 @@ def _fallback_explain_segment(segment_text: str, language: str) -> ExplainSegmen
     return ExplainSegmentResult(summary=summary, keywords=keywords, warnings=["Fallback explanation used."])
 
 
-def _fallback_explain_grammar(sentence_text: str, language: str) -> ExplainGrammarResult:
+def _fallback_explain_grammar(sentence_text: str, response_language: str) -> ExplainGrammarResult:
     points: list[GrammarPoint] = []
-    if language == "en":
+    if response_language == "en":
         if " if " in f" {sentence_text.lower()} ":
             points.append(
                 GrammarPoint(
@@ -373,7 +383,7 @@ def _fallback_explain_grammar(sentence_text: str, language: str) -> ExplainGramm
                     snippet=sentence_text,
                 )
             )
-    elif language == "zh":
+    elif response_language == "zh":
         if "了" in sentence_text:
             points.append(
                 GrammarPoint(
@@ -541,4 +551,3 @@ def _build_explain_provider() -> OpenAIExplainProvider | None:
         base_url=settings.openai_base_url,
         timeout_seconds=settings.openai_explain_timeout_seconds,
     )
-

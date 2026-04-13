@@ -7,7 +7,12 @@ import { ExplainTopBar } from '../components/explain/ExplainTopBar'
 import { SentenceSelectableParagraph } from '../components/explain/SentenceSelectableParagraph'
 import { StickyAnalyzeActionBar } from '../components/explain/StickyAnalyzeActionBar'
 import { useNotifier } from '../components/common/feedbackHooks'
-import { explainService, type ExplainGrammarPoint, type ExplainKeyword } from '../services/explainService'
+import {
+  explainService,
+  type ExplainGrammarPoint,
+  type ExplainKeyword,
+  type ExplainResponseLanguage,
+} from '../services/explainService'
 import { getApiErrorMessage } from '../services/authService'
 import { splitTextToSentences } from '../components/practice/timelineText'
 
@@ -17,8 +22,15 @@ const toLanguageLabel = (language: string, englishLabel: string, chineseLabel: s
   return englishLabel
 }
 
+const resolveExplainResponseLanguage = (resolvedLanguage?: string): ExplainResponseLanguage => {
+  const normalized = resolvedLanguage?.toLowerCase() || ''
+  if (normalized.startsWith('zh')) return 'zh'
+  if (normalized.startsWith('ja')) return 'ja'
+  return 'en'
+}
+
 export const ExplainPage = () => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { error: showError } = useNotifier()
@@ -45,6 +57,10 @@ export const ExplainPage = () => {
     const matched = sentenceOptions.find((item) => item.sentenceIndex === selectedSentenceIndex)
     return matched?.text ?? ''
   }, [selectedSentenceIndex, sentenceOptions])
+  const responseLanguage = useMemo(
+    () => resolveExplainResponseLanguage(i18n.resolvedLanguage),
+    [i18n.resolvedLanguage]
+  )
 
   const languageLabel = toLanguageLabel(
     language,
@@ -78,6 +94,7 @@ export const ExplainPage = () => {
       const result = await explainService.explainSegment({
         articleId,
         segmentOrder,
+        responseLanguage,
       })
       setArticleTitle(result.articleTitle)
       setLanguage(result.language)
@@ -92,7 +109,7 @@ export const ExplainPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [articleId, segmentOrder, t])
+  }, [articleId, responseLanguage, segmentOrder, t])
 
   useEffect(() => {
     void loadSegmentExplain()
@@ -106,6 +123,7 @@ export const ExplainPage = () => {
         articleId,
         segmentOrder,
         sentenceText: selectedSentence,
+        responseLanguage,
       })
       .then((result) => {
         setGrammarPoints(result.grammarPoints || [])
@@ -205,4 +223,3 @@ export const ExplainPage = () => {
     </Box>
   )
 }
-
