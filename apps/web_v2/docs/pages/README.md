@@ -8,6 +8,7 @@
 - `PAGE_04_RESULT.md`：结果页
 - `PAGE_05_ME.md`：我的页
 - `PAGE_06_PROGRESS_DRAWER.md`：进度轻入口（仅练习页，抽屉/弹层）
+- `PAGE_07_EXPLAIN_GRAMMAR.md`：AI 释义与语法页（独立路由）
 
 每份文档统一包含三部分：
 - 页面功能
