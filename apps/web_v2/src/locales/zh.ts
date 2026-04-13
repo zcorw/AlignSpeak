@@ -141,6 +141,7 @@ export default {
           missedWords: '漏读词',
         },
         actions: {
+          openExplain: '语法解析',
           practiceAgain: '再练一次',
           submitView: '提交查看',
           skipSegment: '跳过本段（标记未完成）',
@@ -171,6 +172,20 @@ export default {
           switchLevel: '切换到 {{level}} 将重置当前等级进度。确认切换？',
           skipSegment: '跳过本段将标记为未完成，需要在本等级结束前补齐。确认跳过？',
         },
+      },
+      explain: {
+        titleFallback: '语法解析',
+        backToPractice: '返回听读',
+        loadErrorMissingArticle: '缺少文章上下文。',
+        segmentLabel: '§{{segment}} 当前段落',
+        summaryTitle: '段落释义',
+        keywordTitle: '关键词',
+        grammarTitle: '语法点',
+        emptyGrammar: '请先在段落中点选一句，再点击分析按钮。',
+        selectHint: '请先在段落中选择一个完整句子。',
+        selectedHint: '已选句子 S{{index}}',
+        analyzeAction: '分析该句语法',
+        analyzingAction: '分析中...',
       },
       result: {
         topbarSubtitle: 'L2 · 段落 3/5',

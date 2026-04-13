@@ -1,5 +1,5 @@
 import { ArrowBackRounded } from '@mui/icons-material'
-import { Box, CircularProgress, Typography } from '@mui/material'
+import { Box, Button, CircularProgress, Typography } from '@mui/material'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -381,6 +381,17 @@ export const PracticePage = () => {
     navigate(`/practice?${params.toString()}`, { replace: true })
   }, [articleId, currentSegmentOrder, level, navigate, queryArticleId])
 
+  const openExplainPage = useCallback(() => {
+    const targetArticleId = articleId ?? queryArticleId
+    if (!targetArticleId) return
+    const params = new URLSearchParams({
+      a: targetArticleId,
+      seg: String(currentSegmentOrder),
+      lv: level,
+    })
+    navigate(`/explain?${params.toString()}`)
+  }, [articleId, currentSegmentOrder, level, navigate, queryArticleId])
+
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <PracticeTopBar
@@ -433,6 +444,17 @@ export const PracticePage = () => {
           segmentProgressLabel={t('pages.practice.meta.segmentProgress', { current: currentSegmentOrder, total: totalSegments })}
           targetAccuracyLabel={t('pages.practice.meta.targetAccuracy')}
         />
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={!canPractice}
+            onClick={openExplainPage}
+          >
+            {t('pages.practice.actions.openExplain')}
+          </Button>
+        </Box>
 
         <PracticeSegmentCard
           segmentLabel={t('pages.practice.segmentLabel', { segment: currentSegmentOrder })}

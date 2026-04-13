@@ -141,6 +141,7 @@ export default {
           missedWords: 'Missed',
         },
         actions: {
+          openExplain: 'Grammar insights',
           practiceAgain: 'Practice again',
           submitView: 'Submit',
           skipSegment: 'Skip this segment (mark incomplete)',
@@ -171,6 +172,20 @@ export default {
           switchLevel: 'Switching to {{level}} will reset current level progress. Continue?',
           skipSegment: 'Skipping will mark this segment incomplete and require catch-up later. Continue?',
         },
+      },
+      explain: {
+        titleFallback: 'Grammar insights',
+        backToPractice: 'Back to listening',
+        loadErrorMissingArticle: 'Missing article context.',
+        segmentLabel: '§{{segment}} Selected Segment',
+        summaryTitle: 'Segment meaning',
+        keywordTitle: 'Keywords',
+        grammarTitle: 'Grammar points',
+        emptyGrammar: 'Select one sentence in the paragraph, then tap analyze.',
+        selectHint: 'Tap one complete sentence in the paragraph.',
+        selectedHint: 'Selected sentence S{{index}}',
+        analyzeAction: 'Analyze this sentence',
+        analyzingAction: 'Analyzing...',
       },
       result: {
         topbarSubtitle: 'L2 · Segment 3/5',

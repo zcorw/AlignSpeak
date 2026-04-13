@@ -1,6 +1,7 @@
 export { StartPage } from './StartPage'
 export { EditorPage } from './EditorPage'
 export { PracticePage } from './PracticePage'
+export { ExplainPage } from './ExplainPage'
 export { ResultPage } from './ResultPage'
 export { MePage } from './MePage'
 export { LoginPage } from './LoginPage'

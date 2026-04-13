@@ -5,6 +5,7 @@ import {
   StartPage,
   EditorPage,
   PracticePage,
+  ExplainPage,
   ResultPage,
   MePage,
   LoginPage,
@@ -139,6 +140,10 @@ function App() {
         <Route
           path="/practice"
           element={isAuthenticated ? <PracticePage /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/explain"
+          element={isAuthenticated ? <ExplainPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/result"

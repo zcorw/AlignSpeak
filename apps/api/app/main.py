@@ -16,6 +16,7 @@ from app.db import Base, apply_runtime_schema_fixes, engine
 from app.routers.admin import router as admin_router
 from app.routers.articles import router as articles_router
 from app.routers.auth import router as auth_router
+from app.routers.explain import router as explain_router
 from app.routers.practice import router as practice_router
 from app.routers.protected import router as protected_router
 from app.routers.tts import router as tts_router
@@ -60,6 +61,7 @@ app.include_router(auth_router, prefix=API_PREFIX)
 app.include_router(articles_router, prefix=API_PREFIX)
 app.include_router(admin_router, prefix=API_PREFIX)
 app.include_router(protected_router, prefix=API_PREFIX)
+app.include_router(explain_router, prefix=API_PREFIX)
 app.include_router(tts_router, prefix=API_PREFIX)
 app.include_router(practice_router, prefix=API_PREFIX)
 

@@ -57,6 +57,17 @@ class ArticleRepository:
             .order_by(ArticleSegment.segment_order.asc())
         ).all()
 
+    def get_segment_by_order(self, *, article_id: str, segment_order: int) -> ArticleSegment | None:
+        return self.db.scalar(
+            select(ArticleSegment)
+            .join(Article, Article.id == ArticleSegment.article_id)
+            .where(
+                ArticleSegment.article_id == article_id,
+                ArticleSegment.segment_order == segment_order,
+                Article.deleted_at.is_(None),
+            )
+        )
+
     def list_articles_with_segment_count(
         self,
         *,
