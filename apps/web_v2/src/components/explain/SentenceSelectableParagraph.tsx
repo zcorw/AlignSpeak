@@ -11,9 +11,8 @@ interface SentenceSelectableParagraphProps {
 const sentenceSx = (selected: boolean) => ({
   display: 'inline',
   cursor: 'pointer',
-  border: 'none',
-  p: 0,
-  m: 0,
+  whiteSpace: 'normal',
+  verticalAlign: 'baseline',
   bgcolor: selected ? 'rgba(110,96,238,0.28)' : 'transparent',
   color: selected ? 'text.primary' : 'text.primary',
   borderRadius: '4px',
@@ -42,7 +41,7 @@ export const SentenceSelectableParagraph = ({
           sx={{
             fontSize: '16px',
             lineHeight: 1.85,
-            whiteSpace: 'pre-wrap',
+            whiteSpace: 'normal',
             overflowWrap: 'anywhere',
             wordBreak: 'break-word',
           }}
@@ -65,9 +64,15 @@ export const SentenceSelectableParagraph = ({
       nodes.push(
         <Box
           key={`sentence-${range.sentenceIndex}-${range.start}`}
-          component="button"
-          type="button"
+          component="span"
+          role="button"
+          tabIndex={0}
           onClick={() => onSelectSentence(range.sentenceIndex)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            event.preventDefault()
+            onSelectSentence(range.sentenceIndex)
+          }}
           sx={sentenceSx(selectedSentenceIndex === range.sentenceIndex)}
         >
           {text.slice(range.start, range.end)}
@@ -90,7 +95,7 @@ export const SentenceSelectableParagraph = ({
       sx={{
         fontSize: '16px',
         lineHeight: 1.85,
-        whiteSpace: 'pre-wrap',
+        whiteSpace: 'normal',
         overflowWrap: 'anywhere',
         wordBreak: 'break-word',
       }}
