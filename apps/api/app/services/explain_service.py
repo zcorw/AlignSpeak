@@ -44,6 +44,12 @@ class ExplainGrammarResult:
     warnings: list[str]
 
 
+@dataclass(frozen=True)
+class ExplainQuestionResult:
+    answer: str
+    warnings: list[str]
+
+
 class OpenAIExplainProvider:
     def __init__(self, *, api_key: str, model: str, base_url: str, timeout_seconds: float) -> None:
         self.api_key = api_key
@@ -163,6 +169,43 @@ class OpenAIExplainProvider:
                 status_code=status.HTTP_502_BAD_GATEWAY,
             )
         return ExplainGrammarResult(grammar_points=points[:5], warnings=[])
+
+    def explain_question(
+        self,
+        *,
+        sentence_text: str,
+        question: str,
+        source_language: str,
+        response_language: str,
+        usage_context: OpenAIUsageContext,
+    ) -> ExplainQuestionResult:
+        prompt = (
+            "You are a language tutor. Answer the user's question about one sentence and return strict JSON only.\n"
+            "JSON schema:\n"
+            "{\n"
+            '  "answer": "string"\n'
+            "}\n"
+            "Rules:\n"
+            "- answer the question only based on the provided sentence.\n"
+            "- answer should be concise, practical, and learner-friendly.\n"
+            "- answer must be in the response language.\n"
+            "- do not return markdown.\n"
+            f"Source language code: {source_language}\n"
+            f"Response language code: {response_language}\n"
+            "Sentence:\n"
+            f"{sentence_text}\n"
+            "User question:\n"
+            f"{question}"
+        )
+        payload = self._request_json(prompt=prompt, usage_context=usage_context)
+        answer = str(payload.get("answer", "")).strip()
+        if not answer:
+            raise AppError(
+                code="EXPLAIN_PROVIDER_ERROR",
+                message="AI question response is missing answer.",
+                status_code=status.HTTP_502_BAD_GATEWAY,
+            )
+        return ExplainQuestionResult(answer=answer[:800], warnings=[])
 
     def _request_json(self, *, prompt: str, usage_context: OpenAIUsageContext) -> dict:
         _enforce_openai_budget_for_explain(usage_context=usage_context)
@@ -326,6 +369,47 @@ def explain_sentence_grammar(
         )
 
 
+def explain_sentence_question(
+    *,
+    sentence_text: str,
+    question: str,
+    language: str,
+    response_language: str,
+    user_id: str,
+    article_id: str,
+    segment_order: int,
+) -> ExplainQuestionResult:
+    normalized_sentence = normalize_text(sentence_text)
+    normalized_question = normalize_text(question)
+    provider = _build_explain_provider()
+    if provider is None:
+        return _fallback_explain_question(normalized_sentence, normalized_question, response_language)
+    task_id = f"seg:{segment_order}:question"
+    context = OpenAIUsageContext(
+        module="explain_question",
+        provider="openai",
+        model=settings.openai_explain_model,
+        user_id=user_id,
+        article_id=article_id,
+        task_id=task_id,
+    )
+    try:
+        return provider.explain_question(
+            sentence_text=normalized_sentence,
+            question=normalized_question,
+            source_language=language,
+            response_language=response_language,
+            usage_context=context,
+        )
+    except AppError as exc:
+        logger.warning("Explain question fallback. reason=%s", exc.code)
+        fallback = _fallback_explain_question(normalized_sentence, normalized_question, response_language)
+        return ExplainQuestionResult(
+            answer=fallback.answer,
+            warnings=[*fallback.warnings, "AI question unavailable. Returned fallback result."],
+        )
+
+
 def _fallback_explain_segment(segment_text: str, response_language: str) -> ExplainSegmentResult:
     collapsed = re.sub(r"\s+", " ", segment_text).strip()
     summary = collapsed[:180] if collapsed else ""
@@ -428,6 +512,21 @@ def _fallback_explain_grammar(sentence_text: str, response_language: str) -> Exp
             )
         )
     return ExplainGrammarResult(grammar_points=points[:5], warnings=["Fallback grammar analysis used."])
+
+
+def _fallback_explain_question(
+    sentence_text: str,
+    question: str,
+    response_language: str,
+) -> ExplainQuestionResult:
+    sentence_preview = sentence_text[:120] if sentence_text else ""
+    if response_language == "zh":
+        answer = f"这是降级回答。你问的是“{question}”。请结合该句理解：{sentence_preview}"
+    elif response_language == "ja":
+        answer = f"これはフォールバック回答です。質問:「{question}」。この文を手がかりに確認してください: {sentence_preview}"
+    else:
+        answer = f"This is a fallback answer. Your question: \"{question}\". Please interpret it with this sentence: {sentence_preview}"
+    return ExplainQuestionResult(answer=answer, warnings=["Fallback question answer used."])
 
 
 def _extract_openai_text(response_payload: dict) -> str:

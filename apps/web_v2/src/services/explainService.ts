@@ -51,6 +51,17 @@ export interface ExplainGrammarResult {
   warnings: string[]
 }
 
+export interface ExplainQuestionResult {
+  articleId: string
+  articleTitle: string
+  language: 'ja' | 'en' | 'zh' | string
+  segmentOrder: number
+  sentenceText: string
+  question: string
+  answer: string
+  warnings: string[]
+}
+
 export type ExplainResponseLanguage = 'ja' | 'en' | 'zh'
 
 export const explainService = {
@@ -80,5 +91,22 @@ export const explainService = {
       response_language: payload.responseLanguage,
     })
     return toCamelCase<ExplainGrammarResult>(response.data)
+  },
+
+  async explainQuestion(payload: {
+    articleId: string
+    segmentOrder: number
+    sentenceText: string
+    question: string
+    responseLanguage?: ExplainResponseLanguage
+  }): Promise<ExplainQuestionResult> {
+    const response = await api.post('/bff/v1/explain/question', {
+      article_id: payload.articleId,
+      segment_order: payload.segmentOrder,
+      sentence_text: payload.sentenceText,
+      question: payload.question,
+      response_language: payload.responseLanguage,
+    })
+    return toCamelCase<ExplainQuestionResult>(response.data)
   },
 }

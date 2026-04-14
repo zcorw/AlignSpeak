@@ -45,3 +45,22 @@ class ExplainGrammarResponse(BaseModel):
     sentence_text: str
     grammar_points: list[GrammarPointItem]
     warnings: list[str] = []
+
+
+class ExplainQuestionPayload(BaseModel):
+    article_id: str = Field(min_length=1, max_length=32)
+    segment_order: int = Field(ge=1, le=5000)
+    sentence_text: str = Field(min_length=1, max_length=2000)
+    question: str = Field(min_length=1, max_length=1000)
+    response_language: str | None = Field(default=None, min_length=2, max_length=12)
+
+
+class ExplainQuestionResponse(BaseModel):
+    article_id: str
+    article_title: str
+    language: str
+    segment_order: int
+    sentence_text: str
+    question: str
+    answer: str
+    warnings: list[str] = []

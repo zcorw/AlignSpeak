@@ -186,6 +186,11 @@ export default {
         selectedHint: 'Selected sentence S{{index}}',
         analyzeAction: 'Analyze this sentence',
         analyzingAction: 'Analyzing...',
+        questionTitle: 'Ask AI about this sentence',
+        questionPlaceholder: 'Type your question here...',
+        askAction: 'Ask AI',
+        askingAction: 'Asking...',
+        answerTitle: 'AI answer',
       },
       result: {
         topbarSubtitle: 'L2 · Segment 3/5',

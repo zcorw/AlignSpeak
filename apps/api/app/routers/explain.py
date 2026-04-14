@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.application.usecases.explain_usecase import explain_grammar as explain_grammar_usecase
+from app.application.usecases.explain_usecase import explain_question as explain_question_usecase
 from app.application.usecases.explain_usecase import explain_segment as explain_segment_usecase
 from app.db import get_db
 from app.deps import get_current_user
@@ -10,6 +11,8 @@ from app.models import User
 from app.schemas.explain import (
     ExplainGrammarPayload,
     ExplainGrammarResponse,
+    ExplainQuestionPayload,
+    ExplainQuestionResponse,
     ExplainSegmentPayload,
     ExplainSegmentResponse,
 )
@@ -44,3 +47,16 @@ def explain_grammar(
         payload=payload,
     )
 
+
+@router.post("/question", response_model=ExplainQuestionResponse)
+def explain_question(
+    payload: ExplainQuestionPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ExplainQuestionResponse:
+    repository = ArticleRepository(db=db)
+    return explain_question_usecase(
+        repository=repository,
+        current_user=current_user,
+        payload=payload,
+    )

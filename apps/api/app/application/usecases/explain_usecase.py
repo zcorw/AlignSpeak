@@ -9,12 +9,14 @@ from app.schemas.explain import (
     ExplainGrammarPayload,
     ExplainGrammarResponse,
     ExplainKeywordItem,
+    ExplainQuestionPayload,
+    ExplainQuestionResponse,
     ExplainSegmentPayload,
     ExplainSegmentResponse,
     GrammarPointItem,
 )
 from app.services.article_service import normalize_text
-from app.services.explain_service import explain_segment_text, explain_sentence_grammar
+from app.services.explain_service import explain_segment_text, explain_sentence_grammar, explain_sentence_question
 
 
 def _normalize_response_language(response_language: str | None, article_language: str) -> str:
@@ -33,6 +35,26 @@ def _not_found_error() -> AppError:
         message="Article or segment not found.",
         status_code=status.HTTP_404_NOT_FOUND,
     )
+
+
+def _validate_sentence_in_segment(*, segment_text: str, sentence_text: str) -> str:
+    normalized_sentence = sentence_text.strip()
+    if not normalized_sentence:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Sentence text is required.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    segment_compact = re.sub(r"\s+", " ", normalize_text(segment_text))
+    sentence_compact = re.sub(r"\s+", " ", normalize_text(normalized_sentence))
+    if sentence_compact and sentence_compact not in segment_compact:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Selected sentence does not belong to the segment.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    return normalized_sentence
 
 
 def explain_segment(
@@ -86,22 +108,10 @@ def explain_grammar(
     if segment is None:
         raise _not_found_error()
 
-    sentence_text = payload.sentence_text.strip()
-    if not sentence_text:
-        raise AppError(
-            code="VALIDATION_ERROR",
-            message="Sentence text is required.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
-
-    segment_compact = re.sub(r"\s+", " ", normalize_text(segment.plain_text))
-    sentence_compact = re.sub(r"\s+", " ", normalize_text(sentence_text))
-    if sentence_compact and sentence_compact not in segment_compact:
-        raise AppError(
-            code="VALIDATION_ERROR",
-            message="Selected sentence does not belong to the segment.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+    sentence_text = _validate_sentence_in_segment(
+        segment_text=segment.plain_text,
+        sentence_text=payload.sentence_text,
+    )
 
     grammar_result = explain_sentence_grammar(
         sentence_text=sentence_text,
@@ -127,4 +137,51 @@ def explain_grammar(
             for item in grammar_result.grammar_points
         ],
         warnings=grammar_result.warnings,
+    )
+
+
+def explain_question(
+    *,
+    repository: ArticleRepository,
+    current_user: User,
+    payload: ExplainQuestionPayload,
+) -> ExplainQuestionResponse:
+    article = repository.get_article_by_id_for_user(article_id=payload.article_id, user_id=current_user.id)
+    if article is None:
+        raise _not_found_error()
+
+    segment = repository.get_segment_by_order(article_id=article.id, segment_order=payload.segment_order)
+    if segment is None:
+        raise _not_found_error()
+
+    sentence_text = _validate_sentence_in_segment(
+        segment_text=segment.plain_text,
+        sentence_text=payload.sentence_text,
+    )
+    question = payload.question.strip()
+    if not question:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Question is required.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    question_result = explain_sentence_question(
+        sentence_text=sentence_text,
+        question=question,
+        language=article.language,
+        response_language=_normalize_response_language(payload.response_language, article.language),
+        user_id=current_user.id,
+        article_id=article.id,
+        segment_order=segment.segment_order,
+    )
+    return ExplainQuestionResponse(
+        article_id=article.id,
+        article_title=article.title,
+        language=article.language,
+        segment_order=segment.segment_order,
+        sentence_text=sentence_text,
+        question=question,
+        answer=question_result.answer,
+        warnings=question_result.warnings,
     )

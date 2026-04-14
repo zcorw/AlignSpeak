@@ -1,4 +1,4 @@
-import { Box, CircularProgress, Typography } from '@mui/material'
+import { Box, Button, CircularProgress, TextField, Typography } from '@mui/material'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -50,6 +50,10 @@ export const ExplainPage = () => {
   const [selectedSentenceIndex, setSelectedSentenceIndex] = useState<number | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [grammarPoints, setGrammarPoints] = useState<ExplainGrammarPoint[]>([])
+  const [grammarReady, setGrammarReady] = useState(false)
+  const [questionInput, setQuestionInput] = useState('')
+  const [askingQuestion, setAskingQuestion] = useState(false)
+  const [questionAnswer, setQuestionAnswer] = useState('')
 
   const sentenceOptions = useMemo(() => splitTextToSentences(segmentText), [segmentText])
   const selectedSentence = useMemo(() => {
@@ -103,7 +107,10 @@ export const ExplainPage = () => {
       setKeywords(Array.isArray(result.keywords) ? result.keywords : [])
       setWarnings(Array.isArray(result.warnings) ? result.warnings : [])
       setGrammarPoints([])
+      setGrammarReady(false)
       setSelectedSentenceIndex(null)
+      setQuestionInput('')
+      setQuestionAnswer('')
     } catch (error: unknown) {
       setLoadError(getApiErrorMessage(error, t('common.error')))
     } finally {
@@ -127,6 +134,9 @@ export const ExplainPage = () => {
       })
       .then((result) => {
         setGrammarPoints(result.grammarPoints || [])
+        setGrammarReady(true)
+        setQuestionInput('')
+        setQuestionAnswer('')
         setWarnings((prev) => {
           const merged = [...prev, ...(result.warnings || [])]
           return Array.from(new Set(merged))
@@ -137,6 +147,44 @@ export const ExplainPage = () => {
       })
       .finally(() => {
         setAnalyzing(false)
+      })
+  }
+
+  const onSelectSentence = (nextIndex: number) => {
+    setSelectedSentenceIndex((prev) => {
+      if (prev !== nextIndex) {
+        setGrammarReady(false)
+        setQuestionInput('')
+        setQuestionAnswer('')
+      }
+      return nextIndex
+    })
+  }
+
+  const onAskQuestion = () => {
+    const question = questionInput.trim()
+    if (!articleId || !selectedSentence || !grammarReady || !question) return
+    setAskingQuestion(true)
+    void explainService
+      .explainQuestion({
+        articleId,
+        segmentOrder,
+        sentenceText: selectedSentence,
+        question,
+        responseLanguage,
+      })
+      .then((result) => {
+        setQuestionAnswer(result.answer || '')
+        setWarnings((prev) => {
+          const merged = [...prev, ...(result.warnings || [])]
+          return Array.from(new Set(merged))
+        })
+      })
+      .catch((error: unknown) => {
+        showError(getApiErrorMessage(error, t('common.error')))
+      })
+      .finally(() => {
+        setAskingQuestion(false)
       })
   }
 
@@ -194,7 +242,7 @@ export const ExplainPage = () => {
               <SentenceSelectableParagraph
                 text={segmentText}
                 selectedSentenceIndex={selectedSentenceIndex}
-                onSelectSentence={(nextIndex) => setSelectedSentenceIndex(nextIndex)}
+                onSelectSentence={onSelectSentence}
               />
             </Box>
 
@@ -208,6 +256,46 @@ export const ExplainPage = () => {
               emptyGrammarText={t('pages.explain.emptyGrammar')}
               warnings={warnings}
             />
+
+            {grammarReady && (
+              <Box sx={{ p: '14px', bgcolor: '#1a1a2c', border: '1px solid rgba(255,255,255,0.13)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <Typography sx={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'text.disabled' }}>
+                  {t('pages.explain.questionTitle')}
+                </Typography>
+                <TextField
+                  multiline
+                  minRows={3}
+                  maxRows={6}
+                  value={questionInput}
+                  onChange={(event) => setQuestionInput(event.target.value)}
+                  placeholder={t('pages.explain.questionPlaceholder')}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '10px',
+                      bgcolor: '#22223a',
+                      color: 'text.primary',
+                    },
+                  }}
+                />
+                <Button
+                  variant="contained"
+                  disabled={!questionInput.trim() || askingQuestion}
+                  onClick={onAskQuestion}
+                >
+                  {askingQuestion ? t('pages.explain.askingAction') : t('pages.explain.askAction')}
+                </Button>
+                {questionAnswer && (
+                  <Box sx={{ p: '10px', borderRadius: '10px', bgcolor: '#22223a', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <Typography sx={{ fontSize: '12px', fontWeight: 700, color: 'text.primary' }}>
+                      {t('pages.explain.answerTitle')}
+                    </Typography>
+                    <Typography sx={{ mt: '6px', fontSize: '12px', color: 'text.secondary', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                      {questionAnswer}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
           </>
         )}
       </Box>

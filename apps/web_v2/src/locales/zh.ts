@@ -186,6 +186,11 @@ export default {
         selectedHint: '已选句子 S{{index}}',
         analyzeAction: '分析该句语法',
         analyzingAction: '分析中...',
+        questionTitle: '就这句话提问 AI',
+        questionPlaceholder: '输入你想问的问题...',
+        askAction: '提交问题',
+        askingAction: '提问中...',
+        answerTitle: 'AI 回答',
       },
       result: {
         topbarSubtitle: 'L2 · 段落 3/5',
