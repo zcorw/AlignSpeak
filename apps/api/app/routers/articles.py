@@ -7,6 +7,7 @@ from app.application.usecases.article_usecase import (
     detect_article_language as detect_article_language_usecase,
     get_article_detail as get_article_detail_usecase,
     list_articles as list_articles_usecase,
+    parse_uploaded_files as parse_uploaded_files_usecase,
     parse_uploaded_file as parse_uploaded_file_usecase,
     update_article as update_article_usecase,
 )
@@ -17,6 +18,7 @@ from app.models import User
 from app.routers.article_request_parser import (
     parse_create_article_input,
     parse_detect_language_text,
+    parse_upload_files_input,
     parse_upload_file_input,
 )
 from app.schemas.article import (
@@ -27,6 +29,7 @@ from app.schemas.article import (
     ArticleUpdatePayload,
     ArticleUpdateResponse,
     DetectLanguageResponse,
+    UploadParseBatchResponse,
     UploadParseResponse,
 )
 
@@ -63,6 +66,15 @@ async def parse_uploaded_file(
 ) -> UploadParseResponse:
     parsed = await parse_upload_file_input(request=request)
     return parse_uploaded_file_usecase(parsed=parsed)
+
+
+@router.post("/parse-upload-batch", response_model=UploadParseBatchResponse)
+async def parse_uploaded_files(
+    request: Request,
+    _current_user: User = Depends(get_current_user),
+) -> UploadParseBatchResponse:
+    parsed = await parse_upload_files_input(request=request)
+    return parse_uploaded_files_usecase(parsed=parsed)
 
 
 @router.get("/{article_id}", response_model=ArticleDetailResponse)

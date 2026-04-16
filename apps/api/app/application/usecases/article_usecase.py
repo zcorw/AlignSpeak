@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
+import re
 from uuid import uuid4
 
 from fastapi import status
@@ -18,10 +19,15 @@ from app.schemas.article import (
     ArticleUpdatePayload,
     ArticleUpdateResponse,
     DetectLanguageResponse,
+    UploadBatchItem,
+    UploadBatchOrderSuggestion,
+    UploadBatchUncertainPair,
+    UploadParseBatchResponse,
     UploadParseResponse,
 )
 from app.services.article_service import (
     ParsedArticleInput,
+    ParsedUploadBatchInput,
     ParsedUploadFileInput,
     decode_cursor,
     encode_cursor,
@@ -31,6 +37,7 @@ from app.services.article_service import (
     split_segments,
 )
 from app.services.language_detection_service import detect_language
+from app.services.ocr_order_service import OCROrderCandidate, suggest_ocr_image_order
 from app.services.reading_service import build_segment_reading_tokens
 
 
@@ -152,6 +159,103 @@ def parse_uploaded_file(parsed: ParsedUploadFileInput) -> UploadParseResponse:
         detected_reliable=detection.reliable,
         detected_raw_language=detection.raw_language,
         text_length=len(normalized_text),
+    )
+
+
+def _extract_page_marker_candidates(text: str) -> list[str]:
+    patterns = [
+        r"(?:^|\s)(?:\u7b2c\s*\d+\s*\u9875)",
+        r"(?:^|\s)(?:page\s*\d+)",
+        r"(?:^|\s)(?:p\.\s*\d+)",
+        r"(?:^|\s)(?:chapter\s*\d+)",
+        r"(?:^|\s)(?:section\s*\d+)",
+    ]
+    found: list[str] = []
+    lowered = text.lower()
+    for pattern in patterns:
+        for match in re.findall(pattern, lowered, flags=re.IGNORECASE):
+            value = str(match).strip()
+            if value and value not in found:
+                found.append(value)
+            if len(found) >= 5:
+                return found
+    return found
+
+
+def parse_uploaded_files(parsed: ParsedUploadBatchInput) -> UploadParseBatchResponse:
+    normalized_items: list[tuple[str, str, str, object]] = []
+    order_candidates: list[OCROrderCandidate] = []
+    for item in parsed.files:
+        normalized_text = normalize_text(item.raw_text)
+        if not normalized_text:
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message=f"Uploaded file does not contain valid text: {item.filename}.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        detection = detect_language(normalized_text)
+        page_markers = _extract_page_marker_candidates(normalized_text)
+        normalized_items.append((item.image_id, item.filename, normalized_text, detection))
+        order_candidates.append(
+            OCROrderCandidate(
+                image_id=item.image_id,
+                filename=item.filename,
+                captured_at=None,
+                ocr_text_head=normalized_text[:180],
+                ocr_text_tail=normalized_text[-180:],
+                page_marker_candidates=page_markers,
+                quality_flags=[],
+            )
+        )
+
+    suggestion = suggest_ocr_image_order(
+        candidates=order_candidates,
+        language_hint=parsed.language,
+    )
+    ordered_position = {
+        image_id: index + 1 for index, image_id in enumerate(suggestion.ordered_image_ids)
+    }
+    items_response: list[UploadBatchItem] = []
+    page_marker_by_id = {
+        candidate.image_id: candidate.page_marker_candidates for candidate in order_candidates
+    }
+    for image_id, filename, normalized_text, detection in normalized_items:
+        items_response.append(
+            UploadBatchItem(
+                image_id=image_id,
+                filename=filename,
+                source_type="ocr",
+                text=normalized_text,
+                text_length=len(normalized_text),
+                detected_language=detection.detected_language,
+                detected_confidence=detection.confidence,
+                detected_reliable=detection.reliable,
+                detected_raw_language=detection.raw_language,
+                page_marker_candidates=page_marker_by_id.get(image_id, []),
+                warnings=[],
+                suggested_order=ordered_position.get(image_id, 9999),
+            )
+        )
+
+    items_response.sort(key=lambda item: item.suggested_order)
+    return UploadParseBatchResponse(
+        items=items_response,
+        order_suggestion=UploadBatchOrderSuggestion(
+            ordered_image_ids=suggestion.ordered_image_ids,
+            overall_confidence=suggestion.overall_confidence,
+            reasoning_signals=suggestion.reasoning_signals,
+            uncertain_pairs=[
+                UploadBatchUncertainPair(
+                    left=pair.left,
+                    right=pair.right,
+                    confidence=pair.confidence,
+                )
+                for pair in suggestion.uncertain_pairs
+            ],
+            warnings=suggestion.warnings,
+            fallback_used=suggestion.fallback_used,
+        ),
+        need_manual_confirm=True,
     )
 
 
@@ -355,3 +459,4 @@ def delete_article(
         deleted_at=deleted_at,
         status="deleted",
     )
+

@@ -2,6 +2,7 @@ import { Box, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { EditorTextOverlay } from '../components/EditorTextOverlay'
+import { EditorImageOrderOverlay } from '../components/editor/EditorImageOrderOverlay'
 import { EditorImportMethods } from '../components/editor/EditorImportMethods'
 import { EditorManualEntryTrigger } from '../components/editor/EditorManualEntryTrigger'
 import { EditorTopBar } from '../components/editor/EditorTopBar'
@@ -23,9 +24,14 @@ export const EditorPage = () => {
     creatingArticle,
     isEditing,
     closeOverlay,
+    closeOrderOverlay,
     openOverlay,
     pickFile,
     importFile,
+    orderOverlayOpen,
+    orderItems,
+    orderSuggestion,
+    confirmOrderAndComposeText,
     confirmArticle,
   } = useEditorImport(editingArticleId)
 
@@ -117,6 +123,24 @@ export const EditorPage = () => {
         submitting={creatingArticle}
         onClose={closeOverlay}
         onConfirm={confirmArticle}
+      />
+
+      <EditorImageOrderOverlay
+        open={orderOverlayOpen}
+        loading={ocrLoading}
+        title={t('pages.editor.batch.title')}
+        hint={t('pages.editor.batch.hint')}
+        lowConfidenceHint={t('pages.editor.batch.lowConfidence')}
+        cancelLabel={t('common.cancel')}
+        restoreLabel={t('pages.editor.batch.restoreAi')}
+        confirmLabel={t('pages.editor.batch.confirmOrder')}
+        loadingLabel={t('pages.editor.batch.processing')}
+        pageMarkerLabel={t('pages.editor.batch.pageMarker')}
+        aiConfidence={orderSuggestion?.overallConfidence ?? null}
+        warnings={orderSuggestion?.warnings || []}
+        items={orderItems}
+        onClose={closeOrderOverlay}
+        onConfirm={confirmOrderAndComposeText}
       />
     </Box>
   )

@@ -118,6 +118,42 @@ export interface UploadParseResult {
   textLength: number
 }
 
+export interface UploadBatchUncertainPair {
+  left: string
+  right: string
+  confidence?: number | null
+}
+
+export interface UploadBatchOrderSuggestion {
+  orderedImageIds: string[]
+  overallConfidence?: number | null
+  reasoningSignals: string[]
+  uncertainPairs: UploadBatchUncertainPair[]
+  warnings: string[]
+  fallbackUsed: boolean
+}
+
+export interface UploadBatchItem {
+  imageId: string
+  filename: string
+  sourceType: 'ocr' | string
+  text: string
+  textLength: number
+  detectedLanguage: string
+  detectedConfidence?: number | null
+  detectedReliable: boolean
+  detectedRawLanguage: string
+  pageMarkerCandidates: string[]
+  warnings: string[]
+  suggestedOrder: number
+}
+
+export interface UploadParseBatchResult {
+  items: UploadBatchItem[]
+  orderSuggestion: UploadBatchOrderSuggestion
+  needManualConfirm: boolean
+}
+
 export const articleService = {
   async createArticle(data: CreateArticlePayload): Promise<CreateArticleResult> {
     const response = await api.post('/bff/v1/articles', {
@@ -163,7 +199,21 @@ export const articleService = {
     if (language) {
       formData.append('language', language)
     }
-    const response = await api.post('/bff/v1/articles/parse-upload', formData)
+    const response = await api.post('/bff/v1/articles/parse-upload', formData, {
+      timeout: 120000,
+    })
     return toCamelCase<UploadParseResult>(response.data)
+  },
+
+  async parseUploadBatch(files: File[], language?: string): Promise<UploadParseBatchResult> {
+    const formData = new FormData()
+    files.forEach((file) => formData.append('files', file))
+    if (language) {
+      formData.append('language', language)
+    }
+    const response = await api.post('/bff/v1/articles/parse-upload-batch', formData, {
+      timeout: 300000,
+    })
+    return toCamelCase<UploadParseBatchResult>(response.data)
   },
 }

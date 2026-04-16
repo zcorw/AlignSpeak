@@ -1,10 +1,11 @@
 import { type ChangeEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import type { EditorImageOrderItem } from '../../components/editor/EditorImageOrderOverlay'
 import { useNotifier } from '../../components/common/feedbackHooks'
 import type { OverlayLanguageCode } from '../../components/EditorTextOverlay'
 import { markLegacyArticle } from '../../services/articleLegacyService'
-import { articleService } from '../../services/articleService'
+import { articleService, type UploadBatchOrderSuggestion } from '../../services/articleService'
 import { getApiErrorMessage } from '../../services/authService'
 
 const buildArticleTitle = (text: string) => {
@@ -31,6 +32,9 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
   const [importVersion, setImportVersion] = useState(0)
   const [focusVersion, setFocusVersion] = useState(0)
   const [creatingArticle, setCreatingArticle] = useState(false)
+  const [orderOverlayOpen, setOrderOverlayOpen] = useState(false)
+  const [orderItems, setOrderItems] = useState<EditorImageOrderItem[]>([])
+  const [orderSuggestion, setOrderSuggestion] = useState<UploadBatchOrderSuggestion | null>(null)
   const isEditing = Boolean(editingArticleId)
   const editingOverlayAutoOpen = isEditing && dismissedEditingOverlayForId !== editingArticleId
   const overlayOpen = editingOverlayAutoOpen || overlayOpenByUser
@@ -46,6 +50,7 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
   const closeOverlay = () => {
     setUploadOcrLoading(false)
     setOverlayOpenByUser(false)
+    setOrderOverlayOpen(false)
     if (editingArticleId) setDismissedEditingOverlayForId(editingArticleId)
   }
 
@@ -72,16 +77,57 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
   }
 
   const importFile = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+    const files = Array.from(event.target.files ?? [])
     event.target.value = ''
-    if (!file) return
-
-    setOverlayOpenByUser(true)
-    setUploadOcrLoading(true)
+    if (!files.length) return
 
     const locale = navigator.language.toLowerCase()
     const languageHint = locale.startsWith('zh') ? 'zh' : locale.startsWith('ja') ? 'ja' : 'en'
 
+    if (files.length > 1) {
+      const hasNonImageFile = files.some((file) => {
+        const lowerName = file.name.toLowerCase()
+        return !(/\.(png|jpg|jpeg|webp)$/i.test(lowerName) || file.type.startsWith('image/'))
+      })
+      if (hasNonImageFile) {
+        showError(t('pages.editor.batch.onlyImageFiles'))
+        return
+      }
+
+      setUploadOcrLoading(true)
+      setOverlayOpenByUser(false)
+      setOrderOverlayOpen(true)
+      void articleService
+        .parseUploadBatch(files, languageHint)
+        .then((result) => {
+          const sorted = [...(result.items || [])].sort(
+            (left, right) => left.suggestedOrder - right.suggestedOrder
+          )
+          setOrderItems(
+            sorted.map((item) => ({
+              imageId: item.imageId,
+              filename: item.filename,
+              text: item.text,
+              pageMarkerCandidates: item.pageMarkerCandidates || [],
+              suggestedOrder: item.suggestedOrder,
+            }))
+          )
+          setOrderSuggestion(result.orderSuggestion || null)
+        })
+        .catch((error: unknown) => {
+          setOrderOverlayOpen(false)
+          const message = getApiErrorMessage(error, t('common.error'))
+          showError(message)
+        })
+        .finally(() => {
+          setUploadOcrLoading(false)
+        })
+      return
+    }
+
+    const file = files[0]
+    setOverlayOpenByUser(true)
+    setUploadOcrLoading(true)
     void articleService
       .parseUploadFile(file, languageHint)
       .then((result) => {
@@ -94,6 +140,31 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
       .finally(() => {
         setUploadOcrLoading(false)
       })
+  }
+
+  const closeOrderOverlay = () => {
+    setOrderOverlayOpen(false)
+    setOrderItems([])
+    setOrderSuggestion(null)
+  }
+
+  const confirmOrderAndComposeText = (orderedImageIds: string[]) => {
+    const byId = new Map(orderItems.map((item) => [item.imageId, item]))
+    const merged = orderedImageIds
+      .map((id) => byId.get(id)?.text?.trim() || '')
+      .filter(Boolean)
+      .join('\n\n')
+      .trim()
+    if (!merged) {
+      showError(t('pages.editor.batch.emptyResult'))
+      return
+    }
+    applyImportedText(merged)
+    setOrderOverlayOpen(false)
+    setOrderItems([])
+    setOrderSuggestion(null)
+    setOverlayOpenByUser(true)
+    showSuccess(t('pages.editor.batch.orderApplied'))
   }
 
   const confirmArticle = (payload: { text: string; language: OverlayLanguageCode }) => {
@@ -182,9 +253,14 @@ export const useEditorImport = (editingArticleId: string | null = null) => {
     creatingArticle,
     isEditing,
     closeOverlay,
+    closeOrderOverlay,
     openOverlay,
     pickFile,
     importFile,
+    orderOverlayOpen,
+    orderItems,
+    orderSuggestion,
+    confirmOrderAndComposeText,
     confirmArticle,
   }
 }

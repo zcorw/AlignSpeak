@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_ocr_model: str = "gpt-4.1-mini"
     openai_ocr_timeout_seconds: float = 45.0
+    ocr_batch_max_concurrency: int = 3
+    openai_ocr_order_model: str = "gpt-4.1-mini"
+    openai_ocr_order_timeout_seconds: float = 45.0
     openai_explain_model: str = "gpt-4.1-mini"
     openai_explain_timeout_seconds: float = 45.0
     openai_monthly_budget_usd: float = 10.0

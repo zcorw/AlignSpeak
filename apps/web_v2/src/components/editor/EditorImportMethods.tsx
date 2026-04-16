@@ -135,6 +135,7 @@ export const EditorImportMethods = ({
     <input
       ref={inputRef}
       type="file"
+      multiple
       accept=".txt,.md,image/*"
       style={{ display: 'none' }}
       onChange={onFileChange}

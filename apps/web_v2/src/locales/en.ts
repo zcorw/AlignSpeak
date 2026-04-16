@@ -99,6 +99,18 @@ export default {
           minSegments: 'At least 1 segment is required',
           maxSegments: 'Too many segments ({{count}}/30). Please merge or refine manually',
         },
+        batch: {
+          title: 'Confirm image order',
+          hint: 'AI has suggested a page order. Please adjust if needed before creating the article.',
+          lowConfidence: 'AI confidence is low. Please verify the order manually.',
+          restoreAi: 'Restore AI order',
+          confirmOrder: 'Confirm order and continue',
+          processing: 'Running OCR and order inference...',
+          pageMarker: 'Page clues',
+          onlyImageFiles: 'Batch upload supports images only.',
+          emptyResult: 'No valid text found after ordering.',
+          orderApplied: 'Order confirmed. You can continue proofreading.',
+        },
       },
       practice: {
         topbar: {

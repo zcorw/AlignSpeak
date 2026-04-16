@@ -32,6 +32,21 @@ class ParsedUploadFileInput:
 
 
 @dataclass
+class ParsedUploadBatchFileInput:
+    image_id: str
+    filename: str
+    language: str
+    source_type: str
+    raw_text: str
+
+
+@dataclass
+class ParsedUploadBatchInput:
+    language: str
+    files: list[ParsedUploadBatchFileInput]
+
+
+@dataclass
 class CursorPosition:
     created_at: datetime
     article_id: str

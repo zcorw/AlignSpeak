@@ -99,6 +99,18 @@ export default {
           minSegments: '至少需要 1 个段落',
           maxSegments: '段落数超出上限（{{count}}/30），请在此手动拆分或精简',
         },
+        batch: {
+          title: '确认图片顺序',
+          hint: 'AI 已给出建议顺序。创建文章前请人工确认并可手动调整。',
+          lowConfidence: 'AI 置信度较低，请重点核对顺序。',
+          restoreAi: '恢复 AI 建议顺序',
+          confirmOrder: '确认顺序并继续',
+          processing: '正在执行 OCR 与顺序推理...',
+          pageMarker: '页码线索',
+          onlyImageFiles: '批量上传仅支持图片文件。',
+          emptyResult: '排序后未得到可用文本。',
+          orderApplied: '顺序已确认，可继续校对文本。',
+        },
       },
       practice: {
         topbar: {

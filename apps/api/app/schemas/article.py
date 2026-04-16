@@ -104,3 +104,39 @@ class UploadParseResponse(BaseModel):
     detected_reliable: bool
     detected_raw_language: str
     text_length: int
+
+
+class UploadBatchUncertainPair(BaseModel):
+    left: str
+    right: str
+    confidence: float | None = None
+
+
+class UploadBatchOrderSuggestion(BaseModel):
+    ordered_image_ids: list[str]
+    overall_confidence: float | None = None
+    reasoning_signals: list[str] = []
+    uncertain_pairs: list[UploadBatchUncertainPair] = []
+    warnings: list[str] = []
+    fallback_used: bool = False
+
+
+class UploadBatchItem(BaseModel):
+    image_id: str
+    filename: str
+    source_type: str
+    text: str
+    text_length: int
+    detected_language: str
+    detected_confidence: float | None = None
+    detected_reliable: bool
+    detected_raw_language: str
+    page_marker_candidates: list[str] = []
+    warnings: list[str] = []
+    suggested_order: int
+
+
+class UploadParseBatchResponse(BaseModel):
+    items: list[UploadBatchItem]
+    order_suggestion: UploadBatchOrderSuggestion
+    need_manual_confirm: bool = True
