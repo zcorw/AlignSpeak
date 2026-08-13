@@ -6,7 +6,7 @@ import {
   WarningAmberRounded,
 } from '@mui/icons-material'
 import { Box, Button, CircularProgress, Typography } from '@mui/material'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 export interface EditorImageOrderItem {
   imageId: string
@@ -66,11 +66,6 @@ export const EditorImageOrderOverlay = ({
   )
   const itemMap = useMemo(() => new Map(items.map((item) => [item.imageId, item])), [items])
   const [orderedIds, setOrderedIds] = useState<string[]>(aiOrderedIds)
-
-  useEffect(() => {
-    if (!open) return
-    setOrderedIds(aiOrderedIds)
-  }, [aiOrderedIds, open])
 
   const visibleItems = orderedIds
     .map((id) => itemMap.get(id))

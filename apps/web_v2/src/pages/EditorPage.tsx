@@ -126,6 +126,7 @@ export const EditorPage = () => {
       />
 
       <EditorImageOrderOverlay
+        key={JSON.stringify(orderItems.map((item) => item.imageId))}
         open={orderOverlayOpen}
         loading={ocrLoading}
         title={t('pages.editor.batch.title')}
