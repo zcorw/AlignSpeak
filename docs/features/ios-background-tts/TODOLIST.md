@@ -15,7 +15,7 @@
 
 ## T01 · 后端数据模型与仓储边界
 
-- [ ] 新增整篇任务、资产、资产分段映射模型与基础仓储。
+- [x] 新增整篇任务、资产、资产分段映射模型与基础仓储。
 
 范围：SQLAlchemy 模型、schema bootstrap/兼容迁移、repository、对应测试。
 依赖：T00。
@@ -108,3 +108,4 @@
 | 任务 | 提交 | 验证摘要 |
 | --- | --- | --- |
 | T00 | 见对应 Git 提交 | 文档链接、diff 检查 |
+| T01 | 见对应 Git 提交 | 仓储目标测试 6 passed；后端完整测试 22 passed；PostgreSQL DDL 与 Python compileall 通过 |

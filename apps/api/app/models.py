@@ -1,6 +1,18 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -155,6 +167,151 @@ class TtsAsset(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
     )
+
+
+class ArticleTtsAsset(Base):
+    __tablename__ = "article_tts_assets"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "article_id",
+            "input_hash",
+            name="uq_article_tts_assets_user_article_input_hash",
+        ),
+        CheckConstraint(
+            "status IN ('building', 'ready', 'deleting', 'failed')",
+            name="ck_article_tts_assets_status",
+        ),
+        CheckConstraint("speed > 0", name="ck_article_tts_assets_speed_positive"),
+        CheckConstraint(
+            "duration_ms IS NULL OR duration_ms >= 0",
+            name="ck_article_tts_assets_duration_nonnegative",
+        ),
+        CheckConstraint(
+            "file_size IS NULL OR file_size >= 0",
+            name="ck_article_tts_assets_file_size_nonnegative",
+        ),
+        CheckConstraint(
+            "status <> 'ready' OR "
+            "(audio_path IS NOT NULL AND duration_ms > 0 AND file_size > 0 AND ready_at IS NOT NULL)",
+            name="ck_article_tts_assets_ready_metadata",
+        ),
+        Index("ix_article_tts_assets_article_status", "article_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), nullable=False, index=True)
+    article_id: Mapped[str] = mapped_column(String(32), ForeignKey("articles.id"), nullable=False, index=True)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="building")
+    voice: Mapped[str] = mapped_column(String(64), nullable=False)
+    speed: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    pause_policy_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    encoder_profile_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    timeline_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    audio_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    timeline_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now(), onupdate=func.now()
+    )
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ArticleTtsJob(Base):
+    __tablename__ = "article_tts_jobs"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "article_id",
+            "input_hash",
+            name="uq_article_tts_jobs_user_article_input_hash",
+        ),
+        CheckConstraint(
+            "status IN ('queued', 'processing', 'done', 'failed', 'cancelled')",
+            name="ck_article_tts_jobs_status",
+        ),
+        CheckConstraint("total_segments >= 0", name="ck_article_tts_jobs_total_segments_nonnegative"),
+        CheckConstraint(
+            "completed_segments >= 0 AND completed_segments <= total_segments",
+            name="ck_article_tts_jobs_completed_segments_range",
+        ),
+        CheckConstraint("attempt_count >= 0", name="ck_article_tts_jobs_attempt_count_nonnegative"),
+        CheckConstraint(
+            "failed_segment_order IS NULL OR failed_segment_order > 0",
+            name="ck_article_tts_jobs_failed_segment_order_positive",
+        ),
+        CheckConstraint(
+            "status <> 'done' OR asset_id IS NOT NULL",
+            name="ck_article_tts_jobs_done_asset",
+        ),
+        Index("ix_article_tts_jobs_status_lease", "status", "lease_expires_at"),
+        Index("ix_article_tts_jobs_article_created", "article_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), nullable=False, index=True)
+    article_id: Mapped[str] = mapped_column(String(32), ForeignKey("articles.id"), nullable=False, index=True)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
+    total_segments: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completed_segments: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_segment_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("article_segments.id", ondelete="SET NULL"), nullable=True
+    )
+    failed_segment_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lease_owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    asset_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("article_tts_assets.id"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now(), onupdate=func.now()
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ArticleTtsAssetSegment(Base):
+    __tablename__ = "article_tts_asset_segments"
+    __table_args__ = (
+        UniqueConstraint(
+            "article_tts_asset_id",
+            "segment_id",
+            name="uq_article_tts_asset_segments_asset_segment",
+        ),
+        CheckConstraint("segment_order > 0", name="ck_article_tts_asset_segments_order_positive"),
+        CheckConstraint(
+            "global_start_ms >= 0 AND global_end_ms >= global_start_ms",
+            name="ck_article_tts_asset_segments_time_range",
+        ),
+        Index("ix_article_tts_asset_segments_segment", "segment_id"),
+    )
+
+    article_tts_asset_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("article_tts_assets.id"), primary_key=True
+    )
+    segment_order: Mapped[int] = mapped_column(Integer, primary_key=True)
+    segment_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("article_segments.id", ondelete="SET NULL"), nullable=True
+    )
+    segment_tts_asset_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("tts_assets.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    segment_text_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    global_start_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    global_end_ms: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class PracticeRecording(Base):
