@@ -246,6 +246,7 @@ def prepare_article_tts_segments(
     sleep: Callable[[float], None] = time.sleep,
     max_attempts: int = 3,
     initial_backoff_seconds: float = 0.25,
+    on_segment_prepared: Callable[[PreparedArticleTtsSegment, int, int], None] | None = None,
 ) -> tuple[PreparedArticleTtsSegment, ...]:
     if max_attempts < 1:
         raise ValueError("max_attempts must be at least 1.")
@@ -255,6 +256,7 @@ def prepare_article_tts_segments(
     prepared: list[PreparedArticleTtsSegment] = []
     allow_legacy_default = snapshot.voice_policy_version == DEFAULT_VOICE_POLICY_VERSION
 
+    total_segments = len(snapshot.segments)
     for segment in snapshot.segments:
         cached = _find_valid_cached_asset(
             repository=repository,
@@ -266,15 +268,16 @@ def prepare_article_tts_segments(
         )
         if cached is not None:
             asset, media_path, timeline = cached
-            prepared.append(
-                PreparedArticleTtsSegment(
-                    segment=segment,
-                    asset=asset,
-                    media_path=media_path,
-                    timeline=tuple(timeline),
-                    cached=True,
-                )
+            prepared_segment = PreparedArticleTtsSegment(
+                segment=segment,
+                asset=asset,
+                media_path=media_path,
+                timeline=tuple(timeline),
+                cached=True,
             )
+            prepared.append(prepared_segment)
+            if on_segment_prepared is not None:
+                on_segment_prepared(prepared_segment, len(prepared), total_segments)
             continue
 
         filename = build_tts_filename(
@@ -341,15 +344,16 @@ def prepare_article_tts_segments(
                     asset.created_at = utcnow()
                     repository.update_tts_asset(asset)
 
-                prepared.append(
-                    PreparedArticleTtsSegment(
-                        segment=segment,
-                        asset=asset,
-                        media_path=output_path,
-                        timeline=tuple(timeline),
-                        cached=False,
-                    )
+                prepared_segment = PreparedArticleTtsSegment(
+                    segment=segment,
+                    asset=asset,
+                    media_path=output_path,
+                    timeline=tuple(timeline),
+                    cached=False,
                 )
+                prepared.append(prepared_segment)
+                if on_segment_prepared is not None:
+                    on_segment_prepared(prepared_segment, len(prepared), total_segments)
                 break
             except Exception as exc:
                 repository.db.rollback()

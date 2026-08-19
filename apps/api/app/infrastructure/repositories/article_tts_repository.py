@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.sql.dml import Update
 from sqlalchemy.orm import Session
 
@@ -333,6 +333,56 @@ class ArticleTtsRepository:
         return asset
 
     def update_asset(self, asset: ArticleTtsAsset) -> ArticleTtsAsset:
+        self.db.add(asset)
+        self.db.commit()
+        self.db.refresh(asset)
+        return asset
+
+    def mark_asset_building(self, asset: ArticleTtsAsset, *, updated_at: datetime) -> ArticleTtsAsset:
+        asset.status = "building"
+        asset.audio_path = None
+        asset.duration_ms = None
+        asset.file_size = None
+        asset.timeline_json = None
+        asset.ready_at = None
+        asset.updated_at = updated_at
+        return self.update_asset(asset)
+
+    def mark_asset_failed(self, asset: ArticleTtsAsset, *, updated_at: datetime) -> ArticleTtsAsset:
+        asset.status = "failed"
+        asset.audio_path = None
+        asset.duration_ms = None
+        asset.file_size = None
+        asset.timeline_json = None
+        asset.ready_at = None
+        asset.updated_at = updated_at
+        return self.update_asset(asset)
+
+    def publish_asset(
+        self,
+        *,
+        asset: ArticleTtsAsset,
+        audio_path: str,
+        duration_ms: int,
+        file_size: int,
+        timeline_json: str,
+        mappings: list[ArticleTtsAssetSegment],
+        ready_at: datetime,
+    ) -> ArticleTtsAsset:
+        self.db.execute(
+            delete(ArticleTtsAssetSegment).where(
+                ArticleTtsAssetSegment.article_tts_asset_id == asset.id
+            )
+        )
+        for mapping in mappings:
+            self.db.add(mapping)
+        asset.status = "ready"
+        asset.audio_path = audio_path
+        asset.duration_ms = duration_ms
+        asset.file_size = file_size
+        asset.timeline_json = timeline_json
+        asset.ready_at = ready_at
+        asset.updated_at = ready_at
         self.db.add(asset)
         self.db.commit()
         self.db.refresh(asset)

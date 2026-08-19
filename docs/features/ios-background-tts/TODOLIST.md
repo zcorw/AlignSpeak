@@ -42,7 +42,7 @@
 
 ## T04 · 整篇 MP3 合并与全局时间轴
 
-- [ ] 用 FFmpeg 合并分段音频、插入版本化静音并原子发布整篇资产。
+- [x] 用 FFmpeg 合并分段音频、插入版本化静音并原子发布整篇资产。
 
 范围：合并服务、ffprobe、临时文件、全局 timeline、缓存键、对应测试/媒体 fixture。
 依赖：T03。
@@ -111,3 +111,4 @@
 | T01 | 见对应 Git 提交 | 仓储目标测试 6 passed；后端完整测试 22 passed；PostgreSQL DDL 与 Python compileall 通过 |
 | T02 | 见对应 Git 提交 | 生命周期/仓储目标测试 13 passed；PostgreSQL claim SQL 编译；后端完整回归通过 |
 | T03 | 见对应 Git 提交 | 分段准备/单段回归 13 passed；后端完整测试 36 passed；edge-tts 7.2.8 与 pip check 通过 |
+| T04 | 见对应 Git 提交 | 真实 FFmpeg/processor 测试 3 passed；后端完整测试 39 passed；24kHz/mono/48kbps 验证通过 |
