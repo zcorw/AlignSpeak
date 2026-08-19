@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # TTS configuration
     tts_media_dir: str = "./media/tts"
     tts_default_voice: str = "default"
+    article_tts_worker_lease_seconds: int = 120
+    article_tts_job_max_attempts: int = 3
 
     # STT configuration
     stt_provider: str = "openai"

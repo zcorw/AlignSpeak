@@ -24,7 +24,7 @@
 
 ## T02 · 持久化任务生命周期与 Worker 租约
 
-- [ ] 实现幂等任务创建、PostgreSQL 原子领取、心跳、过期回收、进度、失败和重试。
+- [x] 实现幂等任务创建、PostgreSQL 原子领取、心跳、过期回收、进度、失败和重试。
 
 范围：job use case/repository、Worker 调度骨架、配置、单元/并发测试。
 依赖：T01。
@@ -109,3 +109,4 @@
 | --- | --- | --- |
 | T00 | 见对应 Git 提交 | 文档链接、diff 检查 |
 | T01 | 见对应 Git 提交 | 仓储目标测试 6 passed；后端完整测试 22 passed；PostgreSQL DDL 与 Python compileall 通过 |
+| T02 | 见对应 Git 提交 | 生命周期/仓储目标测试 13 passed；PostgreSQL claim SQL 编译；后端完整回归通过 |
