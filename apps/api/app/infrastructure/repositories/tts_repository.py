@@ -30,6 +30,22 @@ class TtsRepository:
             return None
         return row[0], row[1]
 
+    def get_article_for_user(self, *, article_id: str, user_id: str) -> Article | None:
+        statement = select(Article).where(
+            Article.id == article_id,
+            Article.user_id == user_id,
+            Article.deleted_at.is_(None),
+        )
+        return self.db.scalar(statement)
+
+    def list_segments_for_article(self, *, article_id: str) -> list[ArticleSegment]:
+        statement = (
+            select(ArticleSegment)
+            .where(ArticleSegment.article_id == article_id)
+            .order_by(ArticleSegment.segment_order.asc())
+        )
+        return list(self.db.scalars(statement).all())
+
     def get_segment_for_user(self, *, segment_id: str, user_id: str) -> tuple[Article, ArticleSegment] | None:
         statement = (
             select(Article, ArticleSegment)
@@ -52,7 +68,7 @@ class TtsRepository:
             TtsAsset.speed == speed,
             TtsAsset.text_hash == text_hash,
         )
-        return self.db.scalar(statement)
+        return self.db.scalar(statement.execution_options(populate_existing=True))
 
     def list_segment_reading_overrides(
         self,

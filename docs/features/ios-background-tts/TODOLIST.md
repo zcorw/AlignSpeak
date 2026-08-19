@@ -33,7 +33,7 @@
 
 ## T03 · 分段准备与输入版本
 
-- [ ] 复用现有分段 TTS 缓存并实现整篇输入快照、稳定哈希和逐段重试。
+- [x] 复用现有分段 TTS 缓存并实现整篇输入快照、稳定哈希和逐段重试。
 
 范围：共享 TTS 输入构造、默认音色/1.0、读音覆盖、edge-tts 7.2.8、缓存解析、测试。
 依赖：T02。
@@ -110,3 +110,4 @@
 | T00 | 见对应 Git 提交 | 文档链接、diff 检查 |
 | T01 | 见对应 Git 提交 | 仓储目标测试 6 passed；后端完整测试 22 passed；PostgreSQL DDL 与 Python compileall 通过 |
 | T02 | 见对应 Git 提交 | 生命周期/仓储目标测试 13 passed；PostgreSQL claim SQL 编译；后端完整回归通过 |
+| T03 | 见对应 Git 提交 | 分段准备/单段回归 13 passed；后端完整测试 36 passed；edge-tts 7.2.8 与 pip check 通过 |

@@ -9,7 +9,7 @@ from app.services.tts_service import calculate_text_hash
 class TtsUsecaseTextBuilderTests(unittest.TestCase):
     def test_build_tts_input_text_applies_manual_reading_override(self) -> None:
         with patch(
-            "app.application.usecases.tts_usecase.build_segment_reading_tokens",
+            "app.services.tts_input_service.build_segment_reading_tokens",
             return_value=[
                 ReadingToken(surface="\u79c1"),
                 ReadingToken(surface="\u306f"),
@@ -44,7 +44,7 @@ class TtsUsecaseTextBuilderTests(unittest.TestCase):
 
     def test_build_tts_input_text_fallback_on_tokenization_mismatch(self) -> None:
         with patch(
-            "app.application.usecases.tts_usecase.build_segment_reading_tokens",
+            "app.services.tts_input_service.build_segment_reading_tokens",
             return_value=[
                 ReadingToken(surface="\u6771\u4eac"),
             ],

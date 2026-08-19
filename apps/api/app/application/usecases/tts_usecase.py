@@ -1,6 +1,6 @@
-from pathlib import Path
 import json
 import logging
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import status
@@ -10,10 +10,14 @@ from app.core.errors import AppError
 from app.infrastructure.repositories.tts_repository import TtsRepository
 from app.models import TtsAsset, User, utcnow
 from app.schemas.tts import SegmentTtsResponse, TtsJobCreateResponse, TtsJobStatusResponse
-from app.services.reading_service import build_segment_reading_tokens
+from app.services.tts_asset_service import (
+    SEGMENT_TIMELINE_VERSION,
+    _load_timeline_from_asset,
+    _resolve_media_path_from_audio_url,
+)
+from app.services.tts_input_service import _build_tts_input_text, _resolve_tts_text_hash
 from app.services.tts_service import (
     build_tts_filename,
-    calculate_text_hash,
     create_tts_job_state,
     get_tts_job_state,
     mark_tts_job_done,
@@ -24,53 +28,7 @@ from app.services.tts_service import (
 )
 
 logger = logging.getLogger(__name__)
-TIMELINE_VERSION = "v3"
-
-
-def _normalize_timeline_item(raw: dict) -> dict[str, int | float | str] | None:
-    try:
-        sentence_index = int(raw.get("sentence_index", 0))
-        text = str(raw.get("text") or "").strip()
-        start_ms = float(raw.get("start_ms", 0))
-        end_ms = float(raw.get("end_ms", 0))
-    except (TypeError, ValueError):
-        return None
-
-    if not text:
-        return None
-    if sentence_index < 0:
-        sentence_index = 0
-    if start_ms < 0:
-        start_ms = 0.0
-    if end_ms < start_ms:
-        end_ms = start_ms
-    return {
-        "sentence_index": sentence_index,
-        "text": text,
-        "start_ms": round(start_ms, 3),
-        "end_ms": round(end_ms, 3),
-    }
-
-
-def _load_timeline_from_asset(*, asset: TtsAsset) -> list[dict[str, int | float | str]] | None:
-    if not asset.timeline_json:
-        return None
-    try:
-        payload = json.loads(asset.timeline_json)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(payload, list):
-        return None
-    normalized: list[dict[str, int | float | str]] = []
-    for item in payload:
-        if not isinstance(item, dict):
-            continue
-        normalized_item = _normalize_timeline_item(item)
-        if normalized_item is not None:
-            normalized.append(normalized_item)
-    if not normalized:
-        return None
-    return sorted(normalized, key=lambda item: int(item["sentence_index"]))
+TIMELINE_VERSION = SEGMENT_TIMELINE_VERSION
 
 
 def _load_reading_override_map(
@@ -99,54 +57,6 @@ def _load_token_override_surfaces(
     if not rows:
         return None
     return [str(row.surface or "") for row in rows]
-
-
-def _build_tts_input_text(
-    *,
-    language: str,
-    source_text: str,
-    reading_overrides: dict[int, str],
-    token_surface_overrides: list[str] | None,
-) -> str:
-    if language != "ja":
-        return source_text
-    if not reading_overrides:
-        return source_text
-
-    tokens = build_segment_reading_tokens(
-        text=source_text,
-        language=language,
-        token_surface_overrides=token_surface_overrides,
-    )
-    if not tokens:
-        return source_text
-
-    joined_surface = "".join(token.surface for token in tokens)
-    if joined_surface != source_text:
-        logger.warning(
-            "TTS override skipped due to tokenization mismatch: source_len=%d joined_len=%d",
-            len(source_text),
-            len(joined_surface),
-        )
-        return source_text
-
-    parts: list[str] = []
-    for token_index, token in enumerate(tokens):
-        override_yomi = reading_overrides.get(token_index)
-        if override_yomi:
-            parts.append(override_yomi)
-        else:
-            parts.append(token.surface)
-
-    next_text = "".join(parts)
-    return next_text or source_text
-
-
-def _resolve_tts_text_hash(*, normalized_text: str, plain_text: str, tts_input_text: str) -> str:
-    # Preserve the historical hash key when no pronunciation override is applied.
-    if tts_input_text == plain_text:
-        return calculate_text_hash(normalized_text)
-    return calculate_text_hash(tts_input_text)
 
 
 def create_tts_job(
@@ -410,8 +320,3 @@ def resolve_tts_media_file(filename: str) -> Path:
             status_code=status.HTTP_404_NOT_FOUND,
         )
     return media_path
-
-
-def _resolve_media_path_from_audio_url(audio_url: str) -> Path:
-    filename = Path(audio_url).name
-    return resolve_media_output_path(filename)
