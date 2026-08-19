@@ -1,0 +1,2630 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AlignSpeak · iOS 后台循环 TTS 规划问答</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090a12;
+      --surface: #121420;
+      --surface-2: #191c2c;
+      --surface-3: #22263a;
+      --text: #f1f2fa;
+      --muted: #a0a5bd;
+      --faint: #6e748d;
+      --border: rgba(255, 255, 255, 0.09);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      --accent: #8073ff;
+      --accent-soft: rgba(128, 115, 255, 0.16);
+      --success: #35d39a;
+      --success-soft: rgba(53, 211, 154, 0.12);
+      --warning: #f6b94b;
+      --warning-soft: rgba(246, 185, 75, 0.12);
+      --danger: #ff7272;
+      --radius: 18px;
+      --shadow: 0 22px 80px rgba(0, 0, 0, 0.38);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(128, 115, 255, 0.19), transparent 30rem),
+        radial-gradient(circle at 86% 15%, rgba(53, 211, 154, 0.09), transparent 26rem),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, textarea, input { font: inherit; }
+
+    a { color: #a99fff; }
+
+    .shell {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 56px 0 88px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 28px;
+      align-items: start;
+      padding: 32px;
+      background: linear-gradient(145deg, rgba(25, 28, 44, 0.96), rgba(16, 18, 30, 0.93));
+      border: 1px solid var(--border-strong);
+      border-radius: 26px;
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(128, 115, 255, 0.32);
+      background: var(--accent-soft);
+      color: #b8b1ff;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .badge.live {
+      border-color: rgba(53, 211, 154, 0.28);
+      background: var(--success-soft);
+      color: var(--success);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(29px, 5vw, 48px);
+      line-height: 1.12;
+      letter-spacing: -0.035em;
+    }
+
+    .lead {
+      max-width: 720px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .round-orbit {
+      width: 112px;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(128, 115, 255, 0.35);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle, rgba(128, 115, 255, 0.27), rgba(128, 115, 255, 0.06) 53%, transparent 54%),
+        var(--surface);
+      color: #c2bcff;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.35;
+      box-shadow: 0 0 42px rgba(128, 115, 255, 0.13);
+    }
+
+    .round-orbit strong {
+      display: block;
+      color: white;
+      font-size: 30px;
+      line-height: 1;
+    }
+
+    .notice, .facts, .round, .locked {
+      margin-top: 20px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: rgba(18, 20, 32, 0.88);
+    }
+
+    .notice {
+      padding: 18px 20px;
+      border-color: rgba(246, 185, 75, 0.25);
+      background: var(--warning-soft);
+      color: #e9d3a5;
+    }
+
+    .notice strong { color: var(--warning); }
+
+    .facts { padding: 24px; }
+
+    .section-title {
+      margin: 0 0 4px;
+      font-size: 18px;
+      letter-spacing: -0.015em;
+    }
+
+    .section-subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .fact-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .fact {
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+
+    .fact b {
+      display: block;
+      margin-bottom: 5px;
+      color: #d9dbeb;
+      font-size: 13px;
+    }
+
+    .fact p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .round { overflow: hidden; }
+
+    .round-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: center;
+      padding: 22px 24px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, var(--accent-soft), transparent 72%);
+    }
+
+    .round-header h2 {
+      margin: 0;
+      font-size: 21px;
+    }
+
+    .round-header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .counter {
+      flex: 0 0 auto;
+      color: #bab4f7;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .questions { padding: 6px 24px 24px; }
+
+    .question {
+      padding: 26px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .question:last-child { border-bottom: 0; }
+
+    .question h3 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.45;
+    }
+
+    .question-copy {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .options {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .option {
+      display: grid;
+      grid-template-columns: 20px 1fr;
+      gap: 11px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      background: var(--surface-2);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    }
+
+    .option:hover {
+      transform: translateY(-1px);
+      border-color: rgba(128, 115, 255, 0.4);
+      background: #1d2032;
+    }
+
+    .option:has(input:checked) {
+      border-color: rgba(128, 115, 255, 0.7);
+      background: var(--accent-soft);
+      box-shadow: inset 0 0 0 1px rgba(128, 115, 255, 0.15);
+    }
+
+    input[type="radio"] {
+      width: 18px;
+      height: 18px;
+      margin: 3px 0 0;
+      accent-color: var(--accent);
+    }
+
+    .option-title {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      color: #e5e6f0;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .recommended {
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--success-soft);
+      color: var(--success);
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .option-desc {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 400;
+    }
+
+    .recommendation {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-left: 3px solid var(--success);
+      border-radius: 0 10px 10px 0;
+      background: var(--success-soft);
+      color: #bae8d8;
+      font-size: 13px;
+    }
+
+    .clarification {
+      margin-top: 10px;
+      padding: 13px 14px;
+      border: 1px solid rgba(246, 185, 75, 0.26);
+      border-radius: 11px;
+      background: var(--warning-soft);
+      color: #e9d3a5;
+      font-size: 13px;
+    }
+
+    .clarification strong { color: var(--warning); }
+
+    .detail-label {
+      display: block;
+      margin-top: 14px;
+      color: var(--faint);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 72px;
+      resize: vertical;
+      margin-top: 7px;
+      padding: 12px 13px;
+      border: 1px solid var(--border-strong);
+      border-radius: 11px;
+      outline: none;
+      background: #10121d;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(128, 115, 255, 0.12);
+    }
+
+    .actions {
+      position: sticky;
+      bottom: 12px;
+      z-index: 5;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 18px;
+      padding: 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      background: rgba(18, 20, 32, 0.92);
+      box-shadow: 0 14px 42px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(16px);
+    }
+
+    .button {
+      appearance: none;
+      min-height: 42px;
+      padding: 10px 16px;
+      border: 1px solid transparent;
+      border-radius: 11px;
+      cursor: pointer;
+      color: white;
+      background: var(--accent);
+      font-weight: 700;
+      font-size: 13px;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .button:hover { transform: translateY(-1px); }
+
+    .button.secondary {
+      border-color: var(--border-strong);
+      background: var(--surface-3);
+      color: var(--muted);
+    }
+
+    .save-state {
+      margin-left: auto;
+      color: var(--faint);
+      font-size: 12px;
+    }
+
+    .save-state.ok { color: var(--success); }
+
+    .answer-summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 20px 24px 0;
+    }
+
+    .answer-chip {
+      padding: 12px 13px;
+      border: 1px solid rgba(53, 211, 154, 0.22);
+      border-radius: 12px;
+      background: var(--success-soft);
+      color: #c2e9dc;
+      font-size: 12px;
+    }
+
+    .answer-chip strong {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--success);
+      font-size: 11px;
+    }
+
+    .answer-chip.conflicted {
+      border-color: rgba(246, 185, 75, 0.3);
+      background: var(--warning-soft);
+      color: #e9d3a5;
+    }
+
+    .answer-chip.conflicted strong { color: var(--warning); }
+
+    .conflict-banner {
+      margin: 20px 24px 0;
+      padding: 16px;
+      border: 1px solid rgba(255, 114, 114, 0.3);
+      border-radius: 13px;
+      background: rgba(255, 114, 114, 0.08);
+      color: #f1bcbc;
+      font-size: 13px;
+    }
+
+    .conflict-banner strong { color: #ff9090; }
+
+    .actions.archived-actions {
+      position: static;
+      background: rgba(18, 20, 32, 0.64);
+      box-shadow: none;
+    }
+
+    .button:disabled {
+      cursor: default;
+      opacity: 0.55;
+      transform: none;
+    }
+
+    .plan-body { padding: 24px; }
+
+    .plan-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .plan-block {
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface-2);
+    }
+
+    .plan-block.wide { grid-column: 1 / -1; }
+
+    .plan-block h3 {
+      margin: 0 0 9px;
+      color: #e7e8f2;
+      font-size: 15px;
+    }
+
+    .plan-block p,
+    .plan-block li {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .plan-block p { margin: 0; }
+
+    .plan-block ul,
+    .plan-block ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .plan-block li + li { margin-top: 5px; }
+
+    .plan-code {
+      display: block;
+      margin-top: 9px;
+      padding: 11px 12px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: #0d0f18;
+      color: #c7c3ff;
+      font: 11px/1.6 "SFMono-Regular", Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    .milestones {
+      display: grid;
+      gap: 9px;
+      counter-reset: milestone;
+    }
+
+    .milestone {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      align-items: start;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .milestone::before {
+      counter-increment: milestone;
+      content: counter(milestone);
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: #bbb5ff;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .locked {
+      padding: 23px 24px;
+      border-style: dashed;
+      color: var(--muted);
+    }
+
+    .locked strong { color: #d4d6e2; }
+
+    .sources {
+      margin-top: 20px;
+      padding: 0 4px;
+      color: var(--faint);
+      font-size: 12px;
+    }
+
+    .sources summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .sources ul { padding-left: 20px; }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 20;
+      padding: 12px 15px;
+      border: 1px solid rgba(53, 211, 154, 0.35);
+      border-radius: 11px;
+      background: #17352e;
+      color: #c9f5e6;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: 0.18s ease;
+      box-shadow: var(--shadow);
+      font-size: 13px;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 700px) {
+      .shell { width: min(100% - 20px, 960px); padding-top: 18px; }
+      .hero { grid-template-columns: 1fr; padding: 24px; }
+      .round-orbit { display: none; }
+      .fact-grid { grid-template-columns: 1fr; }
+      .questions { padding-left: 18px; padding-right: 18px; }
+      .round-header { padding-left: 18px; padding-right: 18px; }
+      .answer-summary { grid-template-columns: 1fr; margin-left: 18px; margin-right: 18px; }
+      .conflict-banner { margin-left: 18px; margin-right: 18px; }
+      .plan-body { padding: 18px; }
+      .plan-grid { grid-template-columns: 1fr; }
+      .plan-block.wide { grid-column: auto; }
+      .save-state { width: 100%; margin-left: 0; }
+      .actions { bottom: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <div class="eyebrow">
+          <span class="badge live">规划已确认</span>
+          <span class="badge">固定文件 · 仅显示当前轮</span>
+          <span class="badge">最后更新：2026-08-20</span>
+        </div>
+        <h1>iOS 后台循环播放 TTS</h1>
+        <p class="lead">
+          经过 7 轮、29 项决策，产品边界、媒体架构、异常路径、实施阶段与验收标准已经达成共同理解。
+          本文件现作为后续任务拆分、开发与验收的冻结基线。
+        </p>
+      </div>
+      <div class="round-orbit"><span><strong>✓</strong>已冻结</span></div>
+    </header>
+
+    <aside class="notice">
+      <strong>实施基线：</strong>方案已于 2026-08-20 确认冻结。后续如需改变平台承诺、播放范围或媒体架构，应显式重新打开对应决策，而不是在实现中静默偏离。
+    </aside>
+
+    <section class="facts" aria-labelledby="facts-title">
+      <h2 class="section-title" id="facts-title">已核实，不再反问你的事实</h2>
+      <p class="section-subtitle">这些是代码和 iOS 平台给出的约束，不属于产品偏好。</p>
+      <div class="fact-grid">
+        <article class="fact">
+          <b>现状是段落级 Web 播放</b>
+          <p>当前只用一个 HTMLAudioElement 播放当前段落的 Blob URL；无下一段、文章队列或循环。</p>
+        </article>
+        <article class="fact">
+          <b>页面离开即停止</b>
+          <p>播放器属于练习页 Hook；切段会停止，页面卸载会撤销 Blob URL，没有应用级播放生命周期。</p>
+        </article>
+        <article class="fact">
+          <b>没有 PWA 或 iOS 原生壳</b>
+          <p>仓库目前仅有 Vite/React Web 与 FastAPI，未配置 Manifest、Service Worker、Capacitor 或 Xcode 工程。</p>
+        </article>
+        <article class="fact">
+          <b>Safari 不能承诺可靠后台队列</b>
+          <p>单个已开始媒体可能锁屏续播，但后台 JS、换段回调、网络续取与锁屏控制不能作为可靠产品能力。</p>
+        </article>
+        <article class="fact">
+          <b>后端只有按段 TTS</b>
+          <p>已有 MP3 缓存键为段落 + 音色 + 语速 + 文本哈希；没有文章级播放清单、合并音频或持久任务队列。</p>
+        </article>
+        <article class="fact">
+          <b>现有媒体依赖 Bearer 下载</b>
+          <p>前端先鉴权下载完整 Blob 再播放；这不适合作为长时后台、进程重启或永久离线的主方案。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="round" aria-labelledby="round-1-title" hidden>
+      <div class="round-header">
+        <div>
+          <h2 id="round-1-title">第 1 轮 · 答案已记录</h2>
+          <p>5 项原始回答已写入本文件；其中 Q1 与 Q2 尚未形成一致的可验收决策。</p>
+        </div>
+        <div class="counter"><span id="answered-count">0</span> / 5 已回答</div>
+      </div>
+
+      <div class="answer-summary" aria-label="第 1 轮答案摘要">
+        <div class="answer-chip"><strong>Q1 · C</strong>只支持 Safari/PWA，接受部分 iOS 情况下中断</div>
+        <div class="answer-chip conflicted"><strong>Q2 · A · 待裁决</strong>切 App、锁屏、熄屏均持续，并有基本系统控制</div>
+        <div class="answer-chip"><strong>Q3 · A</strong>整篇顺序循环，段间与轮次间保留自然停顿</div>
+        <div class="answer-chip"><strong>Q4 · A</strong>前 2 段就绪即播，其余后台预取</div>
+        <div class="answer-chip"><strong>Q5 · A</strong>本次已准备文章不中断，不承诺重开后离线</div>
+      </div>
+
+      <form class="questions" id="round-1-form">
+        <article class="question" data-question="Q1">
+          <h3>❓ Q1 - 可靠性承诺与 iOS 交付形态</h3>
+          <p class="question-copy">
+            “锁屏或切到其他 App 后仍持续循环”是否是必须可靠兑现的核心能力？如果是，是否接受安装 iOS App
+            （先用 TestFlight，后续可上架），而不是要求用户只访问 Safari 网页？
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q1" value="A｜接受 Capacitor iOS 壳 + Swift 原生音频插件，可靠后台是硬指标" />
+              <span>
+                <span class="option-title">A · 原生音频层是正式方案 <span class="recommended">推荐</span></span>
+                <span class="option-desc">保留现有 React UI；用 Capacitor + Swift 播放器保证后台、锁屏、队列与系统控制。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q1" value="B｜两阶段：先做 Safari/PWA 尽力而为，再补原生可靠版本" />
+              <span>
+                <span class="option-title">B · Web MVP → 原生增强</span>
+                <span class="option-desc">第一阶段体验与 C 接近，但已承诺第二阶段迁移原生播放器，最终达到可靠后台。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q1" value="C｜只支持 Safari/PWA，接受后台播放在部分 iOS 情况下中断" checked />
+              <span>
+                <span class="option-title">C · 只做 Web / PWA</span>
+                <span class="option-desc">最终方案就停在 Web/PWA；不引入 App 分发，也永久不承诺长时锁屏队列可靠。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：需求把“iOS 后台循环”作为功能本体时，应让原生播放器承担承诺，React 继续承担界面与业务。</div>
+          <div class="clarification">
+            <strong>澄清记录 · B 与 C：</strong>B 是“分两期实现 A”——先用 Web 验证，后续原生化，接受一次播放器迁移；
+            C 是“永久只做第一期”——成本最低，但产品定义必须接受后台可能中断。换句话说，B 的近期能力≈C，长期目标=A。
+          </div>
+          <label class="detail-label" for="q1-note">补充说明（可选）</label>
+          <textarea id="q1-note" name="q1-note" placeholder="例如：首版只通过 TestFlight 给内部用户；暂不考虑 App Store…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q2">
+          <h3>❓ Q2 - 后台播放的验收边界</h3>
+          <p class="question-copy">
+            首版必须通过哪一级真实场景？这里决定我们是否需要系统音频会话、锁屏元数据和远程控制，而不只是让音频偶尔继续响。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q2" value="A｜切 App、锁屏、熄屏均持续；锁屏/控制中心至少可播放暂停" checked />
+              <span>
+                <span class="option-title">A · 完整后台基线 <span class="recommended">推荐</span></span>
+                <span class="option-desc">切换 App、锁屏、屏幕熄灭都持续；锁屏与控制中心至少支持播放/暂停并显示文章。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q2" value="B｜切 App、锁屏、熄屏均持续，但首版不要求锁屏控制" />
+              <span>
+                <span class="option-title">B · 只保证持续发声</span>
+                <span class="option-desc">后台可靠，但首版不做锁屏/控制中心交互；用户回到 App 控制。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q2" value="C｜只保证 Safari 页面仍存活时尽量续播，不覆盖全部后台场景" />
+              <span>
+                <span class="option-title">C · 最小后台范围</span>
+                <span class="option-desc">只验证网页仍在时的续播，不把系统级后台与锁屏控制纳入验收。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：用户对“iOS 后台播放”的自然预期就是锁屏、熄屏、切 App 都不中断，并能从系统界面暂停。</div>
+          <label class="detail-label" for="q2-note">补充说明（可选）</label>
+          <textarea id="q2-note" name="q2-note" placeholder="例如：必须支持蓝牙耳机播放/暂停；上一段和下一段可以放到下一期…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q3">
+          <h3>❓ Q3 - 一次循环的范围与边界停顿</h3>
+          <p class="question-copy">
+            “文章循环”按什么单位验收？现有文章由多个段落组成；段落间和文章末尾回到开头的停顿标准会决定是播放队列还是整篇单媒体。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q3" value="A｜整篇全部段落按顺序循环；段间 0.5–1 秒，轮次间 1–2 秒自然停顿" checked />
+              <span>
+                <span class="option-title">A · 整篇循环 + 自然停顿 <span class="recommended">推荐</span></span>
+                <span class="option-desc">适合语言学习；段落顺序固定，段间短停顿，全文结束后稍停再从第一段开始。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q3" value="B｜整篇全部段落近似无缝连续，文章末尾立即回到开头" />
+              <span>
+                <span class="option-title">B · 整篇近似无缝循环</span>
+                <span class="option-desc">边界不可有明显空白，更偏向预生成整篇单媒体；生成与缓存成本更高。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q3" value="C｜只循环当前段落，不在首版自动串联整篇" />
+              <span>
+                <span class="option-title">C · 当前段落循环</span>
+                <span class="option-desc">范围最小、上线最快，但与“整篇文章循环”的通常理解不同。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：明确而自然的学习节奏比技术上的零间隙更有价值，也能继续复用现有段落级 TTS 缓存。</div>
+          <label class="detail-label" for="q3-note">补充说明（可选）</label>
+          <textarea id="q3-note" name="q3-note" placeholder="例如：默认全部段落，但用户以后可以选择 3–8 段；轮次间固定停 2 秒…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q4">
+          <h3>❓ Q4 - 首次播放等待与后台准备策略</h3>
+          <p class="question-copy">
+            一篇冷缓存文章可能要生成多个段落。用户第一次点击时，是尽快听到第一段，还是必须等整篇准备完成才允许进入可靠后台循环？
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q4" value="A｜前 2 段就绪即播，其余后台预取；进入后台前需有足够缓冲" checked />
+              <span>
+                <span class="option-title">A · 渐进缓冲后开播 <span class="recommended">推荐</span></span>
+                <span class="option-desc">兼顾首声速度与后台稳定；展示准备进度，缓存不够时明确阻止立即锁屏。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q4" value="B｜整篇全部准备并下载后才播放，以稳定优先" />
+              <span>
+                <span class="option-title">B · 全文就绪再开播</span>
+                <span class="option-desc">最容易保证断网与后台循环，但冷启动等待最长。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q4" value="C｜第一段就绪立即播放，后续按需生成；允许缓冲中断" />
+              <span>
+                <span class="option-title">C · 最快首声、允许中断</span>
+                <span class="option-desc">点击反馈最快，但网络或 TTS 较慢时会在段落边界停住，不适合强后台承诺。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：先准备一个小缓冲窗口再播放，同时继续下载整篇；既不让用户等完整文章，也避免马上遇到空队列。</div>
+          <label class="detail-label" for="q4-note">可接受等待上限（请尽量填写）</label>
+          <textarea id="q4-note" name="q4-note" placeholder="例如：冷缓存首次听到声音不超过 10 秒；缓存命中不超过 2 秒…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q5">
+          <h3>❓ Q5 - 断网、登录过期与离线边界</h3>
+          <p class="question-copy">
+            音频已经开始后，如果网络断开或登录 Token 过期，播放必须达到哪一级？是否还要在关闭并重开 App 后继续离线使用？
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q5" value="A｜本次已准备文章不中断；App 被杀/重开后不保证离线，除非以后显式下载" checked />
+              <span>
+                <span class="option-title">A · 本次会话离线可靠 <span class="recommended">推荐</span></span>
+                <span class="option-desc">开播后即使断网或 Token 过期也继续；临时缓存可清理，永久下载另立后续功能。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q5" value="B｜准备过的文章永久离线可播，App 重启后仍保留" />
+              <span>
+                <span class="option-title">B · 永久离线播放</span>
+                <span class="option-desc">需要下载管理、容量上限、版本失效与清理 UI，首版范围显著扩大。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q5" value="C｜只保证在线播放；断网或 Token 过期可以停止并提示" />
+              <span>
+                <span class="option-title">C · 在线流式即可</span>
+                <span class="option-desc">实现最简单，但长时间后台循环很容易被网络和登录生命周期打断。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：把本次播放需要的媒体写入临时本地缓存，保证会话连续；不要在首版同时承担完整离线下载产品。</div>
+          <label class="detail-label" for="q5-note">补充说明（可选）</label>
+          <textarea id="q5-note" name="q5-note" placeholder="例如：用户主动停止后缓存保留 24 小时；蜂窝网络下也允许准备整篇…"></textarea>
+        </article>
+      </form>
+    </section>
+
+    <div class="actions archived-actions" hidden>
+      <button class="button secondary" type="button" id="copy-button">复制第 1 轮答案</button>
+      <button class="button secondary" type="button" id="clear-button" disabled>第 1 轮已记录</button>
+      <span class="save-state" id="save-state">原始答案保留在上方</span>
+    </div>
+
+    <section class="round" aria-labelledby="round-2-title" hidden>
+      <div class="round-header">
+        <div>
+          <h2 id="round-2-title">第 2 轮 · 只裁决一个冲突</h2>
+          <p>这个前提没有解决前，所有依赖后台可靠性的下一层问题都保持锁定。</p>
+        </div>
+        <div class="counter"><span id="round-2-answered-count">0</span> / 1 已回答</div>
+      </div>
+
+      <div class="conflict-banner">
+        <strong>不可同时成立：</strong>Q1-C 允许 Safari/PWA 在部分 iOS 情况下中断；Q2-A 却要求切 App、锁屏、熄屏全部持续。
+        纯 Web 可以把 Q2-A 当作努力优化和测试目标，但不能把它写成稳定保证。
+      </div>
+
+      <form class="questions" id="round-2-form">
+        <article class="question" data-question="Q6">
+          <h3>❓ Q6 - 哪一项才是不可让步的硬约束？</h3>
+          <p class="question-copy">
+            请明确“无需安装 App”和“所有后台场景可靠”谁优先。这里没有第四个既 Web-only 又保证可靠后台的真实选项。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q6" value="A｜保持 Q1-C；将 Q2-A 改为尽力而为的优化目标，不作为稳定性硬验收" checked />
+              <span>
+                <span class="option-title">A · Web-only 优先 <span class="recommended">基于 Q1-C 推荐</span></span>
+                <span class="option-desc">仍覆盖切 App、锁屏、熄屏和基本系统控制测试，但允许部分 iOS 版本或系统状态下中断。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q6" value="B｜保持 Q2-A；将 Q1 改为原生 iOS 音频层，后台可靠性作为硬验收" />
+              <span>
+                <span class="option-title">B · 后台可靠性优先</span>
+                <span class="option-desc">接受 Capacitor/原生音频插件和 App 安装分发，以系统级能力兑现 Q2-A。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q6" value="C｜将 Q1 改为两阶段；Web 首版尽力而为，第二阶段原生化后再把 Q2-A 设为硬验收" />
+              <span>
+                <span class="option-title">C · 分阶段承诺</span>
+                <span class="option-desc">近期接受 Web 限制，保留明确的原生迁移阶段；最终达到可靠后台。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">
+            ➡️ 基于你明确选择 Q1-C，我当前推荐 A：保留 Web-only 这个硬约束，并把 Q2-A 改写成兼容性目标；如果 Q2-A 绝对不能降级，就必须选 B。
+          </div>
+          <label class="detail-label" for="q6-note">补充说明（可选）</label>
+          <textarea id="q6-note" name="q6-note" placeholder="例如：不安装 App 是硬约束；允许极少数系统版本中断，但主流 iPhone 必须实测通过…"></textarea>
+        </article>
+      </form>
+    </section>
+
+    <div class="actions" hidden>
+      <button class="button" type="button" id="copy-round-2-button">复制第 2 轮答案</button>
+      <button class="button secondary" type="button" id="clear-round-2-button">清空第 2 轮</button>
+      <span class="save-state" id="round-2-save-state">答案会自动保存在本浏览器</span>
+    </div>
+
+    <section class="round" aria-labelledby="round-3-title" hidden>
+      <div class="round-header">
+        <div>
+          <h2 id="round-3-title">第 3 轮 · 播放体验边界</h2>
+          <p>Web-only 与“后台尽力而为”已经确定；以下 8 项决策现在都已解锁。</p>
+        </div>
+        <div class="counter"><span id="round-3-answered-count">0</span> / 8 已回答</div>
+      </div>
+
+      <form class="questions" id="round-3-form">
+        <article class="question" data-question="Q7">
+          <h3>❓ Q7 - 首版支持哪种 iOS 打开方式？</h3>
+          <p class="question-copy">
+            普通 Safari 与“添加到主屏幕”的 PWA 生命周期不同，但 PWA 也不会获得原生后台音频资格。首版哪个才是主要验收入口？
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q7" value="A｜普通 Safari 是主入口；主屏幕 PWA 做兼容性验证但不单独承诺" checked />
+              <span>
+                <span class="option-title">A · Safari 主入口 <span class="recommended">推荐</span></span>
+                <span class="option-desc">完全不要求安装；PWA 可用则作为增强，但不扩大同等 QA 承诺。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q7" value="B｜必须添加到主屏幕后使用；普通 Safari 不作为正式后台播放入口" />
+              <span>
+                <span class="option-title">B · PWA 是正式入口</span>
+                <span class="option-desc">体验更像 App，但增加安装引导，仍不能解决可靠后台限制。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q7" value="C｜Safari 与主屏幕 PWA 同等支持、同等测试" />
+              <span>
+                <span class="option-title">C · 两种入口同等支持</span>
+                <span class="option-desc">覆盖面最广，但设备、系统版本和运行形态的测试组合明显增加。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：既然 Web-only 是为了免安装，普通 Safari 应是产品主入口；PWA 只做渐进增强。</div>
+          <label class="detail-label" for="q7-note">补充说明（可选）</label>
+          <textarea id="q7-note" name="q7-note" placeholder="例如：可以引导添加到主屏幕，但不能强制…">chrome是否可以</textarea>
+        </article>
+
+        <article class="question" data-question="Q8">
+          <h3>❓ Q8 - 全文未准备完时，何时允许用户锁屏？</h3>
+          <p class="question-copy">
+            你已选择“前 2 段就绪即播”。在 Web 后台里，边播边准备后续段落风险更高，因此需要明确前台试听与后台循环的分界。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q8" value="A｜前 2 段就绪可前台播放；全文准备完成后才显示“可锁屏循环”" />
+              <span>
+                <span class="option-title">A · 前台早播，后台就绪门槛 <span class="recommended">推荐</span></span>
+                <span class="option-desc">保留快速首声，同时明确提示“后台循环准备中”；全文到齐后再进入最佳后台状态。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q8" value="B｜整篇准备完成前不允许播放，以后台连续性优先" checked />
+              <span>
+                <span class="option-title">B · 全文就绪再播放</span>
+                <span class="option-desc">最稳妥，但推翻第 1 轮的渐进播放选择，冷缓存等待更久。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q8" value="C｜前 2 段就绪即可锁屏；后续中断或缓冲也可接受" />
+              <span>
+                <span class="option-title">C · 立即允许后台</span>
+                <span class="option-desc">限制最少，但最容易在换段、网络请求或 JS 冻结时中断。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：把“能开始听”和“适合锁屏”拆成两个清晰状态，兼顾 Q4 的速度与 Web 后台的现实限制。</div>
+          <label class="detail-label" for="q8-note">补充说明（可选）</label>
+          <textarea id="q8-note" name="q8-note" placeholder="例如：准备完成后震动或 Toast 提示；未完成时仍允许用户自行锁屏…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q9">
+          <h3>❓ Q9 - 播放入口与站内导航生命周期</h3>
+          <p class="question-copy">
+            文章循环从哪里启动？用户在 AlignSpeak 内切换页面时，播放器是否应该继续存在？
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q9" value="A｜练习页和文章列表都可启动；显示全局迷你播放器，站内切页继续播放" checked />
+              <span>
+                <span class="option-title">A · 全局文章播放器 <span class="recommended">推荐</span></span>
+                <span class="option-desc">播放生命周期提升到应用级，练习页与文章列表共享控制，站内导航不打断。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q9" value="B｜只在练习页启动和控制；离开练习页立即停止" />
+              <span>
+                <span class="option-title">B · 仅练习页播放</span>
+                <span class="option-desc">范围最小，接近现有架构，但“后台听文章”容易被普通站内操作意外终止。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q9" value="C｜只在文章列表提供一键播放；练习页保留当前单段朗读" />
+              <span>
+                <span class="option-title">C · 列表快捷播放</span>
+                <span class="option-desc">区分“整篇听”和“单段练”，但播放器入口较割裂。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：后台播放器不应隶属于某一个页面；全局迷你播放器也能清楚告诉用户当前仍在播放。</div>
+          <label class="detail-label" for="q9-note">补充说明（可选）</label>
+          <textarea id="q9-note" name="q9-note" placeholder="例如：从“我的文章”卡片长按启动；进入录音页时自动暂停…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q10">
+          <h3>❓ Q10 - 首版播放器控制范围</h3>
+          <p class="question-copy">
+            首版需要哪些可见控制？当前后端已支持 0.8–1.2 倍速缓存，但前端固定 1.0；音色尚未暴露给用户。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q10" value="A｜播放暂停、上一段下一段、进度、0.8/1.0/1.2 倍速；沿用默认音色" />
+              <span>
+                <span class="option-title">A · 实用控制集 <span class="recommended">推荐</span></span>
+                <span class="option-desc">覆盖语言学习最常用操作；暂不引入音色选择和任意倍速。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q10" value="B｜只做播放暂停和循环状态；固定 1.0 倍速、默认音色" checked />
+              <span>
+                <span class="option-title">B · 极简控制</span>
+                <span class="option-desc">最快上线，但缺少段落导航和学习者常用的慢速播放。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q10" value="C｜增加任意倍速、音色选择、拖动进度和段落范围选择" />
+              <span>
+                <span class="option-title">C · 完整高级控制</span>
+                <span class="option-desc">体验最强，但会扩大 TTS 缓存组合、准备状态和交互复杂度。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：保留默认音色以控制缓存组合，把有限范围的倍速和段落导航放进首版。</div>
+          <label class="detail-label" for="q10-note">补充说明（可选）</label>
+          <textarea id="q10-note" name="q10-note" placeholder="例如：还需要 0.9 倍速；上一段/下一段只在页面内显示…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q11">
+          <h3>❓ Q11 - 循环如何结束？</h3>
+          <p class="question-copy">
+            除了用户手动停止，首版是否需要睡眠定时或固定重复次数？
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q11" value="A｜默认无限循环，并提供本轮结束/15/30/60 分钟睡眠停止" checked />
+              <span>
+                <span class="option-title">A · 无限循环 + 睡眠停止 <span class="recommended">推荐</span></span>
+                <span class="option-desc">默认行为符合需求，同时避免用户睡着后整夜播放。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q11" value="B｜只能无限循环，直到用户手动停止" />
+              <span>
+                <span class="option-title">B · 只做无限循环</span>
+                <span class="option-desc">最简单，但没有自动停止保障。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q11" value="C｜支持重复 1/3/5/无限次，并同时提供睡眠定时" />
+              <span>
+                <span class="option-title">C · 次数与定时都支持</span>
+                <span class="option-desc">适合训练计划，但增加设置项与剩余次数状态。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：无限循环是主模式，睡眠停止是低成本且高价值的安全出口。</div>
+          <label class="detail-label" for="q11-note">补充说明（可选）</label>
+          <textarea id="q11-note" name="q11-note" placeholder="例如：只要 30 分钟；定时结束时淡出 3 秒…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q12">
+          <h3>❓ Q12 - Safari 被刷新或关闭后，是否恢复播放位置？</h3>
+          <p class="question-copy">
+            第 1 轮只排除了“重开后必须离线播放”，并没有决定联网重开后是否记住上次文章、段落和进度。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q12" value="A｜只在当前标签页会话内保留；刷新或重开后从文章开头开始" />
+              <span>
+                <span class="option-title">A · 仅会话内保持</span>
+                <span class="option-desc">规则最简单，但 Safari 回收页面后用户会丢失位置。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q12" value="B｜本机记录上次文章和位置；联网重开后由用户点击恢复，保留 24 小时" checked />
+              <span>
+                <span class="option-title">B · 本机短期恢复 <span class="recommended">推荐</span></span>
+                <span class="option-desc">不承诺离线或自动播放，只记住状态并在用户手势后恢复，能应对 Safari 页面回收。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q12" value="C｜服务端同步位置，跨设备登录后也能恢复" />
+              <span>
+                <span class="option-title">C · 跨设备恢复</span>
+                <span class="option-desc">需要后端播放会话模型和同步策略，明显超出首版本地播放器范围。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 B：用本地短期状态抵御 Safari 页面回收；重开后仍要求用户点击，符合 iOS 自动播放限制。</div>
+          <label class="detail-label" for="q12-note">补充说明（可选）</label>
+          <textarea id="q12-note" name="q12-note" placeholder="例如：永不过期；只记住段落不记住秒数…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q13">
+          <h3>❓ Q13 - 来电、Siri、闹钟或耳机断开后怎么处理？</h3>
+          <p class="question-copy">
+            Web 无法像原生播放器一样稳定控制所有音频中断；自动恢复还可能被 Safari 的用户手势策略阻止。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q13" value="A｜中断后保持暂停并提示，必须由用户手动继续" checked />
+              <span>
+                <span class="option-title">A · 手动恢复 <span class="recommended">推荐</span></span>
+                <span class="option-desc">行为可预测，也避免来电结束后突然外放。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q13" value="B｜尽力自动恢复；失败时再提示用户" />
+              <span>
+                <span class="option-title">B · 尝试自动恢复</span>
+                <span class="option-desc">更连续，但受系统和自动播放策略影响，且可能在不合适的场景突然发声。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q13" value="C｜任何中断都停止并重置到文章开头" />
+              <span>
+                <span class="option-title">C · 中断即重置</span>
+                <span class="option-desc">状态最干净，但用户需要重新寻找进度。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：中断后保持暂停是最安全、最符合 Web 能力边界的默认行为。</div>
+          <label class="detail-label" for="q13-note">补充说明（可选）</label>
+          <textarea id="q13-note" name="q13-note" placeholder="例如：耳机断开必须暂停；蓝牙重新连接后仍不自动播放…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q14">
+          <h3>❓ Q14 - iOS/Safari 版本支持范围</h3>
+          <p class="question-copy">
+            WebKit 的后台媒体行为仍在随版本修复。首版需要一个明确测试边界，避免把所有历史 iPhone 都视为同等支持。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q14" value="A｜正式测试当前稳定版和前一个 iOS 大版本；更旧版本只做尽力兼容" />
+              <span>
+                <span class="option-title">A · 最近两个大版本 <span class="recommended">推荐</span></span>
+                <span class="option-desc">覆盖主流活跃设备，同时把不断变化的后台媒体行为纳入可维护测试矩阵。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q14" value="B｜只正式支持当前最新稳定 iOS/Safari" checked />
+              <span>
+                <span class="option-title">B · 仅最新稳定版</span>
+                <span class="option-desc">QA 成本最低，但会排除仍在使用上一代系统的用户。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q14" value="C｜支持最近三个及以上 iOS 大版本并全部实机验收" />
+              <span>
+                <span class="option-title">C · 扩大历史版本覆盖</span>
+                <span class="option-desc">兼容面更广，但测试设备、回归成本和版本差异风险最高。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：最近两个大版本是较合理的兼容性与维护成本平衡；更旧系统明确标为尽力兼容。</div>
+          <label class="detail-label" for="q14-note">补充说明（可选）</label>
+          <textarea id="q14-note" name="q14-note" placeholder="例如：现有用户主要使用某个 iOS 版本或特定设备…"></textarea>
+        </article>
+      </form>
+    </section>
+
+    <div class="actions" hidden>
+      <button class="button" type="button" id="copy-round-3-button">复制第 3 轮答案</button>
+      <button class="button secondary" type="button" id="clear-round-3-button">清空第 3 轮</button>
+      <span class="save-state" id="round-3-save-state">答案会自动保存在本浏览器</span>
+    </div>
+
+    <section class="round" aria-labelledby="round-4-title" hidden>
+      <div class="round-header">
+        <div>
+          <h2 id="round-4-title">第 4 轮 · 兼容性与异常路径</h2>
+          <p>Safari 是正式支持入口，整篇准备后播放；本轮确定兼容浏览器、失败处理和状态恢复细节。</p>
+        </div>
+        <div class="counter"><span id="round-4-answered-count">0</span> / 7 已回答</div>
+      </div>
+
+      <form class="questions" id="round-4-form">
+        <article class="question" data-question="Q15">
+          <h3>❓ Q15 - iOS Chrome 纳入哪一级支持？</h3>
+          <p class="question-copy">
+            可以使用。当前正式版 Chrome iOS 仍基于 WebKit，基础媒体行为与 Safari 接近；但 Chrome 宿主与 iOS 系统的后台、锁屏集成没有“完全等价于 Safari”的官方保证。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q15" value="A｜Safari 正式支持；Chrome iOS 做核心真机兼容性验证，通过后标记兼容但不共享 Safari SLA" checked />
+              <span>
+                <span class="option-title">A · Chrome 兼容性验证 <span class="recommended">推荐</span></span>
+                <span class="option-desc">验证播放、锁屏、控制中心与循环；可用但不扩大正式支持承诺。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q15" value="B｜Safari 与 Chrome iOS 同等正式支持、同等回归和问题响应" />
+              <span>
+                <span class="option-title">B · Chrome 同等正式支持</span>
+                <span class="option-desc">用户覆盖更广，但需要独立设备回归并承担浏览器宿主差异。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q15" value="C｜首版明确只支持 Safari，Chrome iOS 不测试也不承诺可用" />
+              <span>
+                <span class="option-title">C · Chrome 不在范围内</span>
+                <span class="option-desc">范围最小，但同为 WebKit 的可兼容用户也会被排除。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：Chrome iOS 大概率可用，做核心真机验证即可；不要仅凭同为 WebKit 就承诺与 Safari 完全等价。</div>
+          <label class="detail-label" for="q15-note">补充说明（可选）</label>
+          <textarea id="q15-note" name="q15-note" placeholder="例如：Chrome 用户很多，希望列入正式支持…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q16">
+          <h3>❓ Q16 - 某个段落 TTS 准备失败怎么办？</h3>
+          <p class="question-copy">
+            你选择了“整篇准备完成前不允许播放”。如果一个段落生成失败，是否允许跳过它并破坏全文完整性？
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q16" value="A｜阻止整篇播放，列出失败段落并提供一键重试；绝不静默跳过" checked />
+              <span>
+                <span class="option-title">A · 保证文章完整 <span class="recommended">推荐</span></span>
+                <span class="option-desc">学习内容不缺失；用户明确知道哪一段失败并可重试。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q16" value="B｜提示后允许跳过失败段落，播放其余内容" />
+              <span>
+                <span class="option-title">B · 用户确认后跳过</span>
+                <span class="option-desc">更容易开始播放，但循环内容不再等于完整文章。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q16" value="C｜自动静默跳过失败段落并继续准备" />
+              <span>
+                <span class="option-title">C · 自动跳过</span>
+                <span class="option-desc">流程最顺，但用户可能不知道训练内容已经缺失。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：整篇播放必须保持内容完整；失败应显式、可定位、可重试。</div>
+          <label class="detail-label" for="q16-note">补充说明（可选）</label>
+          <textarea id="q16-note" name="q16-note" placeholder="例如：自动重试两次后再提示；允许用户返回编辑失败段落…">是否可以直接生成一个整篇文章的音档进行播放</textarea>
+        </article>
+
+        <article class="question" data-question="Q17">
+          <h3>❓ Q17 - 播放中启动朗读录音时怎么处理？</h3>
+          <p class="question-copy">
+            全局播放器会跨页面继续，但录音练习不能同时播放 TTS，否则会污染麦克风与识别结果。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q17" value="A｜开始录音前自动暂停 TTS；录音结束后保持暂停，由用户手动继续" checked />
+              <span>
+                <span class="option-title">A · 自动暂停、手动恢复 <span class="recommended">推荐</span></span>
+                <span class="option-desc">避免录音串音，并与系统中断后的手动恢复规则一致。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q17" value="B｜开始录音前自动暂停，录音结束后尽力自动恢复 TTS" />
+              <span>
+                <span class="option-title">B · 录音后自动恢复</span>
+                <span class="option-desc">操作更少，但可能在用户查看结果时突然播放。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q17" value="C｜播放器活动时禁止录音，要求用户先手动停止整篇循环" />
+              <span>
+                <span class="option-title">C · 手动停止后才能录音</span>
+                <span class="option-desc">规则明确，但给核心练习流程增加额外操作。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：自动消除音频冲突，但不擅自恢复发声。</div>
+          <label class="detail-label" for="q17-note">补充说明（可选）</label>
+          <textarea id="q17-note" name="q17-note" placeholder="例如：暂停时保留当前秒数；取消录音也不自动恢复…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q18">
+          <h3>❓ Q18 - 24 小时内恢复到多精确的位置？</h3>
+          <p class="question-copy">
+            联网重开后会提示用户恢复。是回到精确秒数，还是从所在段落开头重新听？
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q18" value="A｜恢复到精确播放秒数" checked />
+              <span>
+                <span class="option-title">A · 精确秒数</span>
+                <span class="option-desc">最像音乐播放器，但可能从句子中间突然开始。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q18" value="B｜恢复到上次所在段落的开头" />
+              <span>
+                <span class="option-title">B · 段落开头 <span class="recommended">推荐</span></span>
+                <span class="option-desc">更符合语言学习语境，也能复用文章的段落时间轴。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q18" value="C｜只记住文章，不记位置；恢复时从全文开头播放" />
+              <span>
+                <span class="option-title">C · 全文开头</span>
+                <span class="option-desc">实现最简单，但长文章恢复价值较低。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 B：从段落开头恢复不会截断语义，用户也更容易重新进入学习上下文。</div>
+          <label class="detail-label" for="q18-note">补充说明（可选）</label>
+          <textarea id="q18-note" name="q18-note" placeholder="例如：从所在句子开头恢复，而不是段落开头…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q19">
+          <h3>❓ Q19 - 睡眠定时在暂停期间是否继续倒计时？</h3>
+          <p class="question-copy">
+            来电或用户暂停后，15/30/60 分钟定时器按现实时间继续，还是只累计实际播放时间？
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q19" value="A｜按现实时间倒计时，暂停期间也继续；到点后保持停止" checked />
+              <span>
+                <span class="option-title">A · 现实时间 <span class="recommended">推荐</span></span>
+                <span class="option-desc">符合“睡眠定时”的通常预期；来电不会把停止时间无限顺延。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q19" value="B｜只累计实际播放时间，暂停时倒计时也暂停" />
+              <span>
+                <span class="option-title">B · 实际播放时长</span>
+                <span class="option-desc">保证听满设定时长，但结束的现实时间不确定。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q19" value="C｜发生中断或手动暂停时自动取消睡眠定时" />
+              <span>
+                <span class="option-title">C · 暂停即取消</span>
+                <span class="option-desc">状态最简单，但用户恢复播放后可能忘记重新设置。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：睡眠定时应绑定墙上时钟；到点即停止，不因暂停或中断延期。</div>
+          <label class="detail-label" for="q19-note">补充说明（可选）</label>
+          <textarea id="q19-note" name="q19-note" placeholder="例如：到点时等当前句子结束再停止…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q20">
+          <h3>❓ Q20 - 播放中选择另一篇文章怎么办？</h3>
+          <p class="question-copy">
+            全局播放器同一时间只播放一篇文章。用户从文章列表点击另一篇时，需要明确切换规则。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q20" value="A｜确认后停止当前文章，准备并切换到新文章" checked />
+              <span>
+                <span class="option-title">A · 确认后替换 <span class="recommended">推荐</span></span>
+                <span class="option-desc">避免误触中断当前循环，又不引入播放队列。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q20" value="B｜立即停止当前文章并切换，不再确认" />
+              <span>
+                <span class="option-title">B · 立即切换</span>
+                <span class="option-desc">操作最快，但误触成本高，当前准备状态会被抛弃。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q20" value="C｜把新文章加入队列，当前文章结束后再播放" />
+              <span>
+                <span class="option-title">C · 文章播放队列</span>
+                <span class="option-desc">能力更强，但与“当前文章无限循环”冲突并扩大首版范围。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：单文章播放器保持简单，用确认防止误切换。</div>
+          <label class="detail-label" for="q20-note">补充说明（可选）</label>
+          <textarea id="q20-note" name="q20-note" placeholder="例如：当前为暂停状态时可直接切换，不需要确认…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q21">
+          <h3>❓ Q21 - 整篇准备期间，用户能否离开当前页面？</h3>
+          <p class="question-copy">
+            冷缓存文章可能需要等待。你已选择全局迷你播放器，因此需要决定准备过程是阻塞页面还是作为全局任务继续。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q21" value="A｜允许站内切页；迷你播放器显示准备进度，全文就绪后提示用户手动播放" checked />
+              <span>
+                <span class="option-title">A · 非阻塞全局准备 <span class="recommended">推荐</span></span>
+                <span class="option-desc">用户可继续使用 AlignSpeak；准备任务由服务端持久执行，完成后不自动发声。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q21" value="B｜必须停留在全屏准备页，完成或取消前不能操作其他功能" />
+              <span>
+                <span class="option-title">B · 阻塞等待</span>
+                <span class="option-desc">状态最清楚，但长文章会让整个应用不可用。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q21" value="C｜离开启动页面就取消准备任务" />
+              <span>
+                <span class="option-title">C · 页面级准备</span>
+                <span class="option-desc">实现接近现状，但与全局播放器和后台听文章的目标不一致。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：整篇准备应是非阻塞的全局任务；完成后只提示，不绕过用户手势自动播放。</div>
+          <label class="detail-label" for="q21-note">补充说明（可选）</label>
+          <textarea id="q21-note" name="q21-note" placeholder="例如：关闭 Safari 后服务端仍继续生成，回来可看到结果…"></textarea>
+        </article>
+      </form>
+    </section>
+
+    <div class="actions" hidden>
+      <button class="button" type="button" id="copy-round-4-button">复制第 4 轮答案</button>
+      <button class="button secondary" type="button" id="clear-round-4-button">清空第 4 轮</button>
+      <span class="save-state" id="round-4-save-state">答案会自动保存在本浏览器</span>
+    </div>
+
+    <section class="round" aria-labelledby="round-5-title" hidden>
+      <div class="round-header">
+        <div>
+          <h2 id="round-5-title">第 5 轮 · 整篇资产与边界</h2>
+          <p>整篇单音档架构已经确定；本轮只问内容变更、并发、范围与流量等产品边界。</p>
+        </div>
+        <div class="counter"><span id="round-5-answered-count">0</span> / 6 已回答</div>
+      </div>
+
+      <div class="notice" style="margin-left:24px;margin-right:24px;">
+        <strong>技术结论 · 可以生成整篇音档：</strong>
+        推荐复用现有分段 TTS 缓存，由持久化 worker 在服务端插入 0.5–1 秒段间静音并合成为一个版本化 MP3。
+        浏览器只播放一个完整文件并设置原生循环；这比后台 JavaScript 逐段换源更稳，也保留失败段重试、日语读音修正、精确秒数恢复和缓存复用。
+      </div>
+
+      <form class="questions" id="round-5-form">
+        <article class="question" data-question="Q22">
+          <h3>❓ Q22 - 播放期间文章或读音被修改怎么办？</h3>
+          <p class="question-copy">
+            正文、段落顺序或日语读音修正都会让整篇音档版本失效。继续播放旧音档会导致页面内容与声音不一致。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q22" value="A｜立即停止旧音档并标记失效，提示用户重新准备后再播放" />
+              <span>
+                <span class="option-title">A · 修改即失效 <span class="recommended">推荐</span></span>
+                <span class="option-desc">始终保证显示内容、读音修正和播放音频一致。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q22" value="B｜允许当前旧音档继续到用户停止；下一次播放前再重新准备" checked />
+              <span>
+                <span class="option-title">B · 当前会话继续旧版</span>
+                <span class="option-desc">不中断正在听的内容，但短时间内页面与音频可能不一致。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q22" value="C｜只在正文变化时失效，读音修正变化不重新生成" />
+              <span>
+                <span class="option-title">C · 忽略读音修改</span>
+                <span class="option-desc">生成次数更少，但用户修正的 TTS 读音不会反映到整篇播放。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：学习音频必须忠于当前文章与读音修正；版本变化后立即停止最诚实。</div>
+          <label class="detail-label" for="q22-note">补充说明（可选）</label>
+          <textarea id="q22-note" name="q22-note" placeholder="例如：只在当前段结束后停止，避免句中截断…">提供一个按钮可以手动更新音频</textarea>
+        </article>
+
+        <article class="question" data-question="Q23">
+          <h3>❓ Q23 - 同一浏览器开多个 AlignSpeak 标签页时怎么办？</h3>
+          <p class="question-copy">
+            如果两个标签页都能播放，会出现叠音、锁屏元数据争用和睡眠定时状态冲突。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q23" value="A｜同一浏览器只允许一个活动播放器；后点击播放的标签页接管并暂停其他标签页" checked />
+              <span>
+                <span class="option-title">A · 最新播放接管 <span class="recommended">推荐</span></span>
+                <span class="option-desc">避免叠音；用浏览器标签页通信同步暂停和播放器所有权。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q23" value="B｜各标签页独立播放，允许同时发声" />
+              <span>
+                <span class="option-title">B · 标签页互不干预</span>
+                <span class="option-desc">实现简单，但很容易出现叠音与锁屏控制错乱。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q23" value="C｜检测到其他标签页播放时阻止新播放，要求用户回原标签页停止" />
+              <span>
+                <span class="option-title">C · 原标签页优先</span>
+                <span class="option-desc">不会叠音，但用户需要寻找原标签页，操作成本较高。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：维持一个清晰的播放器所有者，后发起的用户操作优先。</div>
+          <label class="detail-label" for="q23-note">补充说明（可选）</label>
+          <textarea id="q23-note" name="q23-note" placeholder="例如：接管前需要二次确认…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q24">
+          <h3>❓ Q24 - 整篇准备完成后如何通知？</h3>
+          <p class="question-copy">
+            用户可以在站内切页等待。是否需要请求系统通知权限，让用户离开 Safari 后也收到准备完成消息？
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q24" value="A｜只用站内迷你播放器和 Toast 通知；不申请浏览器通知权限" checked />
+              <span>
+                <span class="option-title">A · 仅站内通知 <span class="recommended">推荐</span></span>
+                <span class="option-desc">不增加权限打扰；用户返回时可看到已就绪状态。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q24" value="B｜用户可主动开启 Web Notification，离开页面后也尝试通知" />
+              <span>
+                <span class="option-title">B · 可选系统通知</span>
+                <span class="option-desc">长文章更方便，但要处理权限、主屏幕安装和浏览器差异。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q24" value="C｜强制申请通知权限，拒绝后不能使用整篇准备" />
+              <span>
+                <span class="option-title">C · 通知是必需权限</span>
+                <span class="option-desc">完成提醒最强，但与普通 Safari 主入口和免安装目标冲突。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：首版不为一个准备完成提示引入通知权限与 PWA 依赖。</div>
+          <label class="detail-label" for="q24-note">补充说明（可选）</label>
+          <textarea id="q24-note" name="q24-note" placeholder="例如：准备超过 30 秒时才提供通知选项…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q25">
+          <h3>❓ Q25 - 哪些长度的文章可使用整篇循环？</h3>
+          <p class="question-copy">
+            当前文章正文上限是 20,000 字符。额外限制会缩短准备时间和下载体积，但会让部分现有文章不能使用新功能。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q25" value="A｜沿用现有 20,000 字符上限，所有合法文章都可准备整篇音档" checked />
+              <span>
+                <span class="option-title">A · 不增加新限制 <span class="recommended">推荐</span></span>
+                <span class="option-desc">功能规则一致；长文章只需要更久的准备进度和更大的下载提示。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q25" value="B｜首版只支持 10,000 字符以内的文章" />
+              <span>
+                <span class="option-title">B · 限制 10,000 字符</span>
+                <span class="option-desc">降低首版长任务风险，但需要解释为什么合法文章不能循环播放。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q25" value="C｜按预计音频时长限制，只支持预计 30 分钟以内" />
+              <span>
+                <span class="option-title">C · 限制预计时长</span>
+                <span class="option-desc">更贴近音频成本，但需要可靠的语言相关时长估算。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：不制造第二套文章长度规则；用持久任务、进度与下载提示承接长文章。</div>
+          <label class="detail-label" for="q25-note">补充说明（可选）</label>
+          <textarea id="q25-note" name="q25-note" placeholder="例如：先实测后再决定是否加文件大小保护阈值…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q26">
+          <h3>❓ Q26 - 现有“朗读当前段/句子”是否保留？</h3>
+          <p class="question-copy">
+            新的整篇循环属于全局播放器；练习页现在还有单段朗读与点句播放，两者需要明确共存规则。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q26" value="A｜保留现有单段和句子朗读；触发时暂停整篇播放器，结束后仍由用户手动恢复" checked />
+              <span>
+                <span class="option-title">A · 两种模式共存 <span class="recommended">推荐</span></span>
+                <span class="option-desc">不破坏现有精读功能，并沿用“音频中断后不自动恢复”原则。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q26" value="B｜移除单段和句子朗读，练习页统一只使用整篇播放器" />
+              <span>
+                <span class="option-title">B · 整篇播放器取代现有朗读</span>
+                <span class="option-desc">界面更简单，但会失去当前段落与句子精听能力。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q26" value="C｜整篇音档就绪时从同一文件 seek 播放段句；未就绪时禁用单段朗读" />
+              <span>
+                <span class="option-title">C · 统一使用整篇音档</span>
+                <span class="option-desc">只维护一个媒体源，但会让原本即时的单段朗读依赖全文准备。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：整篇循环服务泛听，现有段句朗读服务精听；自动暂停避免同时发声。</div>
+          <label class="detail-label" for="q26-note">补充说明（可选）</label>
+          <textarea id="q26-note" name="q26-note" placeholder="例如：点句播放结束后自动恢复整篇，但录音后不自动恢复…"></textarea>
+        </article>
+
+        <article class="question" data-question="Q27">
+          <h3>❓ Q27 - 蜂窝网络下是否允许下载整篇音档？</h3>
+          <p class="question-copy">
+            为满足“开始后断网不中断”，播放前需要完整下载整篇文件。长文章可能消耗较多蜂窝流量。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q27" value="A｜允许蜂窝网络；开始前显示预计文件大小，超过 20 MB 再确认" checked />
+              <span>
+                <span class="option-title">A · 允许并提示大文件 <span class="recommended">推荐</span></span>
+                <span class="option-desc">不阻断移动场景，又能避免用户无感下载大文件。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q27" value="B｜只允许 Wi-Fi 下载整篇音档" />
+              <span>
+                <span class="option-title">B · 仅 Wi-Fi</span>
+                <span class="option-desc">最节省流量，但用户在外无法首次准备或恢复播放。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q27" value="C｜提供“仅 Wi-Fi/蜂窝允许”用户设置，默认仅 Wi-Fi" />
+              <span>
+                <span class="option-title">C · 用户偏好设置</span>
+                <span class="option-desc">控制最完整，但为首版增加设置页和状态分支。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：采用单次大文件确认，避免为了一个设置项扩大首版范围。</div>
+          <label class="detail-label" for="q27-note">补充说明（可选）</label>
+          <textarea id="q27-note" name="q27-note" placeholder="例如：阈值改为 10 MB；用户确认一次后当天不再询问…"></textarea>
+        </article>
+      </form>
+    </section>
+
+    <div class="actions" hidden>
+      <button class="button" type="button" id="copy-round-5-button">复制第 5 轮答案</button>
+      <button class="button secondary" type="button" id="clear-round-5-button">清空第 5 轮</button>
+      <span class="save-state" id="round-5-save-state">答案会自动保存在本浏览器</span>
+    </div>
+
+    <section class="round" aria-labelledby="round-6-title" hidden>
+      <div class="round-header">
+        <div>
+          <h2 id="round-6-title">第 6 轮 · 手动更新如何接管</h2>
+          <p>这是当前设计树中最后一个未决行为分支。</p>
+        </div>
+        <div class="counter"><span id="round-6-answered-count">0</span> / 1 已回答</div>
+      </div>
+
+      <form class="questions" id="round-6-form">
+        <article class="question" data-question="Q28">
+          <h3>❓ Q28 - 点击“更新音频”后，旧音档何时停止？</h3>
+          <p class="question-copy">
+            文章或读音修改后，旧音档可以继续当前播放。用户主动点击更新时，需要决定准备新版本期间是否中断，以及新版本完成后是否自动接管。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q28" value="A｜旧音档继续播放；后台准备新版，完成后提示用户手动切换，绝不自动换音" />
+              <span>
+                <span class="option-title">A · 后台更新、手动切换 <span class="recommended">推荐</span></span>
+                <span class="option-desc">不中断当前收听，也不会在句中或循环中突然切换版本。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q28" value="B｜点击更新就立即停止旧音档，等待新版准备完成后由用户播放" checked />
+              <span>
+                <span class="option-title">B · 立即停止并更新</span>
+                <span class="option-desc">版本状态最简单，但用户会在整篇准备期间失去当前播放。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q28" value="C｜旧音档继续播放；新版完成后在下一轮全文开始时自动切换" />
+              <span>
+                <span class="option-title">C · 循环边界自动切换</span>
+                <span class="option-desc">不会截断句子，但播放内容会在没有再次确认时自动变化，精确位置与睡眠状态也要迁移。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 推荐 A：更新可以在后台完成，但任何正在发声的媒体切换都应由用户明确触发。</div>
+          <label class="detail-label" for="q28-note">补充说明（可选）</label>
+          <textarea id="q28-note" name="q28-note" placeholder="例如：旧音档已经暂停时，新版就绪后可以直接替换，不需要再次确认…"></textarea>
+        </article>
+      </form>
+    </section>
+
+    <div class="actions" hidden>
+      <button class="button" type="button" id="copy-round-6-button">复制第 6 轮答案</button>
+      <button class="button secondary" type="button" id="clear-round-6-button">清空第 6 轮</button>
+      <span class="save-state" id="round-6-save-state">答案会自动保存在本浏览器</span>
+    </div>
+
+    <section class="round" aria-labelledby="round-7-title">
+      <div class="round-header">
+        <div>
+          <h2 id="round-7-title">最终规划 · 已确认实施基线</h2>
+          <p>设计树已遍历并确认完毕。以下方案由全部 29 项决策共同收敛而成。</p>
+        </div>
+        <div class="counter"><span id="round-7-answered-count">1</span> / 1 已确认</div>
+      </div>
+
+      <div class="plan-body">
+        <div class="notice" style="margin:0 0 16px;">
+          <strong>规划状态：</strong>已确认并冻结。此状态只授权将方案作为实施基线，并不代表已经开始编码、迁移数据库或修改部署。
+        </div>
+
+        <div class="plan-grid">
+          <section class="plan-block">
+            <h3>1. 产品承诺</h3>
+            <ul>
+              <li>正式支持发布时最新稳定版 iOS Safari。</li>
+              <li>Chrome iOS 通过真机核心用例后标记“兼容”，不共享 Safari SLA。</li>
+              <li>普通 Safari 是主入口；主屏幕 PWA 仅做兼容验证。</li>
+              <li>锁屏、熄屏、切 App 与系统播放/暂停均为尽力优化，不承诺原生级可靠后台。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block">
+            <h3>2. 播放体验</h3>
+            <ul>
+              <li>整篇文章全部段落按顺序循环。</li>
+              <li>段间停顿 0.5–1 秒，全文循环边界停顿 1–2 秒。</li>
+              <li>整篇音档准备并完整下载后才允许播放。</li>
+              <li>首版只提供播放/暂停与循环状态；固定 1.0 倍速、默认音色。</li>
+              <li>默认无限循环；支持本轮结束、15/30/60 分钟睡眠停止。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block wide">
+            <h3>3. 推荐媒体架构</h3>
+            <p>
+              保留现有分段 TTS 作为生成和缓存最小单元，再由持久化 worker 用 FFmpeg 合成为一个版本化整篇 MP3。
+              浏览器只持有一个长期存在的 HTMLAudioElement，并对单文件使用原生循环，避免依赖后台 JavaScript 切换段落。
+            </p>
+            <span class="plan-code">segment TTS cache
+  → missing segments generated independently
+  → explicit silence inserted between segments
+  → FFmpeg decode/concat/re-encode
+  → ffprobe actual duration
+  → global segment/sentence timeline
+  → atomic publish of one article MP3</span>
+          </section>
+
+          <section class="plan-block">
+            <h3>4. 整篇资产版本</h3>
+            <p>缓存键必须覆盖所有会改变声音或时间轴的输入：</p>
+            <span class="plan-code">article_id
++ ordered(segment_id, TTS text hash, segment asset id)
++ resolved default voice
++ speed = 1.0
++ pause policy version
++ encoder profile version
++ timeline version</span>
+            <p style="margin-top:9px;">正文、顺序、语言或读音修正变化后，新旧资产不会误命中。</p>
+          </section>
+
+          <section class="plan-block">
+            <h3>5. 持久任务与失败处理</h3>
+            <ul>
+              <li>任务状态写入 PostgreSQL，不再使用进程内 job 字典。</li>
+              <li>worker 采用租约、心跳、崩溃恢复与每段独立重试。</li>
+              <li>任一段最终失败则整篇 job 失败，展示失败段并提供一键重试。</li>
+              <li>不发布半成品，不静默跳段；重试只补缺失或失败段。</li>
+              <li>准备过程允许站内切页，迷你播放器持续展示进度。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block wide">
+            <h3>6. 数据模型</h3>
+            <ul>
+              <li><code>article_tts_jobs</code>：用户、文章、输入哈希、状态、总段数、完成数、失败段、错误码、重试、租约与时间戳。</li>
+              <li><code>article_tts_assets</code>：文章、输入哈希、音色、速度、停顿/编码版本、媒体路径、时长、大小、时间轴与状态。</li>
+              <li><code>article_tts_asset_segments</code>：整篇资产与各分段资产的关系、顺序、全局起止时间和文本哈希。</li>
+              <li>本机恢复状态不新增服务端表：保存 <code>asset_id + article_id + position_ms + updated_at</code>，24 小时过期。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block">
+            <h3>7. API 契约</h3>
+            <span class="plan-code">POST /articles/{article_id}/full-tts-jobs
+GET  /full-tts-jobs/{job_id}
+GET  /articles/{article_id}/full-tts
+GET  /media/tts/articles/{asset_id}</span>
+            <ul style="margin-top:9px;">
+              <li>创建接口幂等；缓存命中直接返回完成资产。</li>
+              <li>状态接口返回段进度、失败段、文件大小、时长和最终时间轴。</li>
+              <li>媒体接口必须按资产归属验证当前用户，不能只验证“已登录”。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block">
+            <h3>8. 后端与部署</h3>
+            <ul>
+              <li>API 镜像安装 FFmpeg/ffprobe。</li>
+              <li>新增生产 worker，与 API 共享 TTS 媒体卷。</li>
+              <li>MVP 可用 PostgreSQL claim job，无需立即引入 Redis。</li>
+              <li>临时文件完成后原子重命名；增加磁盘配额、TTL 与孤儿资产清理。</li>
+              <li>edge-tts 从 7.2.7 升级到 7.2.8，并回归跨 chunk 时间轴。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block wide">
+            <h3>9. 前端全局播放器</h3>
+            <p>播放器从练习页 Hook 提升到应用根层 Provider/store，跨站内路由存在。</p>
+            <span class="plan-code">idle → preparing → ready → downloading → playing ↔ paused
+                     ↘ failed        ↘ stale        ↘ sleep-expired</span>
+            <ul style="margin-top:9px;">
+              <li>练习页和文章列表均可启动；全局迷你播放器显示准备、下载、播放、暂停、失效和错误状态。</li>
+              <li>音档就绪后只提示，不自动发声；所有恢复与播放都要求用户手势。</li>
+              <li>下载完整 Blob 后创建 Object URL，网络随后断开仍可完成本次播放；页面被系统回收后不承诺离线。</li>
+              <li>文件超过 20 MB 时下载前确认；不依赖 iOS 不稳定的网络类型检测。</li>
+              <li>设置 Media Session 元数据和 play/pause handler，作为渐进增强。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block">
+            <h3>10. 恢复与定时</h3>
+            <ul>
+              <li>每隔数秒节流保存精确 position_ms。</li>
+              <li>联网重开 24 小时内提示恢复；用户点击后 seek 到精确秒数。</li>
+              <li>资产版本变化时不把旧秒数套到新文件。</li>
+              <li>睡眠定时按现实时间倒计时，暂停和系统中断期间继续。</li>
+              <li>选择“本轮结束”时关闭 loop，在当前全文结束点停止。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block">
+            <h3>11. 音频冲突</h3>
+            <ul>
+              <li>录音、单段朗读或句子朗读开始前自动暂停整篇播放器。</li>
+              <li>操作结束后保持暂停，必须由用户手动恢复。</li>
+              <li>来电、Siri、闹钟、耳机断开等中断后保持暂停并提示。</li>
+              <li>多标签页只允许一个播放器；后点击播放的标签页接管并暂停其他标签页。</li>
+              <li>切换文章先确认，再停止当前文章并准备新文章。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block wide">
+            <h3>12. 音频失效与手动更新</h3>
+            <ul>
+              <li>文章或读音变化后，将当前整篇资产标为 stale，但正在播放的旧音档允许继续到用户停止。</li>
+              <li>下一次播放前必须准备最新版本。</li>
+              <li>提供“更新音频”按钮；点击后立即停止旧音档并启动新版准备。</li>
+              <li>新版就绪后只显示站内 Toast/迷你播放器提示，由用户手动播放；不申请系统通知权限。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block wide">
+            <h3>13. 实施里程碑</h3>
+            <div class="milestones">
+              <div class="milestone"><span><strong>技术基线与实测</strong><br />升级 edge-tts；测量 20k 日/中/英文章的生成时间、MP3 大小、Safari Blob 内存与后台表现，据此设置 worker 超时和并发。</span></div>
+              <div class="milestone"><span><strong>持久任务与数据迁移</strong><br />新增三张表、仓储、租约 worker、任务恢复与失败段重试。</span></div>
+              <div class="milestone"><span><strong>整篇资产管线</strong><br />复用分段缓存、插入静音、FFmpeg 合并、ffprobe 校验、全局时间轴、版本缓存与原子发布。</span></div>
+              <div class="milestone"><span><strong>安全 API 与媒体访问</strong><br />完成幂等准备、状态查询、当前资产、媒体所有权校验和缓存清理。</span></div>
+              <div class="milestone"><span><strong>全局播放器与交互</strong><br />迷你播放器、完整下载、循环、睡眠定时、精确恢复、Media Session、跨标签页接管。</span></div>
+              <div class="milestone"><span><strong>现有练习整合</strong><br />录音、段落朗读、句子朗读、文章切换、失效与手动更新的暂停/恢复规则。</span></div>
+              <div class="milestone"><span><strong>真机验收与灰度</strong><br />最新版 iOS Safari 正式矩阵、Chrome iOS 兼容矩阵、长文/断网/锁屏/中断/大文件场景。</span></div>
+            </div>
+          </section>
+
+          <section class="plan-block wide">
+            <h3>14. 核心验收标准</h3>
+            <ul>
+              <li>所有现有合法文章（最多 20,000 字符）可生成一个完整 MP3；缺段时不可播放。</li>
+              <li>段间和循环边界停顿符合配置；整篇时间轴与最终文件时长一致。</li>
+              <li>文件完整下载后断网，当前页面存活期间仍能持续循环。</li>
+              <li>精确位置恢复误差控制在 1 秒内；过期或资产变化不错误恢复。</li>
+              <li>睡眠定时、录音暂停、段句朗读暂停、手动更新停止和多标签页接管均符合上述规则。</li>
+              <li>最新版 iOS Safari 完成切 App、锁屏、熄屏、控制中心、蓝牙耳机和长时循环实测；结果写入兼容矩阵，不包装为原生级保证。</li>
+              <li>Chrome iOS 完成相同核心兼容验证后再标记兼容。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block">
+            <h3>15. 明确不做</h3>
+            <ul>
+              <li>Capacitor/原生 iOS App。</li>
+              <li>原生级后台可靠性 SLA。</li>
+              <li>永久离线下载和跨设备位置同步。</li>
+              <li>音色选择、变速、进度拖动和文章播放队列。</li>
+              <li>Web Push/系统准备完成通知。</li>
+            </ul>
+          </section>
+
+          <section class="plan-block">
+            <h3>16. 主要风险</h3>
+            <ul>
+              <li>iOS 仍可能冻结或回收网页进程；单音档只能降低风险，不能消除。</li>
+              <li>长文章完整 Blob 会占用内存，必须通过 20k 实测决定保护阈值。</li>
+              <li>FFmpeg 合并、时间轴偏移和编码时长可能漂移，必须用最终文件反向校验。</li>
+              <li>持久音频会增长磁盘占用，需要版本清理和配额监控。</li>
+              <li>批量 TTS 可能放大供应商延迟与成本，需要 worker 并发和重试上限。</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+
+      <form class="questions" id="round-7-form" hidden>
+        <article class="question" data-question="Q29">
+          <h3>❓ Q29 - 这份规划是否准确表达了我们的共同理解？</h3>
+          <p class="question-copy">
+            这是最后确认。确认后设计树结束，规划冻结；后续才能进入任务拆分或实现阶段。
+          </p>
+          <div class="options">
+            <label class="option">
+              <input type="radio" name="q29" value="A｜确认，规划准确，可以冻结为后续实施基线" checked />
+              <span>
+                <span class="option-title">A · 确认并冻结 <span class="recommended">推荐</span></span>
+                <span class="option-desc">当前规划成为任务拆分、开发和验收的唯一基线。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q29" value="B｜整体正确，但需要按补充说明修改后再确认" />
+              <span>
+                <span class="option-title">B · 修改后确认</span>
+                <span class="option-desc">请在下方明确指出要改的条目及期望内容。</span>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="q29" value="C｜存在关键方向问题，需要重新打开相关决策分支" />
+              <span>
+                <span class="option-title">C · 重新打开决策</span>
+                <span class="option-desc">请说明需要重开的主题，例如平台、播放范围、缓存或后台承诺。</span>
+              </span>
+            </label>
+          </div>
+          <div class="recommendation">➡️ 若以上内容与预期一致，推荐 A；任何不准确之处都应在开始实现前修正。</div>
+          <label class="detail-label" for="q29-note">补充说明（选择 B/C 时必填）</label>
+          <textarea id="q29-note" name="q29-note" placeholder="请引用规划条目编号并写出修改要求…"></textarea>
+        </article>
+      </form>
+    </section>
+
+    <div class="actions" hidden>
+      <button class="button" type="button" id="copy-round-7-button">复制方案确认</button>
+      <button class="button secondary" type="button" id="clear-round-7-button">清空确认</button>
+      <span class="save-state" id="round-7-save-state">确认会自动保存在本浏览器</span>
+    </div>
+
+    <details class="sources">
+      <summary>事实来源与核查范围</summary>
+      <ul>
+        <li>仓库：<code>usePracticeAudio.ts</code>、<code>ttsService.ts</code>、TTS router/usecase/models、部署配置与 Web 技术决策。</li>
+        <li><a href="https://developer.apple.com/documentation/Xcode/configuring-background-execution-modes">Apple · Configuring background execution modes</a></li>
+        <li><a href="https://developer.apple.com/documentation/AVFAudio/AVAudioSession">Apple · AVAudioSession</a></li>
+        <li><a href="https://developer.apple.com/documentation/mediaplayer/mpremotecommandcenter">Apple · MPRemoteCommandCenter</a></li>
+        <li><a href="https://webkit.org/blog/17862/webkit-features-for-safari-26-4/">WebKit · Safari 26.4 media fixes</a></li>
+        <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaSession">MDN · Media Session API</a></li>
+        <li><a href="https://chromium.googlesource.com/chromium/src/+/refs/heads/main/ios/web/">Chromium · iOS Web Layer uses WKWebView</a></li>
+        <li><a href="https://developer.apple.com/support/alternative-browser-engines/">Apple · Alternative browser engines in the EU</a></li>
+        <li><a href="https://github.com/rany2/edge-tts/blob/7.2.7/src/edge_tts/communicate.py">edge-tts 7.2.7 · Chunking and MP3 output</a></li>
+        <li><a href="https://ffmpeg.org/ffmpeg-formats.html#concat">FFmpeg · Concat demuxer and duration behavior</a></li>
+      </ul>
+    </details>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">已复制，可粘贴回 Codex</div>
+
+  <script>
+    (() => {
+      const storageKey = 'alignspeak-ios-background-tts-grilling-round-1-v1';
+      const form = document.getElementById('round-1-form');
+      const counter = document.getElementById('answered-count');
+      const saveState = document.getElementById('save-state');
+      const toast = document.getElementById('toast');
+      const questionIds = ['q1', 'q2', 'q3', 'q4', 'q5'];
+
+      const readForm = () => {
+        const data = {};
+        for (const id of questionIds) {
+          data[id] = form.querySelector(`input[name="${id}"]:checked`)?.value ?? '';
+          data[`${id}Note`] = form.querySelector(`[name="${id}-note"]`)?.value.trim() ?? '';
+        }
+        return data;
+      };
+
+      const updateCounter = () => {
+        const data = readForm();
+        counter.textContent = String(questionIds.filter((id) => data[id]).length);
+      };
+
+      const persist = () => {
+        localStorage.setItem(storageKey, JSON.stringify(readForm()));
+        updateCounter();
+        saveState.textContent = '已自动保存';
+        saveState.classList.add('ok');
+        window.clearTimeout(persist.timer);
+        persist.timer = window.setTimeout(() => {
+          saveState.textContent = '答案会自动保存在本浏览器';
+          saveState.classList.remove('ok');
+        }, 1300);
+      };
+
+      const restore = () => {
+        try {
+          const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          for (const id of questionIds) {
+            if (data[id]) {
+              const radio = [...form.querySelectorAll(`input[name="${id}"]`)]
+                .find((item) => item.value === data[id]);
+              if (radio) radio.checked = true;
+            }
+            const note = form.querySelector(`[name="${id}-note"]`);
+            if (note && data[`${id}Note`]) note.value = data[`${id}Note`];
+          }
+        } catch {
+          localStorage.removeItem(storageKey);
+        }
+        updateCounter();
+      };
+
+      const buildAnswerText = () => {
+        const data = readForm();
+        const lines = [
+          'AlignSpeak · iOS 后台循环 TTS 规划',
+          '第 1 轮回答',
+          '',
+        ];
+        questionIds.forEach((id, index) => {
+          lines.push(`Q${index + 1}: ${data[id] || '未选择'}`);
+          if (data[`${id}Note`]) lines.push(`补充: ${data[`${id}Note`]}`);
+          lines.push('');
+        });
+        return lines.join('\n').trim();
+      };
+
+      const showToast = (message) => {
+        toast.textContent = message;
+        toast.classList.add('show');
+        window.setTimeout(() => toast.classList.remove('show'), 1800);
+      };
+
+      form.addEventListener('input', persist);
+
+      document.getElementById('copy-button').addEventListener('click', async () => {
+        const answered = questionIds.filter((id) => readForm()[id]).length;
+        if (answered < questionIds.length) {
+          showToast(`还有 ${questionIds.length - answered} 题未选择`);
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(buildAnswerText());
+          showToast('已复制，可粘贴回 Codex');
+        } catch {
+          window.prompt('复制以下答案后粘贴回 Codex：', buildAnswerText());
+        }
+      });
+
+      document.getElementById('clear-button').addEventListener('click', () => {
+        if (!window.confirm('确定清空第 1 轮的所有选择和补充说明吗？')) return;
+        form.reset();
+        localStorage.removeItem(storageKey);
+        updateCounter();
+        showToast('已清空本轮答案');
+      });
+
+      restore();
+    })();
+
+    (() => {
+      const storageKey = 'alignspeak-ios-background-tts-grilling-round-2-v1';
+      const form = document.getElementById('round-2-form');
+      const counter = document.getElementById('round-2-answered-count');
+      const saveState = document.getElementById('round-2-save-state');
+      const toast = document.getElementById('toast');
+
+      const readForm = () => ({
+        q6: form.querySelector('input[name="q6"]:checked')?.value ?? '',
+        q6Note: form.querySelector('[name="q6-note"]')?.value.trim() ?? '',
+      });
+
+      const updateCounter = () => {
+        counter.textContent = readForm().q6 ? '1' : '0';
+      };
+
+      const showToast = (message) => {
+        toast.textContent = message;
+        toast.classList.add('show');
+        window.setTimeout(() => toast.classList.remove('show'), 1800);
+      };
+
+      const persist = () => {
+        localStorage.setItem(storageKey, JSON.stringify(readForm()));
+        updateCounter();
+        saveState.textContent = '已自动保存';
+        saveState.classList.add('ok');
+        window.clearTimeout(persist.timer);
+        persist.timer = window.setTimeout(() => {
+          saveState.textContent = '答案会自动保存在本浏览器';
+          saveState.classList.remove('ok');
+        }, 1300);
+      };
+
+      const restore = () => {
+        try {
+          const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          if (data.q6) {
+            const radio = [...form.querySelectorAll('input[name="q6"]')]
+              .find((item) => item.value === data.q6);
+            if (radio) radio.checked = true;
+          }
+          if (data.q6Note) form.querySelector('[name="q6-note"]').value = data.q6Note;
+        } catch {
+          localStorage.removeItem(storageKey);
+        }
+        updateCounter();
+      };
+
+      form.addEventListener('input', persist);
+
+      document.getElementById('copy-round-2-button').addEventListener('click', async () => {
+        const data = readForm();
+        if (!data.q6) {
+          showToast('请先完成 Q6');
+          return;
+        }
+        const lines = [
+          'AlignSpeak · iOS 后台循环 TTS 规划',
+          '第 2 轮回答',
+          '',
+          `Q6: ${data.q6}`,
+        ];
+        if (data.q6Note) lines.push(`补充: ${data.q6Note}`);
+        const answerText = lines.join('\n');
+        try {
+          await navigator.clipboard.writeText(answerText);
+          showToast('第 2 轮答案已复制');
+        } catch {
+          window.prompt('复制以下答案后粘贴回 Codex：', answerText);
+        }
+      });
+
+      document.getElementById('clear-round-2-button').addEventListener('click', () => {
+        if (!window.confirm('确定清空第 2 轮答案吗？')) return;
+        form.reset();
+        localStorage.removeItem(storageKey);
+        updateCounter();
+        showToast('已清空第 2 轮答案');
+      });
+
+      restore();
+    })();
+
+    (() => {
+      const storageKey = 'alignspeak-ios-background-tts-grilling-round-3-v1';
+      const form = document.getElementById('round-3-form');
+      const counter = document.getElementById('round-3-answered-count');
+      const saveState = document.getElementById('round-3-save-state');
+      const toast = document.getElementById('toast');
+      const questionIds = ['q7', 'q8', 'q9', 'q10', 'q11', 'q12', 'q13', 'q14'];
+
+      const readForm = () => {
+        const data = {};
+        for (const id of questionIds) {
+          data[id] = form.querySelector(`input[name="${id}"]:checked`)?.value ?? '';
+          data[`${id}Note`] = form.querySelector(`[name="${id}-note"]`)?.value.trim() ?? '';
+        }
+        return data;
+      };
+
+      const updateCounter = () => {
+        const data = readForm();
+        counter.textContent = String(questionIds.filter((id) => data[id]).length);
+      };
+
+      const showToast = (message) => {
+        toast.textContent = message;
+        toast.classList.add('show');
+        window.setTimeout(() => toast.classList.remove('show'), 1800);
+      };
+
+      const persist = () => {
+        localStorage.setItem(storageKey, JSON.stringify(readForm()));
+        updateCounter();
+        saveState.textContent = '已自动保存';
+        saveState.classList.add('ok');
+        window.clearTimeout(persist.timer);
+        persist.timer = window.setTimeout(() => {
+          saveState.textContent = '答案会自动保存在本浏览器';
+          saveState.classList.remove('ok');
+        }, 1300);
+      };
+
+      const restore = () => {
+        try {
+          const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          for (const id of questionIds) {
+            if (data[id]) {
+              const radio = [...form.querySelectorAll(`input[name="${id}"]`)]
+                .find((item) => item.value === data[id]);
+              if (radio) radio.checked = true;
+            }
+            const note = form.querySelector(`[name="${id}-note"]`);
+            if (note && data[`${id}Note`]) note.value = data[`${id}Note`];
+          }
+        } catch {
+          localStorage.removeItem(storageKey);
+        }
+        updateCounter();
+      };
+
+      form.addEventListener('input', persist);
+
+      document.getElementById('copy-round-3-button').addEventListener('click', async () => {
+        const data = readForm();
+        const answered = questionIds.filter((id) => data[id]).length;
+        if (answered < questionIds.length) {
+          showToast(`还有 ${questionIds.length - answered} 题未选择`);
+          return;
+        }
+        const lines = [
+          'AlignSpeak · iOS 后台循环 TTS 规划',
+          '第 3 轮回答',
+          '',
+        ];
+        for (const id of questionIds) {
+          lines.push(`${id.toUpperCase()}: ${data[id]}`);
+          if (data[`${id}Note`]) lines.push(`补充: ${data[`${id}Note`]}`);
+          lines.push('');
+        }
+        const answerText = lines.join('\n').trim();
+        try {
+          await navigator.clipboard.writeText(answerText);
+          showToast('第 3 轮答案已复制');
+        } catch {
+          window.prompt('复制以下答案后粘贴回 Codex：', answerText);
+        }
+      });
+
+      document.getElementById('clear-round-3-button').addEventListener('click', () => {
+        if (!window.confirm('确定清空第 3 轮答案吗？')) return;
+        form.reset();
+        localStorage.removeItem(storageKey);
+        updateCounter();
+        showToast('已清空第 3 轮答案');
+      });
+
+      restore();
+    })();
+
+    (() => {
+      const storageKey = 'alignspeak-ios-background-tts-grilling-round-4-v1';
+      const form = document.getElementById('round-4-form');
+      const counter = document.getElementById('round-4-answered-count');
+      const saveState = document.getElementById('round-4-save-state');
+      const toast = document.getElementById('toast');
+      const questionIds = ['q15', 'q16', 'q17', 'q18', 'q19', 'q20', 'q21'];
+
+      const readForm = () => {
+        const data = {};
+        for (const id of questionIds) {
+          data[id] = form.querySelector(`input[name="${id}"]:checked`)?.value ?? '';
+          data[`${id}Note`] = form.querySelector(`[name="${id}-note"]`)?.value.trim() ?? '';
+        }
+        return data;
+      };
+
+      const updateCounter = () => {
+        const data = readForm();
+        counter.textContent = String(questionIds.filter((id) => data[id]).length);
+      };
+
+      const showToast = (message) => {
+        toast.textContent = message;
+        toast.classList.add('show');
+        window.setTimeout(() => toast.classList.remove('show'), 1800);
+      };
+
+      const persist = () => {
+        localStorage.setItem(storageKey, JSON.stringify(readForm()));
+        updateCounter();
+        saveState.textContent = '已自动保存';
+        saveState.classList.add('ok');
+        window.clearTimeout(persist.timer);
+        persist.timer = window.setTimeout(() => {
+          saveState.textContent = '答案会自动保存在本浏览器';
+          saveState.classList.remove('ok');
+        }, 1300);
+      };
+
+      const restore = () => {
+        try {
+          const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          for (const id of questionIds) {
+            if (data[id]) {
+              const radio = [...form.querySelectorAll(`input[name="${id}"]`)]
+                .find((item) => item.value === data[id]);
+              if (radio) radio.checked = true;
+            }
+            const note = form.querySelector(`[name="${id}-note"]`);
+            if (note && data[`${id}Note`]) note.value = data[`${id}Note`];
+          }
+        } catch {
+          localStorage.removeItem(storageKey);
+        }
+        updateCounter();
+      };
+
+      form.addEventListener('input', persist);
+
+      document.getElementById('copy-round-4-button').addEventListener('click', async () => {
+        const data = readForm();
+        const answered = questionIds.filter((id) => data[id]).length;
+        if (answered < questionIds.length) {
+          showToast(`还有 ${questionIds.length - answered} 题未选择`);
+          return;
+        }
+        const lines = [
+          'AlignSpeak · iOS 后台循环 TTS 规划',
+          '第 4 轮回答',
+          '',
+        ];
+        for (const id of questionIds) {
+          lines.push(`${id.toUpperCase()}: ${data[id]}`);
+          if (data[`${id}Note`]) lines.push(`补充: ${data[`${id}Note`]}`);
+          lines.push('');
+        }
+        const answerText = lines.join('\n').trim();
+        try {
+          await navigator.clipboard.writeText(answerText);
+          showToast('第 4 轮答案已复制');
+        } catch {
+          window.prompt('复制以下答案后粘贴回 Codex：', answerText);
+        }
+      });
+
+      document.getElementById('clear-round-4-button').addEventListener('click', () => {
+        if (!window.confirm('确定清空第 4 轮答案吗？')) return;
+        form.reset();
+        localStorage.removeItem(storageKey);
+        updateCounter();
+        showToast('已清空第 4 轮答案');
+      });
+
+      restore();
+    })();
+
+    (() => {
+      const storageKey = 'alignspeak-ios-background-tts-grilling-round-5-v1';
+      const form = document.getElementById('round-5-form');
+      const counter = document.getElementById('round-5-answered-count');
+      const saveState = document.getElementById('round-5-save-state');
+      const toast = document.getElementById('toast');
+      const questionIds = ['q22', 'q23', 'q24', 'q25', 'q26', 'q27'];
+
+      const readForm = () => {
+        const data = {};
+        for (const id of questionIds) {
+          data[id] = form.querySelector(`input[name="${id}"]:checked`)?.value ?? '';
+          data[`${id}Note`] = form.querySelector(`[name="${id}-note"]`)?.value.trim() ?? '';
+        }
+        return data;
+      };
+
+      const updateCounter = () => {
+        const data = readForm();
+        counter.textContent = String(questionIds.filter((id) => data[id]).length);
+      };
+
+      const showToast = (message) => {
+        toast.textContent = message;
+        toast.classList.add('show');
+        window.setTimeout(() => toast.classList.remove('show'), 1800);
+      };
+
+      const persist = () => {
+        localStorage.setItem(storageKey, JSON.stringify(readForm()));
+        updateCounter();
+        saveState.textContent = '已自动保存';
+        saveState.classList.add('ok');
+        window.clearTimeout(persist.timer);
+        persist.timer = window.setTimeout(() => {
+          saveState.textContent = '答案会自动保存在本浏览器';
+          saveState.classList.remove('ok');
+        }, 1300);
+      };
+
+      const restore = () => {
+        try {
+          const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          for (const id of questionIds) {
+            if (data[id]) {
+              const radio = [...form.querySelectorAll(`input[name="${id}"]`)]
+                .find((item) => item.value === data[id]);
+              if (radio) radio.checked = true;
+            }
+            const note = form.querySelector(`[name="${id}-note"]`);
+            if (note && data[`${id}Note`]) note.value = data[`${id}Note`];
+          }
+        } catch {
+          localStorage.removeItem(storageKey);
+        }
+        updateCounter();
+      };
+
+      form.addEventListener('input', persist);
+
+      document.getElementById('copy-round-5-button').addEventListener('click', async () => {
+        const data = readForm();
+        const answered = questionIds.filter((id) => data[id]).length;
+        if (answered < questionIds.length) {
+          showToast(`还有 ${questionIds.length - answered} 题未选择`);
+          return;
+        }
+        const lines = [
+          'AlignSpeak · iOS 后台循环 TTS 规划',
+          '第 5 轮回答',
+          '',
+        ];
+        for (const id of questionIds) {
+          lines.push(`${id.toUpperCase()}: ${data[id]}`);
+          if (data[`${id}Note`]) lines.push(`补充: ${data[`${id}Note`]}`);
+          lines.push('');
+        }
+        const answerText = lines.join('\n').trim();
+        try {
+          await navigator.clipboard.writeText(answerText);
+          showToast('第 5 轮答案已复制');
+        } catch {
+          window.prompt('复制以下答案后粘贴回 Codex：', answerText);
+        }
+      });
+
+      document.getElementById('clear-round-5-button').addEventListener('click', () => {
+        if (!window.confirm('确定清空第 5 轮答案吗？')) return;
+        form.reset();
+        localStorage.removeItem(storageKey);
+        updateCounter();
+        showToast('已清空第 5 轮答案');
+      });
+
+      restore();
+    })();
+
+    (() => {
+      const storageKey = 'alignspeak-ios-background-tts-grilling-round-6-v1';
+      const form = document.getElementById('round-6-form');
+      const counter = document.getElementById('round-6-answered-count');
+      const saveState = document.getElementById('round-6-save-state');
+      const toast = document.getElementById('toast');
+
+      const readForm = () => ({
+        q28: form.querySelector('input[name="q28"]:checked')?.value ?? '',
+        q28Note: form.querySelector('[name="q28-note"]')?.value.trim() ?? '',
+      });
+
+      const updateCounter = () => {
+        counter.textContent = readForm().q28 ? '1' : '0';
+      };
+
+      const showToast = (message) => {
+        toast.textContent = message;
+        toast.classList.add('show');
+        window.setTimeout(() => toast.classList.remove('show'), 1800);
+      };
+
+      const persist = () => {
+        localStorage.setItem(storageKey, JSON.stringify(readForm()));
+        updateCounter();
+        saveState.textContent = '已自动保存';
+        saveState.classList.add('ok');
+        window.clearTimeout(persist.timer);
+        persist.timer = window.setTimeout(() => {
+          saveState.textContent = '答案会自动保存在本浏览器';
+          saveState.classList.remove('ok');
+        }, 1300);
+      };
+
+      const restore = () => {
+        try {
+          const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          if (data.q28) {
+            const radio = [...form.querySelectorAll('input[name="q28"]')]
+              .find((item) => item.value === data.q28);
+            if (radio) radio.checked = true;
+          }
+          if (data.q28Note) form.querySelector('[name="q28-note"]').value = data.q28Note;
+        } catch {
+          localStorage.removeItem(storageKey);
+        }
+        updateCounter();
+      };
+
+      form.addEventListener('input', persist);
+
+      document.getElementById('copy-round-6-button').addEventListener('click', async () => {
+        const data = readForm();
+        if (!data.q28) {
+          showToast('请先完成 Q28');
+          return;
+        }
+        const lines = [
+          'AlignSpeak · iOS 后台循环 TTS 规划',
+          '第 6 轮回答',
+          '',
+          `Q28: ${data.q28}`,
+        ];
+        if (data.q28Note) lines.push(`补充: ${data.q28Note}`);
+        const answerText = lines.join('\n');
+        try {
+          await navigator.clipboard.writeText(answerText);
+          showToast('第 6 轮答案已复制');
+        } catch {
+          window.prompt('复制以下答案后粘贴回 Codex：', answerText);
+        }
+      });
+
+      document.getElementById('clear-round-6-button').addEventListener('click', () => {
+        if (!window.confirm('确定清空第 6 轮答案吗？')) return;
+        form.reset();
+        localStorage.removeItem(storageKey);
+        updateCounter();
+        showToast('已清空第 6 轮答案');
+      });
+
+      restore();
+    })();
+
+    (() => {
+      const storageKey = 'alignspeak-ios-background-tts-grilling-round-7-v1';
+      const form = document.getElementById('round-7-form');
+      const counter = document.getElementById('round-7-answered-count');
+      const saveState = document.getElementById('round-7-save-state');
+      const toast = document.getElementById('toast');
+
+      const readForm = () => ({
+        q29: form.querySelector('input[name="q29"]:checked')?.value ?? '',
+        q29Note: form.querySelector('[name="q29-note"]')?.value.trim() ?? '',
+      });
+
+      const updateCounter = () => {
+        counter.textContent = readForm().q29 ? '1' : '0';
+      };
+
+      const showToast = (message) => {
+        toast.textContent = message;
+        toast.classList.add('show');
+        window.setTimeout(() => toast.classList.remove('show'), 1800);
+      };
+
+      const persist = () => {
+        localStorage.setItem(storageKey, JSON.stringify(readForm()));
+        updateCounter();
+        saveState.textContent = '已自动保存';
+        saveState.classList.add('ok');
+        window.clearTimeout(persist.timer);
+        persist.timer = window.setTimeout(() => {
+          saveState.textContent = '确认会自动保存在本浏览器';
+          saveState.classList.remove('ok');
+        }, 1300);
+      };
+
+      const restore = () => {
+        try {
+          const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          if (data.q29) {
+            const radio = [...form.querySelectorAll('input[name="q29"]')]
+              .find((item) => item.value === data.q29);
+            if (radio) radio.checked = true;
+          }
+          if (data.q29Note) form.querySelector('[name="q29-note"]').value = data.q29Note;
+        } catch {
+          localStorage.removeItem(storageKey);
+        }
+        updateCounter();
+      };
+
+      form.addEventListener('input', persist);
+
+      document.getElementById('copy-round-7-button').addEventListener('click', async () => {
+        const data = readForm();
+        if (!data.q29) {
+          showToast('请先完成 Q29');
+          return;
+        }
+        if (data.q29.startsWith('B｜') || data.q29.startsWith('C｜')) {
+          if (!data.q29Note) {
+            showToast('选择 B/C 时请填写补充说明');
+            return;
+          }
+        }
+        const lines = [
+          'AlignSpeak · iOS 后台循环 TTS 规划',
+          '第 7 轮方案确认',
+          '',
+          `Q29: ${data.q29}`,
+        ];
+        if (data.q29Note) lines.push(`补充: ${data.q29Note}`);
+        const answerText = lines.join('\n');
+        try {
+          await navigator.clipboard.writeText(answerText);
+          showToast('方案确认已复制');
+        } catch {
+          window.prompt('复制以下确认后粘贴回 Codex：', answerText);
+        }
+      });
+
+      document.getElementById('clear-round-7-button').addEventListener('click', () => {
+        if (!window.confirm('确定清空方案确认吗？')) return;
+        form.reset();
+        localStorage.removeItem(storageKey);
+        updateCounter();
+        showToast('已清空方案确认');
+      });
+
+      restore();
+    })();
+  </script>
+</body>
+</html>
