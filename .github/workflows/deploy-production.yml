@@ -295,8 +295,8 @@ jobs:
               docker compose -f compose.yml $compose_profile_args pull web
               docker compose -f compose.yml $compose_profile_args up -d --no-deps web
             elif [ "$DEPLOY_API" = "true" ]; then
-              docker compose -f compose.yml $compose_profile_args pull api
-              docker compose -f compose.yml $compose_profile_args up -d --no-deps api
+              docker compose -f compose.yml $compose_profile_args pull api worker
+              docker compose -f compose.yml $compose_profile_args up -d --no-deps api worker
             else
               echo "No deployable service changes detected"
               exit 0
@@ -307,7 +307,7 @@ jobs:
               services_to_check="$services_to_check web"
             fi
             if [ "$DEPLOY_API" = "true" ]; then
-              services_to_check="$services_to_check api"
+              services_to_check="$services_to_check api worker"
             fi
             if [ -n "$compose_profile_args" ] && [ "$DEPLOY_WEB" = "true" ] && [ "$DEPLOY_API" = "true" ]; then
               services_to_check="$services_to_check db_admin"

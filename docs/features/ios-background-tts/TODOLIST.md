@@ -60,7 +60,7 @@
 
 ## T06 · Worker 部署、FFmpeg 与资产清理
 
-- [ ] 让开发/生产 Worker 真正运行，并加入音频工具、共享卷、健康与清理机制。
+- [x] 让开发/生产 Worker 真正运行，并加入音频工具、共享卷、健康与清理机制。
 
 范围：Dockerfile、Compose、Worker entrypoint、配置、TTL/orphan cleanup、运维文档和测试。
 依赖：T05。
@@ -113,3 +113,4 @@
 | T03 | 见对应 Git 提交 | 分段准备/单段回归 13 passed；后端完整测试 36 passed；edge-tts 7.2.8 与 pip check 通过 |
 | T04 | 见对应 Git 提交 | 真实 FFmpeg/processor 测试 3 passed；后端完整测试 39 passed；24kHz/mono/48kbps 验证通过 |
 | T05 | 见对应 Git 提交 | API/Range/所有权测试 9 passed；后端完整回归与 OpenAPI 生成通过 |
+| T06 | 见对应 Git 提交 | Worker/清理/配额目标回归 14 passed；后端完整测试 52 passed；开发/生产 Compose config、FFmpeg/ffprobe 与 compileall 通过；本机 Docker 引擎未运行，镜像 build 留待 CI |

@@ -83,7 +83,8 @@ services:
   worker:
     build:
       context: ./apps/api
-    command: ["python", "-c", "import time; print('worker placeholder started'); time.sleep(3600)"]
+    command: ["python", "-m", "app.workers.article_tts"]
+    restart: unless-stopped
     env_file:
       - ./apps/api/.env.secrets
     environment:
@@ -95,14 +96,19 @@ services:
       OPENAI_MONTHLY_BUDGET_USD: ${OPENAI_MONTHLY_BUDGET_USD:-10}
       OPENAI_BUDGET_ALERT_THRESHOLD_USD: ${OPENAI_BUDGET_ALERT_THRESHOLD_USD:-8}
       OPENAI_BUDGET_HARD_STOP_USD: ${OPENAI_BUDGET_HARD_STOP_USD:-9.5}
+      TTS_MEDIA_DIR: /app/media/tts
     volumes:
       - ./data/media/tts:/app/media/tts
       - ./data/media/stt:/app/media/stt
     depends_on:
       db:
         condition: service_healthy
-    profiles:
-      - worker
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.workers.article_tts", "--healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   pgdata:

@@ -17,9 +17,15 @@ from app.infrastructure.repositories.article_tts_repository import ArticleTtsRep
 from app.infrastructure.repositories.tts_repository import TtsRepository
 from app.models import ArticleTtsAsset, ArticleTtsAssetSegment, ArticleTtsJob, utcnow
 from app.services.article_tts_merge_service import (
+    DEFAULT_LOOP_PAUSE_MS,
+    DEFAULT_SEGMENT_PAUSE_MS,
     ArticleTtsMergeError,
     ArticleTtsMergeResult,
     merge_article_tts_audio,
+)
+from app.services.article_tts_cleanup import (
+    ArticleTtsStorageLimitError,
+    ensure_article_tts_storage_capacity,
 )
 from app.services.article_tts_worker import (
     ArticleTtsJobContext,
@@ -179,9 +185,35 @@ class ArticleTtsJobProcessor:
                 media_root=self.media_root,
                 relative_path=relative_path,
             )
+            encoded_pause_bytes = round(
+                (
+                    DEFAULT_SEGMENT_PAUSE_MS * max(len(prepared) - 1, 0)
+                    + DEFAULT_LOOP_PAUSE_MS
+                )
+                / 1000
+                * 48_000
+                / 8
+            )
+            estimated_output_bytes = 65_536 + encoded_pause_bytes + sum(
+                segment.media_path.stat().st_size
+                for segment in prepared
+                if segment.media_path.is_file()
+            )
+            ensure_article_tts_storage_capacity(
+                media_root=self.media_root,
+                max_bytes=settings.article_tts_storage_max_bytes,
+                additional_bytes=estimated_output_bytes,
+                replacement_path=output_path,
+            )
             merge_result = self.merge_audio(
                 prepared_segments=prepared,
                 output_path=output_path,
+            )
+            ensure_article_tts_storage_capacity(
+                media_root=self.media_root,
+                max_bytes=settings.article_tts_storage_max_bytes,
+                additional_bytes=merge_result.probe.file_size,
+                replacement_path=output_path,
             )
             if not context.heartbeat():
                 output_path.unlink(missing_ok=True)
@@ -230,4 +262,11 @@ class ArticleTtsJobProcessor:
             raise ArticleTtsProcessingError(
                 code="merge_failed",
                 message="The article audio could not be merged.",
+            ) from exc
+        except ArticleTtsStorageLimitError as exc:
+            output_path.unlink(missing_ok=True)
+            self.article_repository.mark_asset_failed(asset, updated_at=utcnow())
+            raise ArticleTtsProcessingError(
+                code="storage_limit",
+                message="Article audio storage is full. Try again after cleanup.",
             ) from exc

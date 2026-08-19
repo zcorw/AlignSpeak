@@ -4,7 +4,7 @@
 
 - CI and CD are separated. Pull requests only verify quality; merges to `main` publish images and deploy.
 - Production uses immutable Docker images instead of building on the server. This makes deployment deterministic and rollback simple.
-- The Ubuntu host keeps the public Nginx role. Compose only runs `web`, `api`, and `db`, all bound to `127.0.0.1`.
+- The Ubuntu host keeps the public Nginx role. Compose runs `web`, `api`, the article-audio `worker`, and `db`; only the web and API services bind loopback ports.
 - Application secrets stay on the server in `.env.production`. GitHub Actions only needs SSH access, plus optional GHCR credentials if the registry is private.
 
 ## Repository workflows
@@ -96,6 +96,12 @@ Optional values:
 - `API_PORT`: loopback port exposed by the API container for host Nginx upstream
 - `DB_ADMIN_PORT`: loopback port reserved for the optional browser-based database admin container
 - `DB_ADMIN_ENABLED`: whether the deployment workflow should include the `db-admin` Compose profile on the server
+- `ARTICLE_TTS_WORKER_LEASE_SECONDS`: database lease duration for a claimed full-article TTS job
+- `ARTICLE_TTS_JOB_MAX_ATTEMPTS`: maximum whole-job claim attempts after crashes or lease expiry
+- `ARTICLE_TTS_CLEANUP_INTERVAL_SECONDS`: interval between asset cleanup passes
+- `ARTICLE_TTS_TEMP_FILE_TTL_SECONDS`: retention for orphan MP3, merge directories, and `.tmp` files
+- `ARTICLE_TTS_ASSET_RETENTION_SECONDS`: minimum age before a superseded full-article asset may be retired
+- `ARTICLE_TTS_STORAGE_MAX_BYTES`: hard quota for published full-article MP3 files; the job fails with `storage_limit` before merge when exceeded
 
 ### 5. Update values in the host Nginx config
 
@@ -151,8 +157,28 @@ docker compose -f compose.yml exec -T db psql -U alignspeak -d alignspeak < read
 After the first successful GitHub deployment:
 
 - Check `docker compose -f /opt/alignspeak/compose.yml ps`
+- Confirm both `api` and `worker` are healthy; the worker healthcheck verifies its heartbeat, database, FFmpeg, and ffprobe
 - Check `https://your-domain/`
 - Check `https://your-domain/api/health`
+
+## Article TTS worker operations
+
+The `worker` uses the same API image and `/app/media/tts` volume as the API. Deployments that change the API image restart both services, so their schema, encoder profile, and Python code stay aligned.
+
+Useful checks:
+
+```bash
+cd /opt/alignspeak
+docker compose -f compose.yml ps api worker
+docker compose -f compose.yml logs --tail=200 worker
+docker compose -f compose.yml exec worker ffmpeg -version
+docker compose -f compose.yml exec worker ffprobe -version
+docker compose -f compose.yml exec worker python -m app.workers.article_tts --healthcheck
+```
+
+Cleanup runs at worker startup and then on the configured interval. It keeps the latest ready asset for every live article, retains superseded assets for at least seven days by default, and never deletes referenced segment TTS cache files. Database-backed assets enter `deleting` before filesystem removal; a failed removal remains retryable. Orphan article MP3 files, stale merge directories, and `.tmp` files are removed only after their TTL.
+
+Before reducing retention, remember that an already downloaded browser Blob can keep playing, but a client that has not finished downloading an old asset may no longer be able to fetch it after cleanup. Watch the TTS media volume and cleanup failure logs before changing `ARTICLE_TTS_STORAGE_MAX_BYTES`.
 
 ## Browser Database Admin
 

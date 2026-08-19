@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     tts_default_voice: str = "default"
     article_tts_worker_lease_seconds: int = 120
     article_tts_job_max_attempts: int = 3
+    article_tts_worker_poll_seconds: float = 2.0
+    article_tts_cleanup_interval_seconds: int = 60 * 60
+    article_tts_temp_file_ttl_seconds: int = 24 * 60 * 60
+    article_tts_asset_retention_seconds: int = 7 * 24 * 60 * 60
+    article_tts_cleanup_batch_size: int = 100
+    article_tts_storage_max_bytes: int = 10 * 1024 * 1024 * 1024
+    article_tts_worker_health_file: str = "/tmp/article-tts-worker.heartbeat"
+    article_tts_worker_health_stale_seconds: int = 90
 
     # STT configuration
     stt_provider: str = "openai"

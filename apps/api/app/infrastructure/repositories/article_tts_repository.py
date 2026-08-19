@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 
-from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy import and_, delete, exists, func, or_, select, update
 from sqlalchemy.sql.dml import Update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.models import Article, ArticleTtsAsset, ArticleTtsAssetSegment, ArticleTtsJob
 
@@ -510,3 +510,105 @@ class ArticleTtsRepository:
             .order_by(ArticleTtsAssetSegment.segment_order.asc())
         )
         return list(self.db.scalars(statement).all())
+
+    def claim_asset_cleanup_candidates(
+        self,
+        *,
+        now: datetime,
+        retention_seconds: int,
+        limit: int,
+    ) -> list[ArticleTtsAsset]:
+        """Move safe, expired article assets into the retryable deleting state.
+
+        The latest ready asset for a live article is always retained. A ready
+        asset is eligible only after its retention window and when a newer ready
+        version exists or the owning article has been soft-deleted. Assets that
+        are already deleting are returned first so failed filesystem deletion is
+        retried on the next cleanup pass.
+        """
+
+        newer = aliased(ArticleTtsAsset)
+        cutoff = now - timedelta(seconds=retention_seconds)
+        newer_ready_exists = exists(
+            select(newer.id).where(
+                newer.user_id == ArticleTtsAsset.user_id,
+                newer.article_id == ArticleTtsAsset.article_id,
+                newer.status == "ready",
+                or_(
+                    newer.ready_at > ArticleTtsAsset.ready_at,
+                    and_(
+                        newer.ready_at == ArticleTtsAsset.ready_at,
+                        newer.id > ArticleTtsAsset.id,
+                    ),
+                ),
+            )
+        )
+        article_deleted = exists(
+            select(Article.id).where(
+                Article.id == ArticleTtsAsset.article_id,
+                Article.deleted_at.is_not(None),
+            )
+        )
+        active_job_exists = exists(
+            select(ArticleTtsJob.id).where(
+                ArticleTtsJob.asset_id == ArticleTtsAsset.id,
+                ArticleTtsJob.status.in_(("queued", "processing")),
+            )
+        )
+        eligible_ready = and_(
+            ArticleTtsAsset.status == "ready",
+            ArticleTtsAsset.ready_at.is_not(None),
+            ArticleTtsAsset.ready_at <= cutoff,
+            or_(newer_ready_exists, article_deleted),
+            ~active_job_exists,
+        )
+        statement = (
+            select(ArticleTtsAsset)
+            .where(or_(ArticleTtsAsset.status == "deleting", eligible_ready))
+            .order_by(
+                (ArticleTtsAsset.status == "deleting").desc(),
+                ArticleTtsAsset.updated_at.asc(),
+            )
+            .limit(limit)
+        )
+        assets = list(self.db.scalars(statement).all())
+        for asset in assets:
+            if asset.status != "deleting":
+                asset.status = "deleting"
+                asset.updated_at = now
+                self.db.add(asset)
+        self.db.commit()
+        return assets
+
+    def list_referenced_article_asset_paths(self) -> set[str]:
+        statement = select(ArticleTtsAsset.audio_path).where(
+            ArticleTtsAsset.audio_path.is_not(None)
+        )
+        return {str(path) for path in self.db.scalars(statement).all() if path}
+
+    def finalize_asset_cleanup(
+        self,
+        *,
+        asset_id: str,
+        expected_audio_path: str | None,
+        now: datetime,
+    ) -> bool:
+        statement = (
+            update(ArticleTtsAsset)
+            .where(
+                ArticleTtsAsset.id == asset_id,
+                ArticleTtsAsset.status == "deleting",
+                ArticleTtsAsset.audio_path == expected_audio_path,
+            )
+            .values(
+                audio_path=None,
+                duration_ms=None,
+                file_size=None,
+                timeline_json=None,
+                ready_at=None,
+                updated_at=now,
+            )
+        )
+        result = self.db.execute(statement.execution_options(synchronize_session=False))
+        self.db.commit()
+        return result.rowcount == 1
