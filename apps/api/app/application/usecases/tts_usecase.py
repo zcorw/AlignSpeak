@@ -320,3 +320,23 @@ def resolve_tts_media_file(filename: str) -> Path:
             status_code=status.HTTP_404_NOT_FOUND,
         )
     return media_path
+
+
+def resolve_tts_media_file_for_user(
+    *,
+    repository: TtsRepository,
+    current_user: User,
+    filename: str,
+) -> Path:
+    requested = Path(filename).name
+    asset = repository.get_tts_asset_for_user_by_audio_url(
+        audio_url=f"/media/tts/{requested}",
+        user_id=current_user.id,
+    )
+    if asset is None:
+        raise AppError(
+            code="NOT_FOUND",
+            message="TTS audio file not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return resolve_tts_media_file(filename=requested)

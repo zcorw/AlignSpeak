@@ -70,6 +70,19 @@ class TtsRepository:
         )
         return self.db.scalar(statement.execution_options(populate_existing=True))
 
+    def get_tts_asset_for_user_by_audio_url(self, *, audio_url: str, user_id: str) -> TtsAsset | None:
+        statement = (
+            select(TtsAsset)
+            .join(ArticleSegment, ArticleSegment.id == TtsAsset.segment_id)
+            .join(Article, Article.id == ArticleSegment.article_id)
+            .where(
+                TtsAsset.audio_url == audio_url,
+                Article.user_id == user_id,
+                Article.deleted_at.is_(None),
+            )
+        )
+        return self.db.scalar(statement.execution_options(populate_existing=True))
+
     def list_segment_reading_overrides(
         self,
         *,

@@ -4,7 +4,7 @@ from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.sql.dml import Update
 from sqlalchemy.orm import Session
 
-from app.models import ArticleTtsAsset, ArticleTtsAssetSegment, ArticleTtsJob
+from app.models import Article, ArticleTtsAsset, ArticleTtsAssetSegment, ArticleTtsJob
 
 
 def _claimable_job_predicate(*, now: datetime):
@@ -326,6 +326,44 @@ class ArticleTtsRepository:
             self.db.refresh(job)
         return job
 
+    def requeue_job_for_rebuild(
+        self,
+        *,
+        job_id: str,
+        user_id: str,
+        now: datetime,
+    ) -> ArticleTtsJob | None:
+        statement = (
+            update(ArticleTtsJob)
+            .where(
+                ArticleTtsJob.id == job_id,
+                ArticleTtsJob.user_id == user_id,
+                ArticleTtsJob.status == "done",
+            )
+            .values(
+                status="queued",
+                completed_segments=0,
+                attempt_count=0,
+                asset_id=None,
+                error_code=None,
+                error_message=None,
+                failed_segment_id=None,
+                failed_segment_order=None,
+                lease_owner=None,
+                lease_expires_at=None,
+                heartbeat_at=None,
+                started_at=None,
+                finished_at=None,
+                updated_at=now,
+            )
+            .returning(ArticleTtsJob)
+        )
+        job = self.db.scalar(statement.execution_options(synchronize_session=False))
+        self.db.commit()
+        if job is not None:
+            self.db.refresh(job)
+        return job
+
     def create_asset(self, asset: ArticleTtsAsset) -> ArticleTtsAsset:
         self.db.add(asset)
         self.db.commit()
@@ -392,6 +430,41 @@ class ArticleTtsRepository:
         statement = select(ArticleTtsAsset).where(
             ArticleTtsAsset.id == asset_id,
             ArticleTtsAsset.user_id == user_id,
+        )
+        return self.db.scalar(statement.execution_options(populate_existing=True))
+
+    def get_ready_asset_for_user(self, *, asset_id: str, user_id: str) -> ArticleTtsAsset | None:
+        statement = (
+            select(ArticleTtsAsset)
+            .join(Article, Article.id == ArticleTtsAsset.article_id)
+            .where(
+                ArticleTtsAsset.id == asset_id,
+                ArticleTtsAsset.user_id == user_id,
+                ArticleTtsAsset.status == "ready",
+                Article.user_id == user_id,
+                Article.deleted_at.is_(None),
+            )
+        )
+        return self.db.scalar(statement.execution_options(populate_existing=True))
+
+    def get_latest_ready_asset_for_article(
+        self,
+        *,
+        article_id: str,
+        user_id: str,
+    ) -> ArticleTtsAsset | None:
+        statement = (
+            select(ArticleTtsAsset)
+            .join(Article, Article.id == ArticleTtsAsset.article_id)
+            .where(
+                ArticleTtsAsset.article_id == article_id,
+                ArticleTtsAsset.user_id == user_id,
+                ArticleTtsAsset.status == "ready",
+                Article.user_id == user_id,
+                Article.deleted_at.is_(None),
+            )
+            .order_by(ArticleTtsAsset.ready_at.desc(), ArticleTtsAsset.created_at.desc())
+            .limit(1)
         )
         return self.db.scalar(statement.execution_options(populate_existing=True))
 

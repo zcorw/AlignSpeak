@@ -51,7 +51,7 @@
 
 ## T05 · 整篇 TTS API 与媒体所有权
 
-- [ ] 实现任务创建/查询、当前资产查询和受保护的整篇媒体下载。
+- [x] 实现任务创建/查询、当前资产查询和受保护的整篇媒体下载。
 
 范围：FastAPI router/schema/use case、Range/文件响应、授权、API 测试。
 依赖：T04。
@@ -112,3 +112,4 @@
 | T02 | 见对应 Git 提交 | 生命周期/仓储目标测试 13 passed；PostgreSQL claim SQL 编译；后端完整回归通过 |
 | T03 | 见对应 Git 提交 | 分段准备/单段回归 13 passed；后端完整测试 36 passed；edge-tts 7.2.8 与 pip check 通过 |
 | T04 | 见对应 Git 提交 | 真实 FFmpeg/processor 测试 3 passed；后端完整测试 39 passed；24kHz/mono/48kbps 验证通过 |
+| T05 | 见对应 Git 提交 | API/Range/所有权测试 9 passed；后端完整回归与 OpenAPI 生成通过 |
