@@ -69,7 +69,7 @@
 
 ## T07 · 前端整篇服务与全局播放器内核
 
-- [ ] 建立 API service、应用级 Provider、单一 Audio 元素、状态机和前端测试基础。
+- [x] 建立 API service、应用级 Provider、单一 Audio 元素、状态机和前端测试基础。
 
 范围：TypeScript 类型/service/store/provider/audio adapter、测试框架与单测；不做最终 UI。
 依赖：T05。
@@ -114,3 +114,4 @@
 | T04 | 见对应 Git 提交 | 真实 FFmpeg/processor 测试 3 passed；后端完整测试 39 passed；24kHz/mono/48kbps 验证通过 |
 | T05 | 见对应 Git 提交 | API/Range/所有权测试 9 passed；后端完整回归与 OpenAPI 生成通过 |
 | T06 | 见对应 Git 提交 | Worker/清理/配额目标回归 14 passed；后端完整测试 52 passed；开发/生产 Compose config、FFmpeg/ffprobe 与 compileall 通过；本机 Docker 引擎未运行，镜像 build 留待 CI |
+| T07 | 见对应 Git 提交 | 前端 API/状态机/Provider 测试 7 passed；ESLint 与 TypeScript/Vite 生产构建通过 |

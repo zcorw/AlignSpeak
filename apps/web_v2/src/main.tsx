@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import { FeedbackProvider } from './components/common/FeedbackProvider'
+import { ArticleTtsPlayerProvider } from './features/articleTts'
 import { theme } from './theme'
 import './locales'
 import App from './App.tsx'
@@ -27,7 +28,9 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <FeedbackProvider>
-          <App />
+          <ArticleTtsPlayerProvider>
+            <App />
+          </ArticleTtsPlayerProvider>
         </FeedbackProvider>
       </ThemeProvider>
     </BrowserRouter>
