@@ -15,6 +15,7 @@ import { articleService } from '../services/articleService'
 import { authService, getApiErrorMessage } from '../services/authService'
 import { useMeOverview } from '../hooks/me/useMeOverview'
 import { useAuthStore } from '../stores/authStore'
+import { usePrepareArticleTts } from '../features/articleTts'
 
 const formatLastPracticedAt = (value: string | null): string => {
   if (!value) return '-'
@@ -55,6 +56,7 @@ export const MePage = () => {
   const [inviteGenerating, setInviteGenerating] = useState(false)
   const [latestInvitationCode, setLatestInvitationCode] = useState<string | null>(null)
   const [inviteFeedback, setInviteFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+  const articleAudio = usePrepareArticleTts()
 
   const filters = [
     { id: 'all' as const, label: t('pages.me.filters.all') },
@@ -209,6 +211,13 @@ export const MePage = () => {
           legacyBadgeLabel={t('pages.me.article.legacyBadge')}
           editLabel={t('common.edit')}
           deleteLabel={t('common.delete')}
+          articleAudioLabel={(article) =>
+            articleAudio.activeArticleId === article.id
+              ? t('articleTts.entry.active')
+              : t('articleTts.entry.prepare')
+          }
+          articleAudioBusyId={articleAudio.startingArticleId}
+          articleAudioActiveId={articleAudio.activeArticleId}
           onOpenArticle={(article) => {
             setActiveArticleId(article.id)
             navigate(`/practice?a=${article.id}&seg=${article.currentSegmentOrder}&lv=L${article.level}`)
@@ -218,6 +227,9 @@ export const MePage = () => {
           }}
           onDeleteArticle={(article) => {
             handleDeleteArticle(article.id)
+          }}
+          onPrepareArticleAudio={(article) => {
+            void articleAudio.start({ articleId: article.id, articleTitle: article.title })
           }}
           toArticleBadge={toArticleBadge}
         />

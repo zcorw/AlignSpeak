@@ -14,6 +14,7 @@ import {
 import { authService } from './services/authService'
 import { entryService } from './services/entryService'
 import { useAuthStore } from './stores/authStore'
+import { ArticleTtsMiniPlayer } from './features/articleTts'
 
 function App() {
   const accessToken = useAuthStore((state) => state.accessToken)
@@ -152,6 +153,7 @@ function App() {
         <Route path="/me" element={isAuthenticated ? <MePage /> : <Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to={isAuthenticated ? defaultAuthedRoute : '/login'} replace />} />
       </Routes>
+      {isAuthenticated && <ArticleTtsMiniPlayer />}
     </Box>
   )
 }

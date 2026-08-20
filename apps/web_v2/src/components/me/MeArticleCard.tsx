@@ -1,4 +1,5 @@
-import { Box, Typography } from '@mui/material'
+import HeadphonesRounded from '@mui/icons-material/HeadphonesRounded'
+import { Box, CircularProgress, Typography } from '@mui/material'
 import type { MeArticle } from './types'
 
 interface MeArticleCardProps {
@@ -14,9 +15,13 @@ interface MeArticleCardProps {
   legacyBadgeLabel: string
   editLabel: string
   deleteLabel: string
+  articleAudioLabel: string
+  articleAudioBusy: boolean
+  articleAudioActive: boolean
   onOpen: (article: MeArticle) => void
   onEdit: (article: MeArticle) => void
   onDelete: (article: MeArticle) => void
+  onPrepareArticleAudio: (article: MeArticle) => void
   toArticleBadge: (title: string) => string
 }
 
@@ -33,9 +38,13 @@ export const MeArticleCard = ({
   legacyBadgeLabel,
   editLabel,
   deleteLabel,
+  articleAudioLabel,
+  articleAudioBusy,
+  articleAudioActive,
   onOpen,
   onEdit,
   onDelete,
+  onPrepareArticleAudio,
   toArticleBadge,
 }: MeArticleCardProps) => (
   <Box
@@ -112,6 +121,32 @@ export const MeArticleCard = ({
     </Box>
 
     <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', pt: '2px' }}>
+      <Box
+        component="button"
+        type="button"
+        disabled={articleAudioBusy || articleAudioActive}
+        onClick={(event) => {
+          event.stopPropagation()
+          onPrepareArticleAudio(article)
+        }}
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '5px',
+          border: '1px solid rgba(110,96,238,0.38)',
+          bgcolor: articleAudioActive ? 'rgba(110,96,238,0.18)' : 'rgba(110,96,238,0.08)',
+          color: 'primary.light',
+          borderRadius: '999px',
+          px: '10px',
+          py: '4px',
+          fontSize: '11px',
+          cursor: articleAudioBusy || articleAudioActive ? 'default' : 'pointer',
+          opacity: articleAudioBusy ? 0.7 : 1,
+        }}
+      >
+        {articleAudioBusy ? <CircularProgress size={12} /> : <HeadphonesRounded sx={{ fontSize: 14 }} />}
+        {articleAudioLabel}
+      </Box>
       <Box
         component="button"
         type="button"

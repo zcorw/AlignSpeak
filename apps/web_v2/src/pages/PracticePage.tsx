@@ -1,4 +1,4 @@
-import { ArrowBackRounded } from '@mui/icons-material'
+import { ArrowBackRounded, HeadphonesRounded } from '@mui/icons-material'
 import { Box, Button, CircularProgress, Typography } from '@mui/material'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -29,6 +29,7 @@ import { usePracticeRouteState } from '../hooks/practice/usePracticeRouteState'
 import { computeMaskedReadingTokenIndices } from '../components/practice/masking'
 import { buildSentenceTextRanges, splitTextToSentences } from '../components/practice/timelineText'
 import { useConfirm, useNotifier } from '../components/common/feedbackHooks'
+import { usePrepareArticleTts } from '../features/articleTts'
 
 type Level = PracticeLevel
 type SegmentResultState = {
@@ -52,6 +53,7 @@ export const PracticePage = () => {
     showScore: false,
   })
   const [progressRefreshVersion, setProgressRefreshVersion] = useState(0)
+  const articleAudio = usePrepareArticleTts()
   const { level, setLevel, queryArticleId, querySegment, searchKey } = usePracticeRouteState()
   const {
     articleId,
@@ -445,7 +447,26 @@ export const PracticePage = () => {
           targetAccuracyLabel={t('pages.practice.meta.targetAccuracy')}
         />
 
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<HeadphonesRounded />}
+            disabled={
+              !articleId ||
+              loading ||
+              articleAudio.startingArticleId === articleId ||
+              articleAudio.activeArticleId === articleId
+            }
+            onClick={() => {
+              if (!articleId) return
+              void articleAudio.start({ articleId, articleTitle })
+            }}
+          >
+            {articleAudio.activeArticleId === articleId
+              ? t('articleTts.entry.active')
+              : t('articleTts.entry.prepare')}
+          </Button>
           <Button
             variant="outlined"
             size="small"

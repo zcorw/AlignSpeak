@@ -19,9 +19,13 @@ interface MeArticleListProps {
   legacyBadgeLabel: string
   editLabel: string
   deleteLabel: string
+  articleAudioLabel: (article: MeArticle) => string
+  articleAudioBusyId: string | null
+  articleAudioActiveId: string | null
   onOpenArticle: (article: MeArticle) => void
   onEditArticle: (article: MeArticle) => void
   onDeleteArticle: (article: MeArticle) => void
+  onPrepareArticleAudio: (article: MeArticle) => void
   toArticleBadge: (title: string) => string
 }
 
@@ -42,9 +46,13 @@ export const MeArticleList = ({
   legacyBadgeLabel,
   editLabel,
   deleteLabel,
+  articleAudioLabel,
+  articleAudioBusyId,
+  articleAudioActiveId,
   onOpenArticle,
   onEditArticle,
   onDeleteArticle,
+  onPrepareArticleAudio,
   toArticleBadge,
 }: MeArticleListProps) => (
   <Box sx={{ display: 'flex', flexDirection: 'column', px: '20px', pt: '4px', pb: '32px', gap: '10px' }}>
@@ -83,9 +91,13 @@ export const MeArticleList = ({
           legacyBadgeLabel={legacyBadgeLabel}
           editLabel={editLabel}
           deleteLabel={deleteLabel}
+          articleAudioLabel={articleAudioLabel(article)}
+          articleAudioBusy={articleAudioBusyId === article.id}
+          articleAudioActive={articleAudioActiveId === article.id}
           onOpen={onOpenArticle}
           onEdit={onEditArticle}
           onDelete={onDeleteArticle}
+          onPrepareArticleAudio={onPrepareArticleAudio}
           toArticleBadge={toArticleBadge}
         />
       ))
