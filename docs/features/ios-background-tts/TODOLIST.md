@@ -96,7 +96,7 @@
 
 ## T10 · 端到端回归、兼容清单与交付
 
-- [ ] 完成全链路验收、运维/兼容文档同步和最终回归。
+- [x] 完成全链路验收、运维/兼容文档同步和最终回归。
 
 范围：后端集成测试、前端回归、媒体 smoke、文档校准、真机执行模板；只修复本功能回归。
 依赖：T06、T09。
@@ -117,3 +117,4 @@
 | T07 | 见对应 Git 提交 | 前端 API/状态机/Provider 测试 7 passed；ESLint 与 TypeScript/Vite 生产构建通过 |
 | T08 | 见对应 Git 提交 | 入口门槛与迷你播放器交互回归合计前端 12 passed；ESLint 与生产构建通过 |
 | T09 | 见对应 Git 提交 | 循环/睡眠/恢复/跨标签页/Media Session 与 audio focus 回归合计前端 21 passed；ESLint 与生产构建通过 |
+| T10 | 见对应 Git 提交 | API→重启后 Worker→FFmpeg→鉴权/Range 及 20,000 字符边界集成测试通过；后端 54 passed/compileall、前端 21 passed/lint/build、开发与生产 Compose、FFmpeg/ffprobe、文档链接、CI YAML 与 pip check 通过；本机 Docker 引擎未运行，镜像 build/镜像内音频工具检查已设为 CI 门禁；iOS 真机状态保持待验证 |

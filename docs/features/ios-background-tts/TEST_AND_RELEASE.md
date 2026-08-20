@@ -41,13 +41,24 @@
 实现任务需要按改动范围执行，最终至少包括：
 
 ```powershell
-docker compose run --rm api pytest -q
-docker compose run --rm api python -m compileall app
-docker compose run --rm web_v2 yarn lint
-docker compose run --rm web_v2 yarn build
+Push-Location apps/api
+python -m pytest -q
+python -m compileall app
+Pop-Location
+
+Push-Location apps/web_v2
+yarn test --run
+yarn lint
+yarn build
+Pop-Location
+
+docker compose -f docker-compose.yml config --quiet
+docker compose -f deploy/production/compose.yml config --quiet
+ffmpeg -version
+ffprobe -version
 ```
 
-如果 Compose 服务名与仓库实际配置不同，以验证后的等价命令为准，并在 `TODOLIST.md` 的执行记录中更新。前端新增测试框架后还必须运行其 test 命令。
+CI 另外构建真实 API 镜像，并在镜像内验证 `ffmpeg`/`ffprobe`。生产 Compose 校验需要按 `.env.production.example` 提供 `WEB_IMAGE`、`API_IMAGE` 和 `POSTGRES_PASSWORD`。
 
 ## 3. 媒体验证
 
@@ -73,12 +84,11 @@ docker compose run --rm web_v2 yarn build
 
 ## 5. 发布步骤
 
-1. 部署数据库兼容 schema 和 API，但保持前端入口关闭。
-2. 部署带 FFmpeg/ffprobe 的 Worker 和共享媒体卷。
-3. 运行健康检查和一篇小文章的合成 smoke test。
-4. 开启内部用户功能开关，观察任务失败率、耗时、磁盘和旧 API 回归。
-5. 执行 iOS Safari 真机矩阵。
-6. 逐步扩大 Web 入口；Chrome/PWA 只有通过对应矩阵后才标记兼容。
+1. 在非公开验收环境先部署 API、数据库兼容 schema、带 FFmpeg/ffprobe 的 Worker 和共享媒体卷。
+2. 运行 Worker 健康检查和一篇小文章的合成/Range 下载 smoke test。
+3. 部署 Web，观察任务失败率、耗时、磁盘和旧 API 回归。
+4. 按[兼容与发布状态](./COMPATIBILITY_AND_RELEASE_STATUS.md)执行 iOS Safari 真机门禁。
+5. 门禁通过后再把相同镜像版本提升到生产；Chrome/PWA 只有通过对应矩阵后才标记兼容。
 
 ## 6. 观测指标
 
@@ -91,7 +101,7 @@ docker compose run --rm web_v2 yarn build
 
 ## 7. 回滚
 
-- 前端功能开关关闭整篇入口，不影响现有单段/句子 TTS。
+- Web 回滚到上一个镜像标签即可移除整篇入口，不影响现有单段/句子 TTS API。
 - Worker 停止领取新任务，已处理记录保留供排查。
 - API 保留读取已有资产的兼容窗口；不能在仍有客户端使用时立即删除文件。
 - 数据表为新增表，回滚应用时不自动 drop。

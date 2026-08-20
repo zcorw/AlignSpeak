@@ -64,8 +64,8 @@ flowchart LR
 4. 输出临时 MP3。
 5. 使用 `ffprobe` 获取最终真实 `duration_ms` 和媒体参数。
 6. 构建全局时间轴。
-7. `fsync`/关闭句柄后原子 rename 到正式路径。
-8. 同一数据库事务中将资产与任务标为 `ready`/`done`。
+7. 关闭临时输出后使用 `os.replace` 原子发布到正式路径。
+8. 资产映射和元数据在一个数据库事务中标为 `ready`；Worker 随后以持有租约为条件把任务标为 `done`。数据库发布失败时删除刚发布的文件。
 
 只有完成第 7 步的文件才允许对外返回。
 
@@ -77,7 +77,6 @@ flowchart LR
 
 - `article_id` 和文章所有者。
 - 有序段落 ID、顺序和用于 TTS 的文本哈希。
-- 对应分段 TTS 资产 ID。
 - 解析后的默认音色与 `speed=1.0`。
 - 停顿策略、编码配置和时间轴版本。
 
@@ -87,7 +86,7 @@ flowchart LR
 
 ```text
 article_id
-+ ordered[(segment_id, segment_order, segment_tts_text_hash, segment_asset_id)]
++ ordered[(segment_id, segment_order, segment_tts_text_hash)]
 + resolved_voice
 + speed=1.0
 + pause_policy_version

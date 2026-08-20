@@ -1,6 +1,6 @@
 # iOS 后台循环 TTS
 
-状态：已确认，作为实施基线
+状态：实现完成，发布仍待 iOS 真机门禁
 确认日期：2026-08-20
 适用范围：AlignSpeak Web（`apps/web_v2`）与 API（`apps/api`）
 
@@ -10,6 +10,7 @@
 - [技术架构](./ARCHITECTURE.md)：整篇音频生成、缓存、Worker、播放器与失效策略。
 - [API 与数据设计](./API_AND_DATA.md)：表、状态机、接口与错误语义。
 - [测试与发布](./TEST_AND_RELEASE.md)：自动化验证、iOS 真机矩阵、观测与回滚。
+- [兼容与发布状态](./COMPATIBILITY_AND_RELEASE_STATUS.md)：当前自动化证据、真机待测项与逐次执行模板。
 - [实施清单](./TODOLIST.md)：唯一的任务状态来源，按顺序逐项推进。
 - [规划确认页](../../../previews/ios-background-tts-grilling.html)：第 1–7 轮问答形成的只读确认产物。
 

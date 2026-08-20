@@ -1,6 +1,6 @@
 # API 与数据设计
 
-本文定义目标契约；实现中可以按项目既有命名风格调整 Python 类名，但外部行为不得改变。所有 ID 采用现有项目的整数或 UUID 约定，并在实现任务中固定。
+本文记录已经实现的契约。整篇任务与资产 ID 是最长 32 字符的不透明字符串；客户端不得解析其格式。
 
 ## 1. 数据表
 
@@ -29,7 +29,7 @@
 约束：
 
 - `0 <= completed_segments <= total_segments`。
-- 活动状态下相同 `user_id + article_id + input_hash` 只允许一个幂等任务。
+- 相同 `user_id + article_id + input_hash` 只保留一个幂等任务；失败任务通过 retry 回到队列，不创建同版本副本。
 - `done` 必须有关联的 ready 资产。
 - 所有 job 查询都必须校验 `user_id`。
 
@@ -50,7 +50,7 @@
 | `timeline_version` | 全局时间轴版本 |
 | `audio_path` | 服务端相对路径，不直接返回客户端 |
 | `duration_ms` / `file_size` | ffprobe/文件系统实测值 |
-| `timeline` | JSON 全局句子时间轴 |
+| `timeline_json` | JSON 全局句子时间轴 |
 | `created_at` / `updated_at` / `ready_at` | 审计时间 |
 
 约束：
@@ -88,13 +88,10 @@ stateDiagram-v2
   processing --> failed: segment or merge exhausted
   failed --> queued: user retries
   processing --> done: asset atomically published
-  queued --> cancelled: superseded or removed
-  failed --> cancelled: article removed
   done --> [*]
-  cancelled --> [*]
 ```
 
-状态更新必须使用条件更新或行锁，避免两个 Worker 同时完成同一任务。重复执行必须通过缓存键、临时路径隔离和原子发布保持安全。
+`cancelled` 是数据库约束中的保留状态，首版没有公开取消路径。状态更新使用条件更新或行锁，避免两个 Worker 同时完成同一任务。重复执行通过缓存键、临时路径隔离和原子发布保持安全。
 
 ## 3. HTTP API
 
@@ -157,7 +154,7 @@ stateDiagram-v2
 - 查询资产并验证 `asset.user_id == current_user.id`，同时确保文章仍归属用户。
 - 只允许 `ready` 资产。
 - 支持浏览器所需的 Content-Length、Content-Type、Range/206 和安全的 Content-Disposition。
-- 文件缺失时返回稳定错误并将资产标记为不可用，不能返回其他文件。
+- 文件缺失或大小不符时返回稳定的 410，不能返回其他文件；后续创建请求会把对应任务重新排队构建。
 
 ### 3.5 取消语义
 
@@ -167,15 +164,15 @@ stateDiagram-v2
 
 | 错误码 | HTTP/状态 | 客户端行为 |
 | --- | --- | --- |
-| `article_not_found` | 404 | 关闭播放器并提示 |
-| `article_empty` | 422 | 不创建任务 |
-| `article_too_large` | 422 | 沿用 20,000 字符校验 |
+| `ARTICLE_NOT_FOUND` | 404 | 关闭播放器并提示 |
+| `ARTICLE_EMPTY` | 422 | 不创建任务 |
+| `ARTICLE_TOO_LONG` | 400 | 文章创建/编辑沿用 20,000 字符校验 |
 | `segment_tts_failed` | job failed | 列出失败段并允许重试 |
 | `merge_failed` | job failed | 允许重试，保留分段缓存 |
-| `asset_missing` | 404/410 | 清理本地恢复并重新准备 |
-| `asset_stale` | 409 或查询标记 | 下一次播放前准备最新版 |
-| `media_forbidden` | 404 | 不泄漏资产是否存在 |
-| `storage_limit` | 507/job failed | 提示稍后重试/联系管理员 |
+| `ARTICLE_TTS_ASSET_MISSING` | 410 | 清理本地恢复并重新准备 |
+| `ARTICLE_TTS_ASSET_NOT_FOUND` | 404 | 不泄漏资产是否存在或是否属于其他用户 |
+| `RANGE_NOT_SATISFIABLE` | 416 | 放弃该 Range 并重新请求 |
+| `storage_limit` | job failed | 提示稍后重试/联系管理员 |
 
 ## 5. 估算文件大小
 

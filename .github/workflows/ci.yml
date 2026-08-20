@@ -57,15 +57,73 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: apps/api/requirements.txt
+          cache-dependency-path: |
+            apps/api/requirements.txt
+            apps/api/requirements-dev.txt
+
+      - name: Install audio tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest -q
 
       - name: Compile source
         run: python -m compileall app
 
       - name: Smoke import FastAPI app
         run: python -c "from app.main import app; print(app.title)"
+
+      - name: Smoke audio tools
+        run: |
+          ffmpeg -version
+          ffprobe -version
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare validation environment
+        run: |
+          cp apps/api/.env.secrets.example apps/api/.env.secrets
+          cp deploy/production/.env.production.example deploy/production/.env.production
+
+      - name: Validate development Compose
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Validate production Compose
+        env:
+          WEB_IMAGE: alignspeak-web:ci
+          API_IMAGE: alignspeak-api:ci
+          POSTGRES_PASSWORD: ci-only-password
+        run: docker compose -f deploy/production/compose.yml config --quiet
+
+  api-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile
+          load: true
+          tags: alignspeak-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify bundled audio tools
+        run: docker run --rm --entrypoint sh alignspeak-api:ci -c "ffmpeg -version >/dev/null && ffprobe -version >/dev/null"
