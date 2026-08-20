@@ -29,7 +29,7 @@ import { usePracticeRouteState } from '../hooks/practice/usePracticeRouteState'
 import { computeMaskedReadingTokenIndices } from '../components/practice/masking'
 import { buildSentenceTextRanges, splitTextToSentences } from '../components/practice/timelineText'
 import { useConfirm, useNotifier } from '../components/common/feedbackHooks'
-import { usePrepareArticleTts } from '../features/articleTts'
+import { useArticleTtsPlayer, usePrepareArticleTts } from '../features/articleTts'
 
 type Level = PracticeLevel
 type SegmentResultState = {
@@ -54,6 +54,7 @@ export const PracticePage = () => {
   })
   const [progressRefreshVersion, setProgressRefreshVersion] = useState(0)
   const articleAudio = usePrepareArticleTts()
+  const { interrupt: interruptArticleAudio } = useArticleTtsPlayer()
   const { level, setLevel, queryArticleId, querySegment, searchKey } = usePracticeRouteState()
   const {
     articleId,
@@ -188,6 +189,7 @@ export const PracticePage = () => {
   })
 
   const handleBeforeStart = useCallback(async () => {
+    interruptArticleAudio('recording')
     setEditMode(false)
     try {
       await flushPendingOverrides()
@@ -199,7 +201,7 @@ export const PracticePage = () => {
       alignmentResult: null,
       showScore: false,
     })
-  }, [activeSegmentKey, flushPendingOverrides, setEditMode])
+  }, [activeSegmentKey, flushPendingOverrides, interruptArticleAudio, setEditMode])
 
   const {
     recordOverlayOpen,
@@ -229,6 +231,7 @@ export const PracticePage = () => {
   })
 
   const handleSpeakSegment = useCallback(() => {
+    interruptArticleAudio('segment-audio')
     void (async () => {
       try {
         await flushPendingOverrides()
@@ -241,7 +244,7 @@ export const PracticePage = () => {
         segment: currentSegment,
       })
     })()
-  }, [articleId, canPractice, currentSegment, flushPendingOverrides, speakSegment])
+  }, [articleId, canPractice, currentSegment, flushPendingOverrides, interruptArticleAudio, speakSegment])
 
   const furiganaEditableUIVisible =
     canEditFurigana && !recordOverlayOpen && !recognizing && !showScore && !loading && !loadError
@@ -272,13 +275,14 @@ export const PracticePage = () => {
   )
 
   const handleSelectTimelineSentence = useCallback((sentenceIndex: number) => {
+    interruptArticleAudio('sentence-audio')
     void playSentence({
       canPractice,
       articleId,
       segment: currentSegment,
       sentenceIndex,
     })
-  }, [articleId, canPractice, currentSegment, playSentence])
+  }, [articleId, canPractice, currentSegment, interruptArticleAudio, playSentence])
 
   const recordingSegmentText = useMemo<ReactNode>(() => {
     if (supportsReadingTokens) {

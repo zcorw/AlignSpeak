@@ -6,6 +6,10 @@ import {
   type ArticleTtsJob,
   type ArticleTtsService,
 } from '../../services/articleTtsService'
+import { BrowserPlaybackCoordinator, type PlaybackCoordinator } from './playbackCoordinator'
+
+export const ARTICLE_TTS_RESUME_TTL_MS = 24 * 60 * 60 * 1000
+const POSITION_PERSIST_INTERVAL_MS = 5000
 
 export type ArticleTtsPlayerPhase =
   | 'idle'
@@ -16,6 +20,25 @@ export type ArticleTtsPlayerPhase =
   | 'playing'
   | 'paused'
   | 'failed'
+
+export type ArticleTtsStopModeOption = 'infinite' | 'end-current' | 15 | 30 | 60
+export type ArticleTtsStopMode = 'infinite' | 'end-current' | 'sleep'
+export type ArticleTtsInterruptionReason =
+  | 'another-tab'
+  | 'recording'
+  | 'segment-audio'
+  | 'sentence-audio'
+  | 'system'
+
+export interface ArticleTtsResumeCandidate {
+  articleId: string
+  articleTitle: string
+  assetId: string
+  inputHash: string
+  positionSeconds: number
+  durationSeconds: number
+  updatedAtMs: number
+}
 
 export interface ArticleTtsPlayerError {
   code: string
@@ -38,6 +61,12 @@ export interface ArticleTtsPlayerState {
   asset: ArticleTtsAsset | null
   currentTimeSeconds: number
   durationSeconds: number
+  stopMode: ArticleTtsStopMode
+  sleepMinutes: 15 | 30 | 60 | null
+  sleepDeadlineMs: number | null
+  interruptionReason: ArticleTtsInterruptionReason | null
+  lastStopReason: 'manual' | 'end-current' | 'sleep' | null
+  resumeCandidate: ArticleTtsResumeCandidate | null
   error: ArticleTtsPlayerError | null
 }
 
@@ -53,6 +82,8 @@ export interface ArticleTtsAudio {
   currentTime: number
   duration: number
   paused: boolean
+  loop: boolean
+  playbackRate?: number
   onplay: HTMLMediaElement['onplay']
   onpause: HTMLMediaElement['onpause']
   onended: HTMLMediaElement['onended']
@@ -69,12 +100,31 @@ interface ObjectUrlAdapter {
   revokeObjectURL: (url: string) => void
 }
 
-interface ArticleTtsPlayerControllerOptions {
+interface MediaSessionAdapter {
+  metadata: MediaMetadata | null
+  playbackState: MediaSessionPlaybackState
+  setActionHandler: (
+    action: MediaSessionAction,
+    handler: MediaSessionActionHandler | null
+  ) => void
+  setPositionState?: (state?: MediaPositionState) => void
+}
+
+interface ResumeStorageRecord extends ArticleTtsResumeCandidate {
+  version: 1
+}
+
+export interface ArticleTtsPlayerControllerOptions {
   service?: ArticleTtsService
   audioFactory?: () => ArticleTtsAudio
   objectUrl?: ObjectUrlAdapter
   pollIntervalMs?: number
   wait?: (milliseconds: number, signal: AbortSignal) => Promise<void>
+  now?: () => number
+  storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null
+  coordinatorFactory?: () => PlaybackCoordinator
+  mediaSession?: MediaSessionAdapter | null
+  mediaMetadataFactory?: (init: MediaMetadataInit) => MediaMetadata | null
 }
 
 const initialState = (): ArticleTtsPlayerState => ({
@@ -92,6 +142,12 @@ const initialState = (): ArticleTtsPlayerState => ({
   asset: null,
   currentTimeSeconds: 0,
   durationSeconds: 0,
+  stopMode: 'infinite',
+  sleepMinutes: null,
+  sleepDeadlineMs: null,
+  interruptionReason: null,
+  lastStopReason: null,
+  resumeCandidate: null,
   error: null,
 })
 
@@ -113,6 +169,26 @@ const isAbortError = (error: unknown) =>
     ? error.name === 'AbortError'
     : error instanceof Error && error.name === 'AbortError'
 
+const isResumeStorageRecord = (value: unknown): value is ResumeStorageRecord => {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Partial<ResumeStorageRecord>
+  return (
+    record.version === 1 &&
+    typeof record.articleId === 'string' &&
+    typeof record.articleTitle === 'string' &&
+    typeof record.assetId === 'string' &&
+    typeof record.inputHash === 'string' &&
+    typeof record.positionSeconds === 'number' &&
+    Number.isFinite(record.positionSeconds) &&
+    record.positionSeconds >= 0 &&
+    typeof record.durationSeconds === 'number' &&
+    Number.isFinite(record.durationSeconds) &&
+    record.durationSeconds > 0 &&
+    typeof record.updatedAtMs === 'number' &&
+    Number.isFinite(record.updatedAtMs)
+  )
+}
+
 export class ArticleTtsPlayerController {
   private state = initialState()
   private readonly listeners = new Set<() => void>()
@@ -121,9 +197,21 @@ export class ArticleTtsPlayerController {
   private readonly objectUrl: ObjectUrlAdapter
   private readonly pollIntervalMs: number
   private readonly wait: (milliseconds: number, signal: AbortSignal) => Promise<void>
+  private readonly now: () => number
+  private readonly storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null
+  private readonly coordinatorFactory: () => PlaybackCoordinator
+  private readonly mediaSession: MediaSessionAdapter | null
+  private readonly mediaMetadataFactory: (init: MediaMetadataInit) => MediaMetadata | null
   private audio: ArticleTtsAudio | null = null
   private mediaObjectUrl: string | null = null
   private abortController: AbortController | null = null
+  private coordinator: PlaybackCoordinator | null = null
+  private unsubscribeCoordinator: (() => void) | null = null
+  private sleepTimer: ReturnType<typeof setTimeout> | null = null
+  private storageOwnerId: string | null = null
+  private lastPersistedAtMs = 0
+  private requestedPause: ArticleTtsInterruptionReason | 'manual' | null = null
+  private suppressPauseEvent = false
   private operationId = 0
   private disposed = false
 
@@ -133,6 +221,18 @@ export class ArticleTtsPlayerController {
     this.objectUrl = options.objectUrl ?? URL
     this.pollIntervalMs = options.pollIntervalMs ?? 1000
     this.wait = options.wait ?? defaultWait
+    this.now = options.now ?? Date.now
+    this.storage = options.storage === undefined
+      ? (typeof window === 'undefined' ? null : window.localStorage)
+      : options.storage
+    this.coordinatorFactory = options.coordinatorFactory ?? (() => new BrowserPlaybackCoordinator())
+    this.mediaSession = options.mediaSession === undefined
+      ? (typeof navigator === 'undefined' ? null : navigator.mediaSession ?? null)
+      : options.mediaSession
+    this.mediaMetadataFactory = options.mediaMetadataFactory ?? ((init) => {
+      if (typeof MediaMetadata === 'undefined') return null
+      return new MediaMetadata(init)
+    })
   }
 
   getState = () => this.state
@@ -148,15 +248,134 @@ export class ArticleTtsPlayerController {
     this.listeners.forEach((listener) => listener())
   }
 
+  private ensureCoordinator() {
+    if (this.coordinator) return this.coordinator
+    this.coordinator = this.coordinatorFactory()
+    this.unsubscribeCoordinator = this.coordinator.subscribe(() => {
+      if (this.state.phase === 'playing') this.interrupt('another-tab')
+    })
+    return this.coordinator
+  }
+
+  private updateMediaSessionPlaybackState() {
+    if (!this.mediaSession) return
+    try {
+      this.mediaSession.playbackState = this.state.phase === 'playing'
+        ? 'playing'
+        : this.state.asset
+          ? 'paused'
+          : 'none'
+    } catch {
+      // Media Session support is best effort on iOS WebKit.
+    }
+  }
+
+  private updateMediaSessionPosition() {
+    if (!this.mediaSession?.setPositionState || !this.state.asset) return
+    const duration = this.state.durationSeconds || this.state.asset.durationMs / 1000
+    if (!Number.isFinite(duration) || duration <= 0) return
+    const position = Math.min(Math.max(this.state.currentTimeSeconds, 0), duration)
+    try {
+      this.mediaSession.setPositionState({
+        duration,
+        playbackRate: this.audio?.playbackRate || 1,
+        position,
+      })
+    } catch {
+      // Some iOS versions expose Media Session but reject position state.
+    }
+  }
+
+  private configureMediaSession() {
+    if (!this.mediaSession || !this.state.asset) return
+    try {
+      this.mediaSession.metadata = this.mediaMetadataFactory({
+        title: this.state.articleTitle || 'Article audio',
+        artist: 'AlignSpeak',
+        album: 'Full-article TTS',
+      })
+    } catch {
+      // Metadata construction is optional.
+    }
+    const handlers: Array<[MediaSessionAction, MediaSessionActionHandler]> = [
+      ['play', () => { void this.play() }],
+      ['pause', () => this.pause()],
+      ['stop', () => this.stop()],
+      ['seekto', (details) => {
+        if (typeof details.seekTime === 'number') this.seekTo(details.seekTime)
+      }],
+    ]
+    handlers.forEach(([action, handler]) => {
+      try {
+        this.mediaSession?.setActionHandler(action, handler)
+      } catch {
+        // Ignore unsupported actions while retaining play/pause when available.
+      }
+    })
+    this.updateMediaSessionPlaybackState()
+    this.updateMediaSessionPosition()
+  }
+
+  private clearMediaSession() {
+    if (!this.mediaSession) return
+    ;(['play', 'pause', 'stop', 'seekto'] as MediaSessionAction[]).forEach((action) => {
+      try {
+        this.mediaSession?.setActionHandler(action, null)
+      } catch {
+        // Ignore unsupported actions.
+      }
+    })
+    try {
+      this.mediaSession.metadata = null
+      this.mediaSession.playbackState = 'none'
+      this.mediaSession.setPositionState?.()
+    } catch {
+      // Best effort cleanup.
+    }
+  }
+
   private ensureAudio() {
     if (this.audio) return this.audio
     const audio = this.audioFactory()
     audio.preload = 'auto'
-    audio.onplay = () => this.setState({ phase: 'playing' })
-    audio.onpause = () => {
-      if (this.state.phase === 'playing') this.setState({ phase: 'paused' })
+    audio.loop = true
+    audio.onplay = () => {
+      this.requestedPause = null
+      this.setState({ phase: 'playing', interruptionReason: null, lastStopReason: null })
+      this.updateMediaSessionPlaybackState()
     }
-    audio.onended = () => this.setState({ phase: 'ready', currentTimeSeconds: 0 })
+    audio.onpause = () => {
+      if (this.suppressPauseEvent || this.state.phase !== 'playing') return
+      const reason = this.requestedPause === 'manual'
+        ? null
+        : this.requestedPause ?? 'system'
+      this.requestedPause = null
+      this.setState({ phase: 'paused', interruptionReason: reason })
+      this.persistPosition(true)
+      this.updateMediaSessionPlaybackState()
+    }
+    audio.onended = () => {
+      if (this.state.stopMode === 'end-current') {
+        audio.loop = true
+        audio.currentTime = 0
+        this.setState({
+          phase: 'ready',
+          currentTimeSeconds: 0,
+          stopMode: 'infinite',
+          lastStopReason: 'end-current',
+          interruptionReason: null,
+        })
+        this.persistPosition(true)
+        this.updateMediaSessionPlaybackState()
+        return
+      }
+      if (this.enforceSleepDeadline()) return
+      audio.currentTime = 0
+      void audio.play().catch(() => {
+        this.setState({ phase: 'paused', interruptionReason: 'system' })
+        this.updateMediaSessionPlaybackState()
+      })
+    }
     audio.ontimeupdate = () => {
       this.setState({
         currentTimeSeconds: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
@@ -164,8 +383,13 @@ export class ArticleTtsPlayerController {
           ? audio.duration
           : (this.state.asset?.durationMs ?? 0) / 1000,
       })
+      if (!this.enforceSleepDeadline()) {
+        this.persistPosition(false)
+        this.updateMediaSessionPosition()
+      }
     }
     audio.onerror = () => {
+      this.persistPosition(true)
       this.setState({
         phase: 'failed',
         error: {
@@ -174,17 +398,24 @@ export class ArticleTtsPlayerController {
           failedSegment: null,
         },
       })
+      this.updateMediaSessionPlaybackState()
     }
     this.audio = audio
     return audio
   }
 
   private releaseMedia() {
+    this.clearSleepTimer()
+    this.clearMediaSession()
     if (this.audio) {
+      this.suppressPauseEvent = true
       this.audio.pause()
       this.audio.removeAttribute('src')
       this.audio.load()
       this.audio.currentTime = 0
+      this.audio.loop = true
+      this.suppressPauseEvent = false
+      this.requestedPause = null
     }
     if (this.mediaObjectUrl) {
       this.objectUrl.revokeObjectURL(this.mediaObjectUrl)
@@ -196,14 +427,119 @@ export class ArticleTtsPlayerController {
     this.operationId += 1
     this.abortController?.abort()
     this.abortController = new AbortController()
-    return {
-      id: this.operationId,
-      signal: this.abortController.signal,
-    }
+    return { id: this.operationId, signal: this.abortController.signal }
   }
 
   private isCurrentOperation(id: number) {
     return !this.disposed && id === this.operationId
+  }
+
+  private storageKey() {
+    return this.storageOwnerId
+      ? `alignspeak:article-tts-resume:v1:${this.storageOwnerId}`
+      : null
+  }
+
+  private loadResumeCandidate() {
+    const key = this.storageKey()
+    if (!key || !this.storage) return null
+    try {
+      const raw = this.storage.getItem(key)
+      if (!raw) return null
+      const parsed: unknown = JSON.parse(raw)
+      if (
+        !isResumeStorageRecord(parsed) ||
+        parsed.updatedAtMs > this.now() ||
+        this.now() - parsed.updatedAtMs > ARTICLE_TTS_RESUME_TTL_MS
+      ) {
+        this.storage.removeItem(key)
+        return null
+      }
+      return parsed
+    } catch {
+      try {
+        this.storage.removeItem(key)
+      } catch {
+        // Ignore storage denial.
+      }
+      return null
+    }
+  }
+
+  private persistPosition(force: boolean) {
+    const key = this.storageKey()
+    const asset = this.state.asset
+    const audio = this.audio
+    if (!key || !this.storage || !asset || !audio || !this.state.articleId || !this.state.articleTitle) return
+    const persistedAt = this.now()
+    if (!force && persistedAt - this.lastPersistedAtMs < POSITION_PERSIST_INTERVAL_MS) return
+    const duration = this.state.durationSeconds || asset.durationMs / 1000
+    const record: ResumeStorageRecord = {
+      version: 1,
+      articleId: this.state.articleId,
+      articleTitle: this.state.articleTitle,
+      assetId: asset.assetId,
+      inputHash: asset.inputHash,
+      positionSeconds: Math.min(Math.max(audio.currentTime || 0, 0), duration),
+      durationSeconds: duration,
+      updatedAtMs: persistedAt,
+    }
+    try {
+      this.storage.setItem(key, JSON.stringify(record))
+      this.lastPersistedAtMs = persistedAt
+    } catch {
+      // Private browsing may deny localStorage writes.
+    }
+  }
+
+  private removePersistedPosition() {
+    const key = this.storageKey()
+    if (!key || !this.storage) return
+    try {
+      this.storage.removeItem(key)
+    } catch {
+      // Ignore storage denial.
+    }
+  }
+
+  setStorageOwner(userId: string | null) {
+    const normalized = userId?.trim() || null
+    if (normalized === this.storageOwnerId) return
+    if (this.storageOwnerId && this.storageOwnerId !== normalized) this.reset()
+    this.storageOwnerId = normalized
+    if (this.state.phase === 'idle') {
+      this.setState({ resumeCandidate: normalized ? this.loadResumeCandidate() : null })
+    }
+  }
+
+  clearForLogout() {
+    this.reset()
+    this.storageOwnerId = null
+  }
+
+  dismissResume() {
+    this.removePersistedPosition()
+    this.setState({ resumeCandidate: null })
+  }
+
+  async resume() {
+    const candidate = this.state.resumeCandidate
+    if (!candidate) return
+    await this.prepare({ articleId: candidate.articleId, articleTitle: candidate.articleTitle })
+    if (this.state.phase !== 'ready' || !this.audio || !this.state.asset) {
+      this.setState({ resumeCandidate: candidate })
+      return
+    }
+    const sameAsset =
+      this.state.asset.assetId === candidate.assetId &&
+      this.state.asset.inputHash === candidate.inputHash
+    const position = sameAsset
+      ? Math.min(candidate.positionSeconds, this.state.durationSeconds)
+      : 0
+    this.audio.currentTime = position
+    this.setState({ currentTimeSeconds: position, resumeCandidate: null })
+    this.persistPosition(true)
+    this.updateMediaSessionPosition()
   }
 
   private updateJobState(job: ArticleTtsJob) {
@@ -261,7 +597,9 @@ export class ArticleTtsPlayerController {
     this.mediaObjectUrl = nextObjectUrl
     const audio = this.ensureAudio()
     audio.src = nextObjectUrl
+    audio.loop = true
     audio.load()
+    this.lastPersistedAtMs = 0
     this.setState({
       phase: 'ready',
       asset,
@@ -269,8 +607,16 @@ export class ArticleTtsPlayerController {
       downloadTotalBytes: asset.fileSize,
       currentTimeSeconds: 0,
       durationSeconds: asset.durationMs / 1000,
+      stopMode: 'infinite',
+      sleepMinutes: null,
+      sleepDeadlineMs: null,
+      interruptionReason: null,
+      lastStopReason: null,
+      resumeCandidate: null,
       error: null,
     })
+    this.configureMediaSession()
+    this.persistPosition(true)
   }
 
   private async followJob(
@@ -300,6 +646,7 @@ export class ArticleTtsPlayerController {
   }
 
   async prepare(request: PrepareArticleTtsRequest) {
+    this.persistPosition(true)
     const operation = this.startOperation()
     this.releaseMedia()
     this.setState({
@@ -368,13 +715,100 @@ export class ArticleTtsPlayerController {
     }
   }
 
+  private clearSleepTimer() {
+    if (this.sleepTimer !== null) {
+      clearTimeout(this.sleepTimer)
+      this.sleepTimer = null
+    }
+  }
+
+  private scheduleSleepDeadline() {
+    this.clearSleepTimer()
+    const deadline = this.state.sleepDeadlineMs
+    if (!deadline) return
+    this.sleepTimer = setTimeout(() => {
+      this.sleepTimer = null
+      if (!this.enforceSleepDeadline()) this.scheduleSleepDeadline()
+    }, Math.max(deadline - this.now(), 0))
+  }
+
+  private enforceSleepDeadline() {
+    const deadline = this.state.sleepDeadlineMs
+    if (!deadline || this.now() < deadline) return false
+    this.stopAtPolicyBoundary('sleep')
+    return true
+  }
+
+  private stopAtPolicyBoundary(reason: 'manual' | 'sleep') {
+    if (!this.audio || !this.state.asset) return
+    this.clearSleepTimer()
+    this.requestedPause = 'manual'
+    this.audio.pause()
+    this.audio.currentTime = 0
+    this.audio.loop = true
+    this.requestedPause = null
+    this.setState({
+      phase: 'ready',
+      currentTimeSeconds: 0,
+      stopMode: 'infinite',
+      sleepMinutes: null,
+      sleepDeadlineMs: null,
+      interruptionReason: null,
+      lastStopReason: reason,
+    })
+    this.persistPosition(true)
+    this.updateMediaSessionPlaybackState()
+    this.updateMediaSessionPosition()
+  }
+
+  setStopMode(option: ArticleTtsStopModeOption) {
+    this.clearSleepTimer()
+    if (option === 'infinite') {
+      if (this.audio) this.audio.loop = true
+      this.setState({
+        stopMode: 'infinite',
+        sleepMinutes: null,
+        sleepDeadlineMs: null,
+        lastStopReason: null,
+      })
+      return
+    }
+    if (option === 'end-current') {
+      if (this.audio) this.audio.loop = false
+      this.setState({
+        stopMode: 'end-current',
+        sleepMinutes: null,
+        sleepDeadlineMs: null,
+        lastStopReason: null,
+      })
+      return
+    }
+    const deadline = this.now() + option * 60 * 1000
+    if (this.audio) this.audio.loop = true
+    this.setState({
+      stopMode: 'sleep',
+      sleepMinutes: option,
+      sleepDeadlineMs: deadline,
+      lastStopReason: null,
+    })
+    this.scheduleSleepDeadline()
+  }
+
   async play() {
     if (this.state.phase !== 'ready' && this.state.phase !== 'paused') return
     const audio = this.audio
-    if (!audio || !this.mediaObjectUrl) return
+    if (!audio || !this.mediaObjectUrl || this.enforceSleepDeadline()) return
+    this.ensureCoordinator().claim()
+    audio.loop = this.state.stopMode !== 'end-current'
     try {
       await audio.play()
-      this.setState({ phase: 'playing', error: null })
+      this.setState({
+        phase: 'playing',
+        error: null,
+        interruptionReason: null,
+        lastStopReason: null,
+      })
+      this.updateMediaSessionPlaybackState()
     } catch (error: unknown) {
       this.setState({
         phase: 'failed',
@@ -384,34 +818,74 @@ export class ArticleTtsPlayerController {
           failedSegment: null,
         },
       })
+      this.updateMediaSessionPlaybackState()
     }
   }
 
   pause() {
     if (!this.audio || this.state.phase !== 'playing') return
+    this.requestedPause = 'manual'
     this.audio.pause()
-    this.setState({ phase: 'paused' })
+    this.requestedPause = null
+    this.setState({ phase: 'paused', interruptionReason: null })
+    this.persistPosition(true)
+    this.updateMediaSessionPlaybackState()
+  }
+
+  interrupt(reason: ArticleTtsInterruptionReason) {
+    if (!this.audio || this.state.phase !== 'playing') return
+    this.requestedPause = reason
+    this.audio.pause()
+    this.requestedPause = null
+    this.setState({ phase: 'paused', interruptionReason: reason })
+    this.persistPosition(true)
+    this.updateMediaSessionPlaybackState()
+  }
+
+  seekTo(positionSeconds: number) {
+    if (!this.audio || !this.state.asset || !Number.isFinite(positionSeconds)) return
+    const duration = this.state.durationSeconds || this.state.asset.durationMs / 1000
+    const position = Math.min(Math.max(positionSeconds, 0), duration)
+    this.audio.currentTime = position
+    this.setState({ currentTimeSeconds: position })
+    this.persistPosition(true)
+    this.updateMediaSessionPosition()
   }
 
   stop() {
-    if (!this.audio || !this.state.asset) return
-    this.audio.pause()
-    this.audio.currentTime = 0
-    this.setState({ phase: 'ready', currentTimeSeconds: 0 })
+    this.stopAtPolicyBoundary('manual')
+  }
+
+  checkpoint() {
+    if (!this.enforceSleepDeadline()) this.persistPosition(true)
   }
 
   reset() {
     this.operationId += 1
     this.abortController?.abort()
     this.abortController = null
+    this.removePersistedPosition()
     this.releaseMedia()
+    this.unsubscribeCoordinator?.()
+    this.unsubscribeCoordinator = null
+    this.coordinator?.dispose()
+    this.coordinator = null
     this.setState(initialState())
   }
 
   dispose() {
     if (this.disposed) return
-    this.reset()
+    this.persistPosition(true)
+    this.operationId += 1
+    this.abortController?.abort()
+    this.abortController = null
+    this.clearSleepTimer()
+    this.unsubscribeCoordinator?.()
+    this.coordinator?.dispose()
+    this.unsubscribeCoordinator = null
+    this.coordinator = null
     this.disposed = true
+    this.releaseMedia()
     if (this.audio) {
       this.audio.onplay = null
       this.audio.onpause = null

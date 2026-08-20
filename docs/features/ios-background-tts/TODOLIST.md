@@ -87,7 +87,7 @@
 
 ## T09 · 循环、睡眠、恢复、跨标签页与 Media Session
 
-- [ ] 完成播放策略和 iOS Web 兼容增强。
+- [x] 完成播放策略和 iOS Web 兼容增强。
 
 范围：循环、本轮结束、墙上时间定时、本机 24h 精确恢复、BroadcastChannel/storage、Media Session、audio focus。
 依赖：T08。
@@ -116,3 +116,4 @@
 | T06 | 见对应 Git 提交 | Worker/清理/配额目标回归 14 passed；后端完整测试 52 passed；开发/生产 Compose config、FFmpeg/ffprobe 与 compileall 通过；本机 Docker 引擎未运行，镜像 build 留待 CI |
 | T07 | 见对应 Git 提交 | 前端 API/状态机/Provider 测试 7 passed；ESLint 与 TypeScript/Vite 生产构建通过 |
 | T08 | 见对应 Git 提交 | 入口门槛与迷你播放器交互回归合计前端 12 passed；ESLint 与生产构建通过 |
+| T09 | 见对应 Git 提交 | 循环/睡眠/恢复/跨标签页/Media Session 与 audio focus 回归合计前端 21 passed；ESLint 与生产构建通过 |

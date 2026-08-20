@@ -7,8 +7,10 @@ import type {
 import {
   ArticleTtsPlayerController,
   type ArticleTtsAudio,
+  type ArticleTtsPlayerControllerOptions,
   type ArticleTtsPlayerPhase,
 } from './playerController'
+import type { PlaybackCoordinator } from './playbackCoordinator'
 
 class FakeAudio implements ArticleTtsAudio {
   src = ''
@@ -16,6 +18,7 @@ class FakeAudio implements ArticleTtsAudio {
   currentTime = 0
   duration = Number.NaN
   paused = true
+  loop = false
   onplay: HTMLMediaElement['onplay'] = null
   onpause: HTMLMediaElement['onpause'] = null
   onended: HTMLMediaElement['onended'] = null
@@ -87,8 +90,40 @@ const createService = (): ArticleTtsService => ({
   downloadAudio: vi.fn(),
 })
 
-const setupController = (service: ArticleTtsService) => {
+class FakeCoordinator implements PlaybackCoordinator {
+  claim = vi.fn()
+  dispose = vi.fn()
+  private listener: (() => void) | null = null
+  subscribe = vi.fn((listener: () => void) => {
+    this.listener = listener
+    return () => {
+      this.listener = null
+    }
+  })
+  interruptOtherTab() {
+    this.listener?.()
+  }
+}
+
+class MemoryStorage implements Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
+  readonly values = new Map<string, string>()
+  getItem(key: string) {
+    return this.values.get(key) ?? null
+  }
+  setItem(key: string, value: string) {
+    this.values.set(key, value)
+  }
+  removeItem(key: string) {
+    this.values.delete(key)
+  }
+}
+
+const setupController = (
+  service: ArticleTtsService,
+  options: Partial<ArticleTtsPlayerControllerOptions> = {}
+) => {
   const audio = new FakeAudio()
+  const coordinator = new FakeCoordinator()
   const createObjectURL = vi.fn((blob: Blob) => `blob:test-${blob.size}-${createObjectURL.mock.calls.length}`)
   const revokeObjectURL = vi.fn()
   const audioFactory = vi.fn(() => audio)
@@ -98,8 +133,12 @@ const setupController = (service: ArticleTtsService) => {
     objectUrl: { createObjectURL, revokeObjectURL },
     wait: async () => undefined,
     pollIntervalMs: 1,
+    mediaSession: null,
+    storage: null,
+    coordinatorFactory: () => coordinator,
+    ...options,
   })
-  return { controller, audio, audioFactory, createObjectURL, revokeObjectURL }
+  return { controller, audio, audioFactory, coordinator, createObjectURL, revokeObjectURL }
 }
 
 describe('ArticleTtsPlayerController', () => {
@@ -207,5 +246,199 @@ describe('ArticleTtsPlayerController', () => {
 
     controller.dispose()
     expect(revokeObjectURL).toHaveBeenCalledTimes(2)
+  })
+
+  it('loops by default and stops cleanly after the selected current round', async () => {
+    const service = createService()
+    vi.mocked(service.getCurrent).mockResolvedValue(current({ asset: asset('a') }))
+    vi.mocked(service.downloadAudio).mockResolvedValue(new Blob(['audio']))
+    const { controller, audio } = setupController(service)
+    await controller.prepare({ articleId: 'article-a', articleTitle: 'Article A' })
+
+    expect(audio.loop).toBe(true)
+    await controller.play()
+    controller.setStopMode('end-current')
+    expect(audio.loop).toBe(false)
+
+    audio.paused = true
+    audio.onended?.call(audio as unknown as GlobalEventHandlers, new Event('ended'))
+
+    expect(controller.getState()).toMatchObject({
+      phase: 'ready',
+      stopMode: 'infinite',
+      lastStopReason: 'end-current',
+      currentTimeSeconds: 0,
+    })
+    expect(audio.loop).toBe(true)
+  })
+
+  it('uses wall-clock sleep time even while playback is paused', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-20T00:00:00Z'))
+    try {
+      const service = createService()
+      vi.mocked(service.getCurrent).mockResolvedValue(current({ asset: asset('a') }))
+      vi.mocked(service.downloadAudio).mockResolvedValue(new Blob(['audio']))
+      const { controller, audio } = setupController(service, { now: Date.now })
+      await controller.prepare({ articleId: 'article-a', articleTitle: 'Article A' })
+      await controller.play()
+      audio.currentTime = 4
+      audio.ontimeupdate?.call(audio as unknown as GlobalEventHandlers, new Event('timeupdate'))
+      controller.pause()
+
+      controller.setStopMode(15)
+      expect(controller.getState()).toMatchObject({ stopMode: 'sleep', sleepMinutes: 15 })
+      await vi.advanceTimersByTimeAsync(15 * 60 * 1000)
+
+      expect(controller.getState()).toMatchObject({
+        phase: 'ready',
+        currentTimeSeconds: 0,
+        stopMode: 'infinite',
+        lastStopReason: 'sleep',
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('persists an exact position for 24 hours and restores without autoplay', async () => {
+    const storage = new MemoryStorage()
+    const now = Date.parse('2026-08-20T00:00:00Z')
+    const firstService = createService()
+    vi.mocked(firstService.getCurrent).mockResolvedValue(current({ asset: asset('a') }))
+    vi.mocked(firstService.downloadAudio).mockResolvedValue(new Blob(['audio']))
+    const first = setupController(firstService, { storage, now: () => now })
+    first.controller.setStorageOwner('user-a')
+    await first.controller.prepare({ articleId: 'article-a', articleTitle: 'Article A' })
+    first.audio.currentTime = 4.25
+    first.audio.ontimeupdate?.call(first.audio as unknown as GlobalEventHandlers, new Event('timeupdate'))
+    first.controller.dispose()
+
+    const secondService = createService()
+    vi.mocked(secondService.getCurrent).mockResolvedValue(current({ asset: asset('a') }))
+    vi.mocked(secondService.downloadAudio).mockResolvedValue(new Blob(['audio']))
+    const second = setupController(secondService, {
+      storage,
+      now: () => now + 60_000,
+    })
+    second.controller.setStorageOwner('user-a')
+    expect(second.controller.getState().resumeCandidate?.positionSeconds).toBe(4.25)
+
+    await second.controller.resume()
+
+    expect(second.controller.getState()).toMatchObject({
+      phase: 'ready',
+      currentTimeSeconds: 4.25,
+      resumeCandidate: null,
+    })
+    expect(second.audio.currentTime).toBe(4.25)
+    expect(second.audio.play).not.toHaveBeenCalled()
+  })
+
+  it('expires old resume records and never applies seconds to a different asset version', async () => {
+    const now = Date.parse('2026-08-20T00:00:00Z')
+    const expiredStorage = new MemoryStorage()
+    expiredStorage.setItem(
+      'alignspeak:article-tts-resume:v1:user-a',
+      JSON.stringify({
+        version: 1,
+        articleId: 'article-a',
+        articleTitle: 'Article A',
+        assetId: 'asset-a',
+        inputHash: 'hash-a',
+        positionSeconds: 4,
+        durationSeconds: 10,
+        updatedAtMs: now - 24 * 60 * 60 * 1000 - 1,
+      })
+    )
+    const emptyService = createService()
+    const expired = setupController(emptyService, { storage: expiredStorage, now: () => now })
+    expired.controller.setStorageOwner('user-a')
+    expect(expired.controller.getState().resumeCandidate).toBeNull()
+    expect(expiredStorage.values.size).toBe(0)
+
+    const storage = new MemoryStorage()
+    storage.setItem(
+      'alignspeak:article-tts-resume:v1:user-a',
+      JSON.stringify({
+        version: 1,
+        articleId: 'article-a',
+        articleTitle: 'Article A',
+        assetId: 'asset-old',
+        inputHash: 'hash-old',
+        positionSeconds: 7,
+        durationSeconds: 10,
+        updatedAtMs: now,
+      })
+    )
+    const nextAsset = { ...asset('new'), articleId: 'article-a' }
+    const service = createService()
+    vi.mocked(service.getCurrent).mockResolvedValue(
+      current({ inputHash: nextAsset.inputHash, asset: nextAsset })
+    )
+    vi.mocked(service.downloadAudio).mockResolvedValue(new Blob(['audio']))
+    const next = setupController(service, { storage, now: () => now + 1000 })
+    next.controller.setStorageOwner('user-a')
+
+    await next.controller.resume()
+
+    expect(next.audio.currentTime).toBe(0)
+    expect(next.controller.getState().currentTimeSeconds).toBe(0)
+  })
+
+  it('pauses for another tab or recording and requires manual continuation', async () => {
+    const service = createService()
+    vi.mocked(service.getCurrent).mockResolvedValue(current({ asset: asset('a') }))
+    vi.mocked(service.downloadAudio).mockResolvedValue(new Blob(['audio']))
+    const { controller, coordinator } = setupController(service)
+    await controller.prepare({ articleId: 'article-a', articleTitle: 'Article A' })
+    await controller.play()
+    expect(coordinator.claim).toHaveBeenCalledTimes(1)
+
+    coordinator.interruptOtherTab()
+    expect(controller.getState()).toMatchObject({
+      phase: 'paused',
+      interruptionReason: 'another-tab',
+    })
+
+    await controller.play()
+    controller.interrupt('recording')
+    expect(controller.getState()).toMatchObject({
+      phase: 'paused',
+      interruptionReason: 'recording',
+    })
+    expect(controller.getState().phase).not.toBe('playing')
+  })
+
+  it('publishes Media Session controls, metadata, and exact seek state when supported', async () => {
+    const handlers = new Map<MediaSessionAction, MediaSessionActionHandler | null>()
+    const mediaSession = {
+      metadata: null as MediaMetadata | null,
+      playbackState: 'none' as MediaSessionPlaybackState,
+      setActionHandler: vi.fn((action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+        handlers.set(action, handler)
+      }),
+      setPositionState: vi.fn(),
+    }
+    const service = createService()
+    vi.mocked(service.getCurrent).mockResolvedValue(current({ asset: asset('a') }))
+    vi.mocked(service.downloadAudio).mockResolvedValue(new Blob(['audio']))
+    const { controller, audio } = setupController(service, {
+      mediaSession,
+      mediaMetadataFactory: (init) => init as unknown as MediaMetadata,
+    })
+
+    await controller.prepare({ articleId: 'article-a', articleTitle: 'Article A' })
+    expect(mediaSession.metadata).toMatchObject({ title: 'Article A', artist: 'AlignSpeak' })
+
+    handlers.get('play')?.({ action: 'play' })
+    await vi.waitFor(() => expect(audio.play).toHaveBeenCalledTimes(1))
+    handlers.get('seekto')?.({ action: 'seekto', seekTime: 3.5, fastSeek: false })
+    expect(controller.getState().currentTimeSeconds).toBe(3.5)
+    expect(mediaSession.setPositionState).toHaveBeenCalledWith(
+      expect.objectContaining({ duration: 10, position: 3.5, playbackRate: 1 })
+    )
+    handlers.get('pause')?.({ action: 'pause' })
+    expect(controller.getState().phase).toBe('paused')
   })
 })

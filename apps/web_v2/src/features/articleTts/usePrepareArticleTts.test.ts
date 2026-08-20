@@ -25,6 +25,12 @@ const state = (overrides: Partial<ArticleTtsPlayerState> = {}): ArticleTtsPlayer
   asset: null,
   currentTimeSeconds: 0,
   durationSeconds: 0,
+  stopMode: 'infinite',
+  sleepMinutes: null,
+  sleepDeadlineMs: null,
+  interruptionReason: null,
+  lastStopReason: null,
+  resumeCandidate: null,
   error: null,
   ...overrides,
 })

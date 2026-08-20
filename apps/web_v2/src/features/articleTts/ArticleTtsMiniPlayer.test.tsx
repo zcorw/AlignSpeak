@@ -13,6 +13,7 @@ class FakeAudio implements ArticleTtsAudio {
   currentTime = 0
   duration = 10
   paused = true
+  loop = false
   onplay: HTMLMediaElement['onplay'] = null
   onpause: HTMLMediaElement['onpause'] = null
   onended: HTMLMediaElement['onended'] = null
@@ -64,7 +65,16 @@ const doneJob = (readyAsset: ArticleTtsAsset): ArticleTtsJob => ({
 
 describe('ArticleTtsMiniPlayer', () => {
   beforeEach(() => {
-    useAuthStore.setState({ accessToken: 'test-token' })
+    useAuthStore.setState({
+      accessToken: 'test-token',
+      user: {
+        id: 'user-a',
+        email: 'a@example.com',
+        role: 'user',
+        displayName: 'A',
+        status: 'active',
+      },
+    })
   })
 
   afterEach(() => {
@@ -101,6 +111,8 @@ describe('ArticleTtsMiniPlayer', () => {
         revokeObjectURL,
       },
       wait: async () => undefined,
+      mediaSession: null,
+      storage: null,
     })
     const view = render(
       <ArticleTtsPlayerProvider controller={controller}>
@@ -111,6 +123,11 @@ describe('ArticleTtsMiniPlayer', () => {
       await controller.prepare({ articleId: 'article-a', articleTitle: 'Article A' })
     })
     expect(audio.play).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Set loop or stop time' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Stop after this round' }))
+    expect(controller.getState().stopMode).toBe('end-current')
+    expect(audio.loop).toBe(false)
 
     await userEvent.click(screen.getByRole('button', { name: 'Play full-article audio' }))
     expect(audio.play).toHaveBeenCalledTimes(1)
@@ -156,6 +173,8 @@ describe('ArticleTtsMiniPlayer', () => {
       audioFactory: () => new FakeAudio(),
       objectUrl: { createObjectURL: () => 'blob:recovered', revokeObjectURL: vi.fn() },
       wait: async () => undefined,
+      mediaSession: null,
+      storage: null,
     })
     const view = render(
       <ArticleTtsPlayerProvider controller={controller}>
@@ -170,6 +189,68 @@ describe('ArticleTtsMiniPlayer', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Retry failed task' }))
     expect(await screen.findByRole('button', { name: 'Play full-article audio' })).toBeInTheDocument()
     expect(service.retryJob).toHaveBeenCalledWith('job-a', expect.any(AbortSignal))
+    view.unmount()
+  })
+
+  it('shows a 24-hour local resume prompt and restores position without autoplay', async () => {
+    const readyAsset = asset('resume')
+    const now = Date.parse('2026-08-20T00:00:00Z')
+    const values = new Map<string, string>([
+      [
+        'alignspeak:article-tts-resume:v1:user-a',
+        JSON.stringify({
+          version: 1,
+          articleId: 'article-a',
+          articleTitle: 'Article A',
+          assetId: readyAsset.assetId,
+          inputHash: readyAsset.inputHash,
+          positionSeconds: 4.5,
+          durationSeconds: 10,
+          updatedAtMs: now,
+        }),
+      ],
+    ])
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    }
+    const service: ArticleTtsService = {
+      getCurrent: vi.fn(async () => ({
+        articleId: 'article-a',
+        inputHash: readyAsset.inputHash,
+        isStale: false,
+        estimate: { bytes: 100, isEstimate: false },
+        asset: readyAsset,
+        job: null,
+      })),
+      createJob: vi.fn(),
+      retryJob: vi.fn(),
+      getJob: vi.fn(),
+      downloadAudio: vi.fn(async () => new Blob(['audio'])),
+    }
+    const audio = new FakeAudio()
+    const controller = new ArticleTtsPlayerController({
+      service,
+      audioFactory: () => audio,
+      objectUrl: { createObjectURL: () => 'blob:resume', revokeObjectURL: vi.fn() },
+      wait: async () => undefined,
+      mediaSession: null,
+      storage,
+      now: () => now + 60_000,
+    })
+    const view = render(
+      <ArticleTtsPlayerProvider controller={controller}>
+        <ArticleTtsMiniPlayer />
+      </ArticleTtsPlayerProvider>
+    )
+
+    expect(await screen.findByText('Last position 0:04 · manual restore required')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Restore last position' }))
+
+    expect(await screen.findByRole('button', { name: 'Play full-article audio' })).toBeInTheDocument()
+    expect(audio.currentTime).toBe(4.5)
+    expect(audio.play).not.toHaveBeenCalled()
     view.unmount()
   })
 })

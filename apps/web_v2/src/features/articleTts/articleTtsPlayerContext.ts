@@ -1,5 +1,10 @@
 import { createContext, useContext } from 'react'
-import type { ArticleTtsPlayerState, PrepareArticleTtsRequest } from './playerController'
+import type {
+  ArticleTtsInterruptionReason,
+  ArticleTtsPlayerState,
+  ArticleTtsStopModeOption,
+  PrepareArticleTtsRequest,
+} from './playerController'
 
 export interface ArticleTtsPlayerContextValue {
   state: ArticleTtsPlayerState
@@ -8,6 +13,10 @@ export interface ArticleTtsPlayerContextValue {
   play: () => Promise<void>
   pause: () => void
   stop: () => void
+  setStopMode: (option: ArticleTtsStopModeOption) => void
+  interrupt: (reason: ArticleTtsInterruptionReason) => void
+  resume: () => Promise<void>
+  dismissResume: () => void
   reset: () => void
 }
 

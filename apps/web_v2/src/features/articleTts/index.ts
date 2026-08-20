@@ -6,5 +6,7 @@ export {
   ArticleTtsPlayerController,
   type ArticleTtsPlayerPhase,
   type ArticleTtsPlayerState,
+  type ArticleTtsStopModeOption,
+  type ArticleTtsInterruptionReason,
   type PrepareArticleTtsRequest,
 } from './playerController'
